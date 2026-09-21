@@ -1,0 +1,668 @@
+import { useState, useEffect } from 'react';
+import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
+import { useAdminWeeklySchedules, useBulkUpdate, useUpdateSchedule } from '@/hooks/useSchedule';
+import { useCourts } from '@/hooks/useCourts';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MapPinIcon as MapPin, ArrowPathIcon as LoaderCircle } from '@heroicons/react/24/outline';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { BookingStatus, RateType, Schedule, ScheduleStatus } from '@/types';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/services/api';
+import { Input } from '@/components/ui/input';
+import { useRates } from '@/hooks/useRates';
+import { calculateRateQuote } from '@/lib/rate-calculation';
+
+function getWeekRangeString(start: Date, end: Date) {
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
+  }
+  if (start.getMonth() !== end.getMonth()) {
+    return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+  }
+  return `${format(start, 'MMM d')} - ${format(end, 'd, yyyy')}`;
+}
+
+function getTimedStatus(slot: Schedule) {
+  const base = STATUS_LABELS[slot.status];
+  if (slot.status === ScheduleStatus.Unavailable || slot.status === ScheduleStatus.Available) return { label: base, phase: 'scheduled' as const };
+  const start = new Date(`${slot.date}T${slot.startTime}`);
+  const end = new Date(`${slot.date}T${slot.endTime}`);
+  if (end <= start) end.setDate(end.getDate() + 1);
+  const now = new Date();
+  if (now >= end) return { label: `Completed ${base}`, phase: 'completed' as const };
+  if (now >= start) return { label: `Ongoing ${base}`, phase: 'ongoing' as const };
+  return { label: base, phase: 'scheduled' as const };
+}
+
+const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: (d: Date) => void }) => {
+  const [viewDate, setViewDate] = useState(currentDate);
+  const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
+  const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
+  const calendarDays = eachDayOfInterval({ start, end });
+
+  return (
+    <div className="w-[240px] p-1">
+      <div className="flex justify-between items-center mb-4 gap-1">
+         <Select
+           value={String(viewDate.getMonth())}
+           onValueChange={(value) => {
+             const newDate = new Date(viewDate);
+             newDate.setMonth(parseInt(value));
+             setViewDate(newDate);
+           }}
+         >
+           <SelectTrigger className="h-8 w-[126px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
+           <SelectContent>{Array.from({length: 12}).map((_, i) => <SelectItem key={i} value={String(i)}>{format(new Date(2000, i, 1), 'MMMM')}</SelectItem>)}</SelectContent>
+         </Select>
+         
+         <Select
+           value={String(viewDate.getFullYear())}
+           onValueChange={(value) => {
+             const newDate = new Date(viewDate);
+             newDate.setFullYear(parseInt(value));
+             setViewDate(newDate);
+           }}
+         >
+           <SelectTrigger className="h-8 w-[84px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
+           <SelectContent>{Array.from({length: 10}).map((_, i) => {
+             const y = new Date().getFullYear() - 2 + i;
+             return <SelectItem key={y} value={String(y)}>{y}</SelectItem>;
+           })}</SelectContent>
+         </Select>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {calendarDays.map(day => {
+          const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+          const isSelected = format(day, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
+          const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+          
+          return (
+            <button
+              key={day.toISOString()}
+              onClick={() => onSelect(day)}
+              className={cn(
+                "h-8 w-8 rounded-full flex items-center justify-center text-[12px] font-medium transition-colors",
+                !isCurrentMonth && "text-slate-300",
+                isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
+                isToday && !isSelected && "bg-slate-100 text-primary font-bold",
+                isSelected && "bg-primary text-primary-foreground font-bold shadow-sm"
+              )}
+            >
+              {format(day, 'd')}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default function SchedulePage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [, setClock] = useState(Date.now());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number } | null>(null);
+  const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
+  const [viewModalData, setViewModalData] = useState<Schedule | null>(null);
+  const bulkUpdateMutation = useBulkUpdate();
+  const updateMutation = useUpdateSchedule();
+  
+  const { data: courtsRes } = useCourts();
+  const courts = courtsRes?.data || [];
+  const { data: ratesRes } = useRates();
+  const rates = ratesRes?.data || [];
+  
+  const [selectedCourt, setSelectedCourt] = useState<string>('');
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (courts.length > 0 && !selectedCourt) {
+      setSelectedCourt(courts[0].id.toString());
+    }
+  }, [courts, selectedCourt]);
+
+  const activeCourtId = selectedCourt;
+
+  const prevWeek = () => setCurrentDate(addDays(currentDate, -7));
+  const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
+  const today = () => setCurrentDate(new Date());
+
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
+  const weekDaysStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+
+  const { data: schedules } = useAdminWeeklySchedules(weekDaysStrs, activeCourtId);
+  const weekSchedules = schedules || [];
+  const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
+  const modalQuote = bookingModalData ? calculateRateQuote(rates, bookingModalData.startTimeStr, bookingModalData.endTimeStr, modalRateType) : null;
+
+  const handleSaveSchedule = () => {
+    if (!bookingModalData || !activeCourtId) return;
+    const needsContact = bookingModalData.status === 'Booked' || bookingModalData.status === 'Training';
+    const errors: Record<string, string> = {};
+    if (needsContact && !bookingModalData.bookedBy.trim()) errors.bookedBy = 'Booked by is required.';
+    if (needsContact && bookingModalData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingModalData.email)) errors.email = 'Enter a valid email address.';
+    if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && bookingModalData.amountPaid < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
+    if (needsContact && !modalQuote?.covered) errors.rate = 'No active rate covers the complete selected schedule.';
+    if (!bookingModalData.endTimeStr.startsWith('00:00') && bookingModalData.startTimeStr >= bookingModalData.endTimeStr) errors.endTimeStr = 'End time must be after start time.';
+    setScheduleErrors(errors);
+    if (Object.keys(errors).length) return;
+    const payload = {
+      courtId: parseInt(activeCourtId),
+      date: bookingModalData.dateStr,
+      startTime: bookingModalData.startTimeStr,
+      endTime: bookingModalData.endTimeStr,
+      status: bookingModalData.status as any,
+      notes: bookingModalData.notes,
+      bookedBy: needsContact ? bookingModalData.bookedBy : null,
+      email: needsContact ? bookingModalData.email : null,
+      phone: needsContact ? bookingModalData.phone : null,
+      paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Reserved,
+      amountPaid: needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved ? bookingModalData.amountPaid : 0,
+    };
+    const mutation = bookingModalData.id
+      ? { mutate: (p: any, o: any) => updateMutation.mutate({ id: bookingModalData.id!, update: p }, o) }
+      : bulkUpdateMutation;
+    mutation.mutate(payload, {
+      onSuccess: (response: any) => {
+        if (response?.success === false) {
+          toast.error(response.message || response.errors?.[0] || 'The schedule could not be saved');
+          return;
+        }
+        toast.success(bookingModalData.id ? 'Schedule updated' : 'Schedule saved');
+        setScheduleErrors({});
+        setBookingModalData(null);
+      },
+      onError: (error: any) => toast.error(error.response?.status === 401 ? 'Your admin session expired. Please sign in again.' : getApiErrorMessage(error, 'Unable to save schedule'))
+    });
+  };
+
+  return (
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12">
+      
+      {/* Header */}
+      <div className="mb-6 pl-1">
+        <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Court Schedule</h1>
+        <p className="text-[14px] text-slate-500 mt-2 leading-relaxed max-w-[600px]">
+          Manage court availability, daily bookings, and coordinate upcoming time slots. Click any empty slot to add a new booking.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
+        
+        {/* Navigation & Filters Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6 md:mb-8 border-b border-slate-100 pb-5 md:pb-6">
+          
+          <div className="flex flex-wrap items-end gap-3 sm:gap-5">
+            {/* Date Navigation */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto order-1 sm:order-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Week View</label>
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full justify-between sm:justify-start">
+                <button 
+                  onClick={prevWeek} 
+                  title="Previous week" 
+                  className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:h-4 sm:w-4" />
+                </button>
+
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 h-10 sm:h-9 px-3.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm">
+                      <CalendarIcon className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-[13px] font-semibold text-slate-700">
+                        {getWeekRangeString(weekDays[0], weekDays[6])}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="center" sideOffset={8}>
+                    <MiniCalendar 
+                      currentDate={currentDate} 
+                      onSelect={(d) => { setCurrentDate(d); setIsCalendarOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <button 
+                  onClick={nextWeek} 
+                  title="Next week" 
+                  className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 sm:h-4 sm:w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Jump */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-2 sm:order-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Quick Jump</label>
+              <button 
+                onClick={today} 
+                className="h-10 sm:h-9 px-4 w-full rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-semibold text-slate-700 shadow-sm transition-all"
+              >
+                Today
+              </button>
+            </div>
+
+            {/* Court Selection */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-3">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Court</label>
+              {courts.length > 0 && (
+                <Select value={selectedCourt} onValueChange={setSelectedCourt}>
+                  <SelectTrigger className="w-full sm:w-[150px] h-10 sm:h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-semibold text-slate-700 shadow-sm focus:ring-0 focus:ring-offset-0 data-[state=open]:border-primary data-[state=open]:text-primary transition-colors">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                      <SelectValue placeholder="Select Court" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                    {courts.map(c => (
+                      <SelectItem key={c.id} value={c.id.toString()} className="text-[13px] font-semibold rounded-lg cursor-pointer py-2">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          {/* Add Schedule Button */}
+          <div className="w-full lg:w-auto mt-2 lg:mt-0">
+            <button 
+              onClick={() => {
+                setBookingModalData({
+                  dateStr: format(currentDate, 'yyyy-MM-dd'),
+                  startTimeStr: '07:00:00',
+                  endTimeStr: '08:00:00',
+                  status: 'Booked',
+                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Reserved, amountPaid: 0
+                });
+              }}
+              className="h-11 sm:h-9 w-full sm:px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-[14px] sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Schedule
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Day Selector */}
+        <div className="md:hidden flex overflow-x-auto gap-2 mb-4 snap-x custom-scrollbar pb-2">
+          {weekDays.map(date => {
+            const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
+            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+            return (
+              <button 
+                key={date.toISOString()}
+                onClick={() => setCurrentDate(date)}
+                className={cn(
+                  "flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl border snap-center transition-all",
+                  isSelectedDay 
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                    : isToday 
+                      ? "bg-primary/5 border-primary/20 text-primary"
+                      : "bg-white border-slate-200 text-slate-600"
+                )}
+              >
+                <span className={cn("text-[10px] font-bold uppercase tracking-wider mb-0.5", isSelectedDay ? "text-primary-foreground/80" : isToday ? "text-primary/70" : "text-slate-400")}>{format(date, 'EEE')}</span>
+                <span className="text-xl font-medium leading-none">{format(date, 'd')}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Flush Schedule Grid */}
+        <div className="overflow-x-auto custom-scrollbar">
+          <div className="min-w-full md:min-w-[950px] border border-slate-200 rounded-xl overflow-hidden bg-white">
+            
+            {/* Header Row */}
+            <div className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] border-b border-slate-200 bg-slate-50/50">
+              <div className="flex items-center justify-center pb-2 pt-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</span>
+              </div>
+              
+              {weekDays.map(date => {
+                const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
+                const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                return (
+                  <div 
+                    key={date.toISOString()} 
+                    className={cn(
+                      "flex-col items-center py-4 border-l border-slate-200 relative transition-colors",
+                      isToday ? "bg-primary/5" : "",
+                      isSelectedDay ? "flex" : "hidden md:flex"
+                    )}
+                  >
+                    {isToday && <div className="absolute top-0 left-0 right-0 h-1 bg-primary rounded-t-sm" />}
+                    <span className={cn("text-[11px] font-bold uppercase tracking-widest mb-1", isToday ? "text-primary/70" : "text-slate-400")}>
+                      {format(date, 'EEEE')}
+                    </span>
+                    <span className={cn("text-3xl font-light tracking-tight leading-none mb-1", isToday ? "text-primary font-medium" : "text-slate-900")}>
+                      {format(date, 'd')}
+                    </span>
+                    <span className={cn("text-[11px] font-semibold", isToday ? "text-primary" : "text-slate-500")}>
+                      {format(date, 'MMMM')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Time Rows */}
+            <div className="overflow-y-auto max-h-[650px] custom-scrollbar bg-white">
+              <div className="flex flex-col">
+                {Array.from({ length: 17 }).map((_, i) => {
+                  const hour = i + 7; // 7 AM to 12 MN
+                  const timeStr = `${hour.toString().padStart(2, '0')}:00:00`;
+                  
+                  const formatHourLabel = (h: number) => {
+                    if (h === 12) return '12:00 NN';
+                    if (h === 24 || h === 0) return '12:00 MN';
+                    if (h < 12) return `${h}:00 AM`;
+                    return `${h - 12}:00 PM`;
+                  };
+                  const displayTime = `${formatHourLabel(hour)} - ${formatHourLabel(hour + 1)}`;
+                  return (
+                    <div key={timeStr} className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] group/row border-b border-slate-200 last:border-b-0">
+                      
+                      {/* Time Label */}
+                      <div className="flex items-center justify-center border-r border-slate-200 bg-white p-1 px-2">
+                        <span className="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-black dark:text-white transition-colors tracking-tight text-center">
+                          {displayTime}
+                        </span>
+                      </div>
+                      
+                      {/* Slots for each day */}
+                      {weekDays.map(date => {
+                        const dStr = format(date, 'yyyy-MM-dd');
+                         const scheduleRecord = weekSchedules.find(s => s.date === dStr && s.startTime === timeStr);
+                         const slot = scheduleRecord?.status === ScheduleStatus.Available ? undefined : scheduleRecord;
+                        const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
+                        const isToday = dStr === format(new Date(), 'yyyy-MM-dd');
+                        
+                        return (
+                          <div 
+                            key={`${dStr}-${timeStr}`} 
+                            className={cn(
+                              "border-l border-slate-200 p-1.5 h-[90px] relative group/cell transition-colors",
+                              isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
+                              !slot && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
+                              isSelectedDay ? "block" : "hidden md:block"
+                            )}
+                            onClick={() => {
+                              if (!slot) {
+                                setBookingModalData({
+                                  dateStr: dStr,
+                                  startTimeStr: timeStr,
+                                  endTimeStr: hour + 1 === 24 ? '00:00:00' : `${(hour + 1).toString().padStart(2, '0')}:00:00`,
+                                  status: 'Booked',
+                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Reserved, amountPaid: 0
+                                });
+                              }
+                            }}
+                          >
+                            {slot ? (() => {
+                              const timedStatus = getTimedStatus(slot);
+                              return (
+                              <div className={cn(
+                                "w-full h-full rounded-xl border p-2.5 flex flex-col items-center justify-center overflow-hidden relative group/booked text-center gap-1",
+                                STATUS_COLORS[slot.status],
+                                "shadow-sm",
+                                timedStatus.phase === 'ongoing' && "ring-2 ring-emerald-500 ring-offset-1",
+                                timedStatus.phase === 'completed' && "brightness-75 saturate-50"
+                              )}>
+                                <span className="font-bold text-[11px] uppercase tracking-wider leading-tight w-full">{timedStatus.label}</span>
+                                {(slot.bookedBy || slot.notes) && <span className="text-[11px] truncate opacity-90 font-medium w-full">{slot.bookedBy || slot.notes}</span>}
+                                {/* Hover View Details Overlay */}
+                                <div 
+                                  className="absolute inset-0 bg-black/60 opacity-0 group-hover/booked:opacity-100 flex items-center justify-center transition-opacity rounded-xl cursor-pointer backdrop-blur-[1px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewModalData(slot);
+                                  }}
+                                >
+                                  <span className="text-white text-[11px] font-bold tracking-wide">View Details</span>
+                                </div>
+                              </div>
+                              );
+                            })() : (
+                              <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm border border-primary/20">
+                                  <Plus className="h-4 w-4" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Modal */}
+      <Dialog open={!!bookingModalData} onOpenChange={(open) => { if (!open) { setBookingModalData(null); setScheduleErrors({}); } }}>
+        <DialogContent className="schedule-form-modal sm:max-w-[760px] p-0 bg-white text-slate-900 dark:bg-[#2c2c2e] dark:text-slate-100 rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+          
+          <div className="px-6 pt-6 pb-2 sm:px-7 sm:pt-7 sm:pb-2 shrink-0">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Schedule</DialogTitle>
+              <DialogDescription className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+                Block out court time or add a new booking.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 sm:px-7 pb-6 overflow-y-auto custom-scrollbar flex-1">
+            {bookingModalData && (
+              <div className="schedule-form mt-4 space-y-5">
+                {/* Vercel-like Data Badge using Brand Palette */}
+                <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-white p-3.5 pl-4 shadow-sm dark:border-primary/30 dark:bg-[#3a3a3c]">
+                  <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                    <CalendarIcon className="h-[18px] w-[18px] text-white" />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary/70">Selected Date</span>
+                    <span className="break-words text-[13px] font-bold leading-snug text-primary sm:truncate">
+                      {format(new Date(bookingModalData.dateStr + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Start Time</label>
+                      <Select value={bookingModalData.startTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, startTimeStr: val}); setScheduleErrors(e => ({...e, startTimeStr: '', endTimeStr: ''})); }}>
+                        <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
+                          <SelectValue placeholder="Start" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-200 shadow-lg max-h-[200px]">
+                          {Array.from({ length: 17 }).map((_, i) => {
+                            const hour = i + 7;
+                            const hStr = hour === 24 ? '00:00:00' : `${hour.toString().padStart(2, '0')}:00:00`;
+                            const formatHourLabel = (h: number) => {
+                              if (h === 12) return '12NN';
+                              if (h === 24 || h === 0) return '12MN';
+                              return h < 12 ? `${h}AM` : `${h - 12}PM`;
+                            };
+                            return (
+                              <SelectItem key={hStr} value={hStr} className="text-[13px] font-medium rounded-lg py-2">
+                                {formatHourLabel(hour)}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">End Time</label>
+                      <Select value={bookingModalData.endTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, endTimeStr: val}); setScheduleErrors(e => ({...e, endTimeStr: ''})); }}>
+                        <SelectTrigger aria-invalid={!!scheduleErrors.endTimeStr} className={cn("w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium", scheduleErrors.endTimeStr && "field-invalid")}>
+                          <SelectValue placeholder="End" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-200 shadow-lg max-h-[200px]">
+                          {Array.from({ length: 17 }).map((_, i) => {
+                            const hour = i + 8; // End time starts from 8AM up to 12MN
+                            const hStr = hour === 24 ? '00:00:00' : `${hour.toString().padStart(2, '0')}:00:00`;
+                            const formatHourLabel = (h: number) => {
+                              if (h === 12) return '12NN';
+                              if (h === 24 || h === 0) return '12MN';
+                              return h < 12 ? `${h}AM` : `${h - 12}PM`;
+                            };
+                            return (
+                              <SelectItem key={hStr} value={hStr} className="text-[13px] font-medium rounded-lg py-2">
+                                {formatHourLabel(hour)}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {scheduleErrors.endTimeStr && <p className="field-error" role="alert">{scheduleErrors.endTimeStr}</p>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Status</label>
+                    <Select value={bookingModalData.status} onValueChange={(val) => { setBookingModalData({...bookingModalData, status: val}); setScheduleErrors({}); }}>
+                      <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                        <SelectItem value="Booked" className="text-[13px] font-medium rounded-lg py-2">Booked</SelectItem>
+                        <SelectItem value="Training" className="text-[13px] font-medium rounded-lg py-2">Training</SelectItem>
+                        <SelectItem value="Unavailable" className="text-[13px] font-medium rounded-lg py-2">Unavailable</SelectItem>
+                        <SelectItem value="FreePlay" className="text-[13px] font-medium rounded-lg py-2">Free Play</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Notes</label>
+                    <Input
+                      value={bookingModalData.notes}
+                      onChange={(e) => setBookingModalData({...bookingModalData, notes: e.target.value})}
+                      placeholder="Optional schedule notes" 
+                      className="w-full h-10 text-[13px]" 
+                    />
+                  </div>
+                  {(bookingModalData.status === 'Booked' || bookingModalData.status === 'Training') && (
+                    <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2 sm:grid-cols-2 dark:border-white/10 dark:bg-[#323234]">
+                      {modalQuote && <div className={cn("rounded-xl border p-3 sm:col-span-2", modalQuote.covered ? "border-primary/25 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20")}><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{modalQuote.covered ? modalQuote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString()} (${line.pricingId})`).join(' + ') : `No ${modalRateType} rate covers the complete schedule.`}</p></div><p className="shrink-0 text-xl font-bold text-primary">{modalQuote.covered ? `₱${modalQuote.total.toLocaleString()}` : '—'}</p></div></div>}
+                      <div className="space-y-1.5 sm:col-span-2"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Booked By *</label><Input aria-invalid={!!scheduleErrors.bookedBy} value={bookingModalData.bookedBy} onChange={e => { setBookingModalData({...bookingModalData, bookedBy: e.target.value}); setScheduleErrors(v => ({...v, bookedBy: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.bookedBy && "field-invalid")} placeholder="Customer or trainee name" />{scheduleErrors.bookedBy && <p className="field-error" role="alert">{scheduleErrors.bookedBy}</p>}</div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, email: e.target.value}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, phone: e.target.value})} className="h-10 text-[13px]" placeholder="Optional phone number" /></div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? 0 : bookingModalData.amountPaid})}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
+                      {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Reservation Amount</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.amountPaid && "field-invalid")} placeholder="0.00" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+            <button 
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" 
+              onClick={() => setBookingModalData(null)}
+              disabled={bulkUpdateMutation.isPending || updateMutation.isPending}
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSaveSchedule}
+              disabled={bulkUpdateMutation.isPending || updateMutation.isPending}
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
+            >
+              {bookingModalData?.id ? 'Update Schedule' : 'Save Schedule'}
+              {(bulkUpdateMutation.isPending || updateMutation.isPending) && <LoaderCircle className="h-4 w-4 animate-spin" />}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Modal */}
+      <Dialog open={!!viewModalData} onOpenChange={(open) => !open && setViewModalData(null)}>
+        <DialogContent className="sm:max-w-[425px] p-0 bg-white rounded-xl border-slate-200 shadow-xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+          <div className="px-6 pt-6 pb-2 shrink-0">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">Schedule Details</DialogTitle>
+              <DialogDescription className="text-[13px] text-slate-500 mt-1">
+                Viewing details for the selected schedule.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 pb-6 overflow-y-auto custom-scrollbar flex-1">
+            {viewModalData && (
+              <div className="mt-4 space-y-6">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                    <CalendarIcon className="h-4 w-4 text-slate-600" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date & Time</span>
+                    <span className="text-[13px] font-bold text-slate-900">
+                      {format(new Date(viewModalData.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')} <br/>
+                      <span className="text-slate-500 font-medium">{viewModalData.startTime} - {viewModalData.endTime}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
+                    <div className="mt-1">
+                      <span className={cn("inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold", STATUS_COLORS[viewModalData.status])}>
+                        {getTimedStatus(viewModalData).label}
+                      </span>
+                    </div>
+                  </div>
+                  {(viewModalData.status === ScheduleStatus.Booked || viewModalData.status === ScheduleStatus.Training) && <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment</label><div className="mt-1 flex items-center gap-2"><span className={cn("rounded-md px-2.5 py-1 text-xs font-bold", viewModalData.paymentStatus === BookingStatus.Paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{viewModalData.paymentStatus === BookingStatus.Paid ? 'Paid' : 'Reservation'}</span>{viewModalData.paymentStatus !== BookingStatus.Paid && <span className="text-xs font-medium text-slate-600">₱{(viewModalData.amountPaid || 0).toLocaleString()} paid</span>}</div></div>}
+                  
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Booked By / Notes</label>
+                    <div className="mt-1 p-3 rounded-lg bg-slate-50 border border-slate-100 min-h-[60px]">
+                      <p className="text-[13px] font-medium text-slate-700">
+                        {viewModalData.bookedBy || viewModalData.notes || 'No additional details provided.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 sm:px-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+            {viewModalData && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || 0 }); setViewModalData(null); }}>Edit Details</button>}
+            <button 
+              className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
+              onClick={() => setViewModalData(null)}
+            >
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+

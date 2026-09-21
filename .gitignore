@@ -1,0 +1,35 @@
+# Local configuration and secrets
+.agents/
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# .NET builds and local runtime data
+**/bin/
+**/obj/
+backend/.runtime/
+backend/.runtime-logs/
+backend/TDK.Api/App_Data/
+backend/gen_part*.py
+
+# IDE and operating-system files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
