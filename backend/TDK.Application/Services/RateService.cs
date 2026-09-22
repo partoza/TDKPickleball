@@ -24,6 +24,9 @@ public class RateService : IRateService
 
     public async Task<ApiResponse<RateDto>> CreateAsync(CreateRateRequest request)
     {
+        if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
+        if (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
+        if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
         var conflict = await HasConflictAsync(request.StartTime, request.EndTime, request.RateType);
         if (conflict) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range");
         var rate = new Rate
@@ -45,6 +48,9 @@ public class RateService : IRateService
     {
         var rate = await _rateRepo.GetByIdAsync(id);
         if (rate == null) return ApiResponse<RateDto>.Fail("Rate not found");
+        if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
+        if (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
+        if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
         if (request.IsActive && await HasConflictAsync(request.StartTime, request.EndTime, request.RateType, id)) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range for the selected type");
         
         rate.StartTime = request.StartTime;
@@ -63,9 +69,11 @@ public class RateService : IRateService
     {
         var rate = await _rateRepo.GetByIdAsync(id);
         if (rate == null) return ApiResponse<bool>.Fail("Rate not found");
-        _rateRepo.Delete(rate);
+        rate.IsActive = false;
+        rate.UpdatedAt = DateTime.UtcNow;
+        _rateRepo.Update(rate);
         await _rateRepo.SaveChangesAsync();
-        return ApiResponse<bool>.Ok(true);
+        return ApiResponse<bool>.Ok(true, "Rate marked inactive");
     }
 
     public async Task<decimal> CalculateRateAsync(TimeOnly startTime, TimeOnly endTime, RateType rateType = RateType.Booking)
@@ -91,9 +99,12 @@ public class RateService : IRateService
     {
         var newStart = start.Hour * 60 + start.Minute;
         var newEnd = end == TimeOnly.MinValue ? 1440 : end.Hour * 60 + end.Minute;
-        if (newStart >= newEnd) return true;
+        if (newEnd - newStart < 60) return true;
         return (await _rateRepo.GetAllAsync()).Any(r => r.IsActive && r.Id != excludedId && r.RateType == rateType &&
             newStart < (r.EndTime == TimeOnly.MinValue ? 1440 : r.EndTime.Hour * 60 + r.EndTime.Minute) &&
             (r.StartTime.Hour * 60 + r.StartTime.Minute) < newEnd);
     }
+
+    private static bool IsAtLeastOneHour(TimeOnly start, TimeOnly end) =>
+        start != end && (end == TimeOnly.MinValue ? 1440 : end.Hour * 60 + end.Minute) - (start.Hour * 60 + start.Minute) >= 60;
 }

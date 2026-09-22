@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Security.Claims;
 using TDK.Infrastructure.Data;
 using TDK.Infrastructure.Identity;
 
@@ -39,6 +40,21 @@ public static class AuthenticationExtensions
                 ValidIssuer = config["Jwt:Issuer"],
                 ValidAudience = config["Jwt:Audience"],
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            };
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        context.Fail("Invalid user identity");
+                        return;
+                    }
+                    var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+                    var user = await userManager.FindByIdAsync(userId);
+                    if (user is null || !user.IsActive) context.Fail("User account is inactive");
+                }
             };
         })
         .AddCookie("GoogleExternal", options =>

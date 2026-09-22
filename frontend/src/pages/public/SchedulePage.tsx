@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 import { usePublicWeeklySchedules } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Schedule, ScheduleStatus } from '@/types';
 import AvailabilityChecker from '@/components/public/AvailabilityChecker';
 import { Link } from 'react-router-dom';
+import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 
 function getWeekRangeString(start: Date, end: Date) {
   if (start.getFullYear() !== end.getFullYear()) {
@@ -113,7 +114,7 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   const { data: courtsRes, isLoading: courtsLoading, isError: courtsError } = useCourts();
@@ -131,6 +132,10 @@ export default function SchedulePage() {
     const timer = window.setInterval(() => setClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setPickedSlots(current => current.filter(slot => !isPastManilaStart(slot.date, slot.startTime, new Date(clock))));
+  }, [clock]);
 
   useEffect(() => {
     if (courts.length > 0 && !selectedCourt) {
@@ -301,7 +306,7 @@ export default function SchedulePage() {
         <div className="md:hidden flex overflow-x-auto gap-2 mb-4 snap-x custom-scrollbar pb-2">
           {weekDays.map(date => {
             const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+            const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
             return (
               <button 
                 key={date.toISOString()}
@@ -334,7 +339,7 @@ export default function SchedulePage() {
               
               {weekDays.map(date => {
                 const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-                const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
                 return (
                   <div 
                     key={date.toISOString()} 
@@ -389,7 +394,8 @@ export default function SchedulePage() {
                         const scheduleRecord = weekSchedules.find(s => s.date === dStr && s.startTime === timeStr);
                         const slot = scheduleRecord?.status === ScheduleStatus.Available ? undefined : scheduleRecord;
                         const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
-                        const isToday = dStr === format(new Date(), 'yyyy-MM-dd');
+                        const isToday = dStr === getManilaDate(new Date(clock));
+                        const isPastStart = isPastManilaStart(dStr, timeStr, new Date(clock));
                         
                         return (
                           <div 
@@ -397,7 +403,8 @@ export default function SchedulePage() {
                             className={cn(
                               "border-l border-slate-300 p-1.5 h-[90px] relative transition-colors",
                               isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
-                              !slot && "hover:bg-slate-50 dark:hover:bg-white/[0.04]",
+                              !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04]",
+                              !slot && isPastStart && "bg-slate-100/70 dark:bg-white/[0.03]",
                               isSelectedDay ? "block" : "hidden md:block"
                             )}
                           >
@@ -420,21 +427,25 @@ export default function SchedulePage() {
                               const isMaxed = pickedSlots.length >= MAX_SLOTS && !isSelected;
                               // Calculate endTime directly (1 hour duration)
                               const startHour = parseInt(timeStr.split(':')[0], 10);
-                              const endTime = `${(startHour + 1).toString().padStart(2, '0')}:00:00`;
+                              const endTime = startHour + 1 === 24 ? '00:00:00' : `${(startHour + 1).toString().padStart(2, '0')}:00:00`;
                               return (
                                 <button
-                                  disabled={isMaxed}
-                                  onClick={() => !isMaxed && toggleSlot(dStr, timeStr, endTime)}
+                                  disabled={isMaxed || isPastStart}
+                                  onClick={() => !isMaxed && !isPastStart && toggleSlot(dStr, timeStr, endTime)}
                                   className={cn(
-                                    "w-full h-full flex flex-col items-center justify-center rounded-xl border transition-all cursor-pointer",
-                                    isSelected
+                                    "w-full h-full flex flex-col items-center justify-center rounded-xl border transition-all",
+                                    isPastStart
+                                      ? "cursor-not-allowed border-slate-200 border-dashed bg-slate-100/80 text-slate-400"
+                                      : isSelected
                                       ? "bg-[#e8fbf4] border-[#00c881] shadow-sm"
                                       : isMaxed
                                         ? "border-slate-200 border-dashed opacity-40 cursor-not-allowed"
                                         : "border-dashed border-slate-200 hover:border-[#00c881]/50 hover:bg-[#e8fbf4]/40 group/cell"
                                   )}
                                 >
-                                  {isSelected ? (
+                                  {isPastStart ? (
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Past</span>
+                                  ) : isSelected ? (
                                     <div className="h-8 w-8 rounded-full bg-[#00c881] flex items-center justify-center shadow-sm">
                                       <CheckIcon className="h-4 w-4 text-white stroke-[2.5]" />
                                     </div>
@@ -464,9 +475,9 @@ export default function SchedulePage() {
           <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 px-7 py-6 flex items-center justify-between gap-4 relative">
             <button
               onClick={() => setPickedSlots([])}
-              className="absolute top-4 right-4 p-1.5 text-[#8a99a8] hover:text-slate-600 transition-colors"
+              className="absolute right-4 top-4 cursor-pointer rounded-lg p-1.5 text-muted-foreground opacity-70 ring-offset-background transition-all duration-200 hover:opacity-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 active:scale-95 focus:outline-none"
             >
-              <XIcon className="h-3.5 w-3.5 stroke-[2]" />
+              <XIcon className="h-4 w-4 stroke-[2]" />
             </button>
             
             <div className="flex flex-col gap-1">

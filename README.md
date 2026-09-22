@@ -12,6 +12,9 @@ React/Vite public booking and administration frontend with an ASP.NET Core API a
    dotnet user-secrets set "Jwt:Key" "<at-least-32-random-characters>" --project TDK.Api
    dotnet user-secrets set "Authentication:Google:ClientId" "<google-client-id>" --project TDK.Api
    dotnet user-secrets set "Authentication:Google:ClientSecret" "<google-client-secret>" --project TDK.Api
+   dotnet user-secrets set "Cloudinary:CloudName" "<cloud-name>" --project TDK.Api
+   dotnet user-secrets set "Cloudinary:ApiKey" "<api-key>" --project TDK.Api
+   dotnet user-secrets set "Cloudinary:ApiSecret" "<api-secret>" --project TDK.Api
    ```
 
 3. In Google Cloud, register this local authorized redirect URI:
@@ -23,4 +26,4 @@ React/Vite public booking and administration frontend with an ASP.NET Core API a
 
 The API applies Entity Framework migrations and seeds required roles when it starts.
 
-For a production deployment, provide `SeedAdmin__Email` and `SeedAdmin__Password` as environment variables for the first administrator account, then remove or rotate the bootstrap password after provisioning.
+For a production deployment, provide `SeedAdmin__Email` and `SeedAdmin__Password` as environment variables for the first administrator account, then remove or rotate the bootstrap password after provisioning. Configure Cloudinary with `Cloudinary__CloudName`, `Cloudinary__ApiKey`, and `Cloudinary__ApiSecret`; `Cloudinary__Folder` is optional and defaults to `tdk/users`. Set `Frontend__BaseUrl` to the production Vercel URL so links in booking and invitation emails open the deployed frontend.

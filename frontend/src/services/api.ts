@@ -16,8 +16,10 @@ export function getApiErrorMessage(error: any, fallback = 'The request could not
   if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message;
   if (Array.isArray(payload?.errors) && payload.errors.length) return String(payload.errors[0]);
   if (payload?.errors && typeof payload.errors === 'object') {
-    const first = Object.values(payload.errors).flat().find(Boolean);
-    if (first) return String(first);
+    const messages = Object.values(payload.errors).flat().filter(Boolean).map(String);
+    const specific = messages.find(message => !/^The request field is required\.?$/i.test(message.trim()));
+    if (specific) return specific;
+    if (messages[0]) return messages[0];
   }
   return error?.message || fallback;
 }

@@ -12,5 +12,8 @@ public interface IAuthService
     Task<ApiResponse<AuthResponse>> GetCurrentUserAsync(string userId);
     Task<ApiResponse<IEnumerable<UserDto>>> GetUsersAsync();
     Task<ApiResponse<UserDto>> CreateUserAsync(CreateUserRequest request);
+    Task<ApiResponse<UserDto>> SetUserActiveAsync(string userId, bool isActive, string actingUserId);
+    Task<ApiResponse<bool>> DeleteUserAsync(string userId, string actingUserId, CancellationToken cancellationToken = default);
+    Task<ApiResponse<UserDto>> UpdateProfileImageAsync(string userId, Stream content, string fileName, string contentType, CancellationToken cancellationToken = default);
     Task<ApiResponse<bool>> ChangePasswordAsync(string userId, ChangePasswordRequest request);
 }

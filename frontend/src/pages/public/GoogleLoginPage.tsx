@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 import { authService } from '@/services/auth';
 import { ROUTES } from '@/lib/constants';
@@ -9,9 +9,9 @@ function GoogleMark() {
 
 export default function GoogleLoginPage() {
   return (
-    <main className="min-h-[calc(100vh-5rem)] bg-gradient-to-br from-white via-white to-primary/10 flex w-full">
+    <main className="flex-1 bg-gradient-to-br from-white via-white to-primary/10 flex w-full">
       {/* Left Panel */}
-      <section className="hidden lg:flex flex-col justify-between w-1/2 max-w-[800px] p-4 lg:p-6">
+      <section className="hidden lg:flex flex-col justify-between w-1/2 p-4 lg:p-6">
         <div className="relative w-full h-full rounded-[32px] overflow-hidden bg-primary shadow-[0_20px_60px_-15px_rgba(114,21,29,0.3)] flex flex-col justify-between p-10 lg:p-14">
           <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: 'url(/assets/images/hero-image.png)' }} />
           <div className="absolute inset-0 bg-gradient-to-t from-[#2a0407] via-primary/80 to-primary/30" />
@@ -44,12 +44,11 @@ export default function GoogleLoginPage() {
             <p className="mt-4 text-[15px] text-slate-500 leading-relaxed">We use your verified Google email for the booking. Your display name remains editable later.</p>
           </div>
           
-          <button type="button" onClick={() => window.location.assign(authService.getGoogleLoginUrl())} className="h-[52px] w-full flex items-center justify-center gap-3 rounded-2xl text-[15px] font-bold border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.98]">
+          <button type="button" onClick={() => window.location.assign(authService.getGoogleLoginUrl())} className="h-[52px] w-full flex items-center justify-center gap-3 rounded-2xl text-[15px] font-bold border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.98] cursor-pointer">
             <GoogleMark /> Sign in with Google
           </button>
 
-          <div className="mt-10 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50/50 p-4">
-            <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div className="mt-10 text-center lg:text-left">
             <p className="text-[13px] leading-relaxed text-slate-600">Google verifies your identity securely. We never receive or store your Google password.</p>
           </div>
         </div>

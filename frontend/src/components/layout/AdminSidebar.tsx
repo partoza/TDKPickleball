@@ -11,7 +11,7 @@ import {
   SunIcon as Sun,
   MoonIcon as Moon,
   UsersIcon as Users,
-} from '@heroicons/react/24/outline';
+} from '@heroicons/react/24/solid';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';

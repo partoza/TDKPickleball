@@ -21,11 +21,11 @@ public class BookingController : ControllerBase
     }
 
     [HttpGet("api/bookings/availability")]
-    [EnableRateLimiting("PublicBooking")]
+    [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> GetAvailability([FromQuery] DateOnly date, [FromQuery] int courtId) => Ok(await _bookingService.GetAvailabilityAsync(date, courtId));
 
     [HttpPost("api/bookings")]
-    [EnableRateLimiting("PublicBooking")]
+    [EnableRateLimiting("Email")]
     [Authorize(Roles = "Admin,Staff,Customer")]
     public async Task<IActionResult> Create(CreateBookingRequest request)
     {
@@ -34,7 +34,7 @@ public class BookingController : ControllerBase
     }
 
     [HttpPost("api/bookings/with-receipt")]
-    [EnableRateLimiting("PublicBooking")]
+    [EnableRateLimiting("Email")]
     [Authorize(Roles = "Admin,Staff,Customer")]
     [RequestSizeLimit(5_500_000)]
     public async Task<IActionResult> CreateWithReceipt([FromForm] CreateBookingWithReceiptForm request)
@@ -66,7 +66,7 @@ public class BookingController : ControllerBase
     }
 
     [HttpPost("api/bookings/verify")]
-    [EnableRateLimiting("PublicBooking")]
+    [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> Verify(VerifyBookingRequest request) => Ok(await _bookingService.VerifyAsync(request.BookingReference));
 
     [HttpGet("api/admin/bookings")]
@@ -83,7 +83,11 @@ public class BookingController : ControllerBase
 
     [HttpPost("api/admin/bookings/{id}/reschedule")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Reschedule(long id, RescheduleBookingRequest request) => Ok(await _bookingService.RescheduleAsync(id, request));
+    public async Task<IActionResult> Reschedule(long id, RescheduleBookingRequest request)
+    {
+        var result = await _bookingService.RescheduleAsync(id, request);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
 
     [HttpPost("api/admin/bookings/{id}/confirm")]
     [Authorize(Roles = "Admin,Staff")]

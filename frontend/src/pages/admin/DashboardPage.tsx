@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isWithinInterval, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
-import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/outline';
+import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -86,7 +86,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
         <p className="mt-1 text-muted-foreground">{user?.role === 'Staff' ? 'Today’s bookings and court schedule at a glance.' : 'Revenue and court operations from live booking data.'}</p>
       </div>
-      <div className="flex flex-col sm:flex-row items-center gap-2 rounded-xl border bg-white p-1.5 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center gap-2 rounded-xl border bg-card p-1.5 shadow-sm">
         <div className="w-full sm:w-[250px]">
           <AdminDatePicker value={anchor} onChange={setAnchor} displayRange={range} />
         </div>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
 }
 function Stat({ icon: Icon, label, value, note }: any) { 
   return (
-    <div className="rounded-xl sm:rounded-2xl border bg-white p-4 sm:p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20 group">
+    <div className="rounded-xl sm:rounded-2xl border bg-card p-4 sm:p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20 group">
       <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 group-hover:scale-105 transition-transform">
         <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
       </div>
@@ -210,10 +210,10 @@ function Stat({ icon: Icon, label, value, note }: any) {
 }
 function Upcoming({ booking: b }: { booking: Booking }) { 
   return (
-    <div className="rounded-xl border bg-white dark:bg-background/50 p-3 hover:border-primary/30 transition-colors">
+    <div className="rounded-xl border bg-card p-3 shadow-sm hover:border-primary/40 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <p className="font-semibold text-[13px] text-foreground truncate">{b.customerName}</p>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-md whitespace-nowrap">{b.courtName}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider bg-primary text-primary-foreground px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm">{b.courtName}</span>
       </div>
       <p className="mt-1 text-[11px] font-medium text-muted-foreground">
         {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')} • {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')}

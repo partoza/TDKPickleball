@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, ClockIcon, AlertCircle, Lightbulb, ChevronRight } from 'lucide-react';
+import { CalendarIcon, ClockIcon, ExclamationCircleIcon as AlertCircle, LightBulbIcon as Lightbulb, ChevronRightIcon as ChevronRight } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,6 +8,7 @@ import { useScheduleBoard } from '@/hooks/useSchedule';
 import { ScheduleStatus } from '@/types';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { isValidTimeRange } from '@/lib/time-range';
 import { startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 
 const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: (d: Date) => void }) => {
@@ -96,6 +97,7 @@ export default function AvailabilityChecker() {
   const board = response?.data;
 
   const handleCheck = () => {
+    if (!isValidTimeRange(startTime, endTime)) return;
     setSelectedCourt(null);
     setHasChecked(true);
   };
@@ -197,13 +199,13 @@ export default function AvailabilityChecker() {
 
   // Filter end time slots to only those AFTER the selected start time
   const startIndex = slots.findIndex(s => s.startTime === startTime);
-  const endSlots = startIndex !== -1 ? slots.slice(startIndex) : slots;
+  const endSlots = (startIndex !== -1 ? slots.slice(startIndex) : slots)
+    .filter(slot => isValidTimeRange(startTime, slot.endTime));
 
   // Auto-adjust end time if it is before start time
   useEffect(() => {
     const sIndex = slots.findIndex(s => s.startTime === startTime);
-    const eIndex = slots.findIndex(s => s.endTime === endTime);
-    if (sIndex !== -1 && (eIndex === -1 || eIndex < sIndex)) {
+    if (sIndex !== -1 && !isValidTimeRange(startTime, endTime)) {
       setEndTime(slots[sIndex].endTime);
     }
   }, [startTime, endTime, slots]);
@@ -435,7 +437,7 @@ export default function AvailabilityChecker() {
           </button>
           <button 
             onClick={handleCheck}
-            disabled={isLoading || isFetching}
+            disabled={isLoading || isFetching || !isValidTimeRange(startTime, endTime)}
             className="h-10 px-6 rounded-xl text-[13px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
           >
             {isLoading || (hasChecked && isFetching) ? 'Checking...' : 'Check'}

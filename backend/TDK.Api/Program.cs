@@ -5,6 +5,7 @@ using TDK.Api.Middleware;
 using TDK.Infrastructure.Data;
 using TDK.Infrastructure.Identity;
 using System.Threading.RateLimiting;
+using TDK.Api.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 builder.Services.AddControllers().AddJsonOptions(options => {
+    options.JsonSerializerOptions.Converters.Add(new FlexibleTimeOnlyJsonConverter());
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
@@ -29,8 +31,47 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddMemoryCache();
 builder.Services.AddApplicationServices();
 builder.Services.AddCorsPolicies(builder.Configuration);
-builder.Services.AddRateLimiter(options => options.AddPolicy("PublicBooking", context =>
-    RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+var rateLimitConfig = builder.Configuration.GetSection("RateLimiting");
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter($"global:{ClientIp(context)}", _ => FixedWindow(
+            rateLimitConfig.GetValue("GlobalPermitLimit", 300),
+            TimeSpan.FromSeconds(rateLimitConfig.GetValue("GlobalWindowSeconds", 60)))));
+
+    options.AddPolicy("PublicRead", context =>
+        RateLimitPartition.GetFixedWindowLimiter($"read:{ClientIp(context)}", _ => FixedWindow(
+            rateLimitConfig.GetValue("PublicReadPermitLimit", 120),
+            TimeSpan.FromSeconds(rateLimitConfig.GetValue("PublicReadWindowSeconds", 60)))));
+
+    options.AddPolicy("Authentication", context =>
+        RateLimitPartition.GetFixedWindowLimiter($"auth:{ClientIp(context)}", _ => FixedWindow(
+            rateLimitConfig.GetValue("AuthenticationPermitLimit", 10),
+            TimeSpan.FromMinutes(rateLimitConfig.GetValue("AuthenticationWindowMinutes", 5)))));
+
+    options.AddPolicy("Email", context =>
+        RateLimitPartition.GetFixedWindowLimiter($"email:{ClientIp(context)}", _ => FixedWindow(
+            rateLimitConfig.GetValue("EmailPermitLimit", 10),
+            TimeSpan.FromMinutes(rateLimitConfig.GetValue("EmailWindowMinutes", 10)))));
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var retryAfterSeconds = 60;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            context.HttpContext.Response.Headers.RetryAfter = retryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            success = false,
+            message = "Too many requests from this IP address. Please wait before trying again.",
+            retryAfterSeconds
+        }, cancellationToken);
+    };
+});
 
 var app = builder.Build();
 
@@ -47,6 +88,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseRouting();
 app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -69,7 +111,19 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<TdkDbContext>();
     await context.Database.MigrateAsync();
+    await ApplicationDataSeeder.SeedRatesAsync(context);
     await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider, builder.Configuration, app.Environment.IsDevelopment());
 }
 
 app.Run();
+
+static string ClientIp(HttpContext context) =>
+    context.Connection.RemoteIpAddress?.MapToIPv6().ToString() ?? "unknown";
+
+static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, TimeSpan window) => new()
+{
+    PermitLimit = Math.Max(1, permitLimit),
+    Window = window,
+    QueueLimit = 0,
+    AutoReplenishment = true
+};

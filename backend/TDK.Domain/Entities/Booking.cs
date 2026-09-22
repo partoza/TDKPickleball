@@ -19,6 +19,7 @@ public class Booking
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? RescheduledAt { get; set; }
     public DateTime? ReminderSentAt { get; set; }
     public string? ReceiptFileName { get; set; }
     public string? ReceiptContentType { get; set; }

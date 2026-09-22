@@ -31,11 +31,20 @@ public class CourtService : ICourtService
 
     public async Task<ApiResponse<CourtDto>> CreateAsync(CreateCourtRequest request)
     {
+        var name = request.Name?.Trim() ?? "";
+        var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? name : request.DisplayName.Trim();
+        if (name.Length is < 2 or > 100) return ApiResponse<CourtDto>.Fail("Court name must contain between 2 and 100 characters");
+        if (displayName.Length > 100) return ApiResponse<CourtDto>.Fail("Display name cannot exceed 100 characters");
+        var courts = (await _courtRepo.GetAllAsync()).ToList();
+        if (courts.Any(court => string.Equals(court.Name, name, StringComparison.OrdinalIgnoreCase)))
+            return ApiResponse<CourtDto>.Fail("A court with this name already exists");
+
         var court = new Court
         {
-            Name = request.Name,
-            DisplayName = request.DisplayName,
+            Name = name,
+            DisplayName = displayName,
             IsActive = true,
+            SortOrder = courts.Count == 0 ? 1 : courts.Max(item => item.SortOrder) + 1,
             OpenTime = new TimeOnly(7, 0),
             CloseTime = TimeOnly.MinValue,
             CreatedAt = DateTime.UtcNow,
@@ -51,8 +60,16 @@ public class CourtService : ICourtService
         var court = await _courtRepo.GetByIdAsync(id);
         if (court == null) return ApiResponse<CourtDto>.Fail("Court not found");
 
-        court.Name = request.Name;
-        court.DisplayName = request.DisplayName;
+        var name = request.Name?.Trim() ?? "";
+        var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? name : request.DisplayName.Trim();
+        if (name.Length is < 2 or > 100) return ApiResponse<CourtDto>.Fail("Court name must contain between 2 and 100 characters");
+        if (displayName.Length > 100) return ApiResponse<CourtDto>.Fail("Display name cannot exceed 100 characters");
+        var courts = await _courtRepo.GetAllAsync();
+        if (courts.Any(item => item.Id != id && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
+            return ApiResponse<CourtDto>.Fail("A court with this name already exists");
+
+        court.Name = name;
+        court.DisplayName = displayName;
         court.IsActive = request.IsActive;
         court.SortOrder = request.SortOrder;
         court.OpenTime = new TimeOnly(7, 0);
@@ -68,8 +85,10 @@ public class CourtService : ICourtService
     {
         var court = await _courtRepo.GetByIdAsync(id);
         if (court == null) return ApiResponse<bool>.Fail("Court not found");
-        _courtRepo.Delete(court);
+        court.IsActive = false;
+        court.UpdatedAt = DateTime.UtcNow;
+        _courtRepo.Update(court);
         await _courtRepo.SaveChangesAsync();
-        return ApiResponse<bool>.Ok(true);
+        return ApiResponse<bool>.Ok(true, "Court marked inactive");
     }
 }

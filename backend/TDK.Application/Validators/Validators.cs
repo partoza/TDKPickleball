@@ -3,6 +3,7 @@ using TDK.Application.DTOs.Auth;
 using TDK.Application.DTOs.Bookings;
 using TDK.Application.DTOs.Schedules;
 using TDK.Application.DTOs.Rates;
+using TDK.Application.Interfaces;
 
 namespace TDK.Application.Validators;
 
@@ -17,14 +18,16 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
 
 public class CreateBookingValidator : AbstractValidator<CreateBookingRequest>
 {
-    public CreateBookingValidator()
+    public CreateBookingValidator(IBusinessClock clock)
     {
         RuleFor(x => x.CustomerName).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.Phone).MaximumLength(30);
         RuleFor(x => x.CourtId).GreaterThan(0);
-        RuleFor(x => x.BookingDate).GreaterThanOrEqualTo(DateOnly.FromDateTime(DateTime.Today));
-        RuleFor(x => x).Must(x => x.EndTime == TimeOnly.MinValue ? x.StartTime != TimeOnly.MinValue : x.StartTime < x.EndTime).WithMessage("End time must be after start time");
+        RuleFor(x => x.BookingDate)
+            .Must(date => date >= clock.ManilaToday)
+            .WithMessage("Booking date cannot be in the past");
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0);
     }
 }
@@ -67,7 +70,7 @@ public class BulkUpdateValidator : AbstractValidator<BulkUpdateRequest>
     public BulkUpdateValidator()
     {
         RuleFor(x => x.CourtId).GreaterThan(0);
-        RuleFor(x => x).Must(x => x.EndTime == TimeOnly.MinValue ? x.StartTime != TimeOnly.MinValue : x.StartTime < x.EndTime).WithMessage("End time must be after start time");
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.Status).IsInEnum();
         RuleFor(x => x.BookedBy).NotEmpty().MaximumLength(150).When(x => x.Status is TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Training);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
@@ -84,7 +87,7 @@ public class UpdateBookingValidator : AbstractValidator<UpdateBookingRequest>
         RuleFor(x => x.CourtId).GreaterThan(0);
         RuleFor(x => x.CustomerName).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
-        RuleFor(x => x).Must(x => x.EndTime == TimeOnly.MinValue ? x.StartTime != TimeOnly.MinValue : x.StartTime < x.EndTime).WithMessage("End time must be after start time");
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Status).IsInEnum();
     }
@@ -96,7 +99,7 @@ public class CreateRateValidator : AbstractValidator<CreateRateRequest>
     {
         RuleFor(x => x.RateType).IsInEnum();
         RuleFor(x => x.PricePerHour).GreaterThan(0);
-        RuleFor(x => x).Must(x => x.EndTime == TimeOnly.MinValue ? x.StartTime != TimeOnly.MinValue : x.StartTime < x.EndTime).WithMessage("End time must be after start time");
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
     }
 }
 
@@ -106,6 +109,26 @@ public class UpdateRateValidator : AbstractValidator<UpdateRateRequest>
     {
         RuleFor(x => x.RateType).IsInEnum();
         RuleFor(x => x.PricePerHour).GreaterThan(0);
-        RuleFor(x => x).Must(x => x.EndTime == TimeOnly.MinValue ? x.StartTime != TimeOnly.MinValue : x.StartTime < x.EndTime).WithMessage("End time must be after start time");
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
+    }
+}
+
+public class RescheduleBookingValidator : AbstractValidator<RescheduleBookingRequest>
+{
+    public RescheduleBookingValidator()
+    {
+        RuleFor(x => x.CourtId).GreaterThan(0);
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
+    }
+}
+
+internal static class TimeRangeValidation
+{
+    public static bool IsAtLeastOneHour(TimeOnly startTime, TimeOnly endTime)
+    {
+        if (startTime == endTime) return false;
+        var startMinutes = startTime.Hour * 60 + startTime.Minute;
+        var endMinutes = endTime == TimeOnly.MinValue ? 24 * 60 : endTime.Hour * 60 + endTime.Minute;
+        return endMinutes - startMinutes >= 60;
     }
 }

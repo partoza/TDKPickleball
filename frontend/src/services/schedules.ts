@@ -1,5 +1,6 @@
 import { api } from './api';
 import { ScheduleBoardResponse, Schedule, ApiResponse } from '@/types';
+import { withSeconds } from '@/lib/time-range';
 
 export const schedulesService = {
   getScheduleBoard: async (date: string): Promise<ApiResponse<ScheduleBoardResponse>> => {
@@ -29,7 +30,12 @@ export const schedulesService = {
     return data;
   },
   bulkUpdate: async (payload: any): Promise<ApiResponse<void>> => {
-    const { data } = await api.post('/api/admin/schedules/bulk-update', payload);
+    const request = {
+      ...payload,
+      startTime: withSeconds(payload.startTime),
+      endTime: withSeconds(payload.endTime),
+    };
+    const { data } = await api.post('/api/admin/schedules/bulk-update', request);
     return data;
   },
   copySchedule: async (payload: any): Promise<ApiResponse<void>> => {

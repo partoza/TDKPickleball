@@ -18,11 +18,12 @@ public class BookingService : IBookingService
     private readonly IRepository<Notification> _notifications;
     private readonly IRateService _rates;
     private readonly IEmailService _email;
+    private readonly IBusinessClock _clock;
 
-    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRateService rates, IEmailService email)
+    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRateService rates, IEmailService email, IBusinessClock clock)
     {
         _bookings = bookings; _schedules = schedules; _timeSlots = timeSlots; _courts = courts;
-        _notifications = notifications; _rates = rates; _email = email;
+        _notifications = notifications; _rates = rates; _email = email; _clock = clock;
     }
 
     public async Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId)
@@ -48,13 +49,15 @@ public class BookingService : IBookingService
         if (court is null) return ApiResponse<BookingDto>.Fail("Court not found");
         var total = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, request.RateType);
         if (total <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
-        var paid = Math.Clamp(request.AmountPaid, 0, total);
+        if (request.AmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
+        if (request.AmountPaid > total) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{total:N2}");
+        var paid = request.AmountPaid;
         var booking = new Booking {
             BookingReference = await GenerateReferenceAsync(), CourtId = request.CourtId,
             CustomerName = request.CustomerName.Trim(), Email = request.Email?.Trim() ?? "", Phone = request.Phone?.Trim(),
             BookingDate = request.BookingDate, StartTime = request.StartTime, EndTime = request.EndTime,
             TotalAmount = total, AmountPaid = paid, Status = paid >= total ? BookingStatus.Paid : BookingStatus.Reserved,
-            Notes = request.Notes?.Trim(), CreatedAt = DateTime.UtcNow
+            Notes = request.Notes?.Trim(), CreatedAt = _clock.UtcNow.UtcDateTime
         };
         await _bookings.AddAsync(booking); await _bookings.SaveChangesAsync();
         await AssignScheduleAsync(booking, request.RateType); await AddNotificationAsync(booking, court.Name); await TrySendConfirmationAsync(booking, court.Name);
@@ -91,16 +94,24 @@ public class BookingService : IBookingService
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
         var rateType = await GetRateTypeAsync(id);
+        var newTotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
+        if (newTotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+        if (request.AmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
+        if (request.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{newTotal:N2}");
         var moved = b.CourtId != request.CourtId || b.BookingDate != request.BookingDate || b.StartTime != request.StartTime || b.EndTime != request.EndTime;
         if (moved) {
+            if (b.Status is not (BookingStatus.Paid or BookingStatus.Reserved)) return ApiResponse<BookingDto>.Fail("Only paid and reservation bookings can be rescheduled");
+            if (b.RescheduledAt.HasValue) return ApiResponse<BookingDto>.Fail("A booking can only be rescheduled once");
+            if (!CanReschedule(b)) return ApiResponse<BookingDto>.Fail("Rescheduling is available only within 24 hours after the booking was created");
             var conflict = await ValidateSlotAsync(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, id);
             if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
             await ReleaseScheduleAsync(id);
         }
+        var utcNow = _clock.UtcNow.UtcDateTime;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
         b.CustomerName = request.CustomerName.Trim(); b.Email = request.Email?.Trim() ?? ""; b.Phone = request.Phone?.Trim(); b.Notes = request.Notes?.Trim();
-        b.TotalAmount = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType); b.AmountPaid = Math.Clamp(request.AmountPaid, 0, b.TotalAmount);
-        b.Status = request.Status; b.UpdatedAt = DateTime.UtcNow; _bookings.Update(b); await _bookings.SaveChangesAsync();
+        b.TotalAmount = newTotal; b.AmountPaid = request.AmountPaid;
+        b.Status = request.Status; b.UpdatedAt = utcNow; if (moved) b.RescheduledAt = utcNow; _bookings.Update(b); await _bookings.SaveChangesAsync();
         if (moved) await AssignScheduleAsync(b, rateType);
         return ApiResponse<BookingDto>.Ok(ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", rateType), "Booking updated");
     }
@@ -109,13 +120,19 @@ public class BookingService : IBookingService
     {
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
-        if (b.Status is BookingStatus.Cancelled or BookingStatus.Completed) return ApiResponse<BookingDto>.Fail("This booking can no longer be rescheduled");
+        if (b.Status is not (BookingStatus.Paid or BookingStatus.Reserved)) return ApiResponse<BookingDto>.Fail("Only paid and reservation bookings can be rescheduled");
+        if (b.RescheduledAt.HasValue) return ApiResponse<BookingDto>.Fail("A booking can only be rescheduled once");
+        if (!CanReschedule(b)) return ApiResponse<BookingDto>.Fail("Rescheduling is available only within 24 hours after the booking was created");
         var rateType = await GetRateTypeAsync(id);
         var conflict = await ValidateSlotAsync(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, id);
         if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
+        var newTotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
+        if (newTotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+        if (b.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"The existing amount paid cannot exceed the new total amount of ₱{newTotal:N2}");
         await ReleaseScheduleAsync(id);
+        var utcNow = _clock.UtcNow.UtcDateTime;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
-        b.TotalAmount = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType); b.UpdatedAt = DateTime.UtcNow; b.ReminderSentAt = null;
+        b.TotalAmount = newTotal; b.UpdatedAt = utcNow; b.RescheduledAt = utcNow; b.ReminderSentAt = null;
         b.Status = b.AmountPaid >= b.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
         _bookings.Update(b); await _bookings.SaveChangesAsync(); await AssignScheduleAsync(b, rateType);
         var courtName = (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court"; await TrySendConfirmationAsync(b, courtName);
@@ -160,7 +177,7 @@ public class BookingService : IBookingService
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
         booking.ReceiptFileName = fileName;
         booking.ReceiptContentType = contentType;
-        booking.UpdatedAt = DateTime.UtcNow;
+        booking.UpdatedAt = _clock.UtcNow.UtcDateTime;
         _bookings.Update(booking);
         await _bookings.SaveChangesAsync();
         return ApiResponse<bool>.Ok(true);
@@ -178,13 +195,16 @@ public class BookingService : IBookingService
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<bool>.Fail("Booking not found");
         b.Status = status; if (status == BookingStatus.Paid) b.AmountPaid = b.TotalAmount;
-        b.UpdatedAt = DateTime.UtcNow; _bookings.Update(b); await _bookings.SaveChangesAsync(); return ApiResponse<bool>.Ok(true);
+        b.UpdatedAt = _clock.UtcNow.UtcDateTime; _bookings.Update(b); await _bookings.SaveChangesAsync(); return ApiResponse<bool>.Ok(true);
     }
 
     private async Task<string?> ValidateSlotAsync(int courtId, DateOnly date, TimeOnly start, TimeOnly end, long? excludedBookingId = null)
     {
-        if (date < DateOnly.FromDateTime(DateTime.Today)) return "Booking date cannot be in the past";
-        if (end != TimeOnly.MinValue && start >= end) return "End time must be after start time";
+        if (date < _clock.ManilaToday) return "Booking date cannot be in the past";
+        var manilaNow = _clock.ToManilaTime(_clock.UtcNow);
+        if (date == DateOnly.FromDateTime(manilaNow.DateTime) && start <= TimeOnly.FromDateTime(manilaNow.DateTime))
+            return "Start time has already passed in Manila";
+        if (start == end || Minutes(end, true) - Minutes(start, false) < 60) return "End time must be at least 1 hour after start time";
         var court = await _courts.GetByIdAsync(courtId);
         if (court is null || !court.IsActive) return "Court is not active";
         var startMinutes = Minutes(start, false); var endMinutes = Minutes(end, true);
@@ -203,8 +223,9 @@ public class BookingService : IBookingService
         var slots = (await _timeSlots.GetAllAsync()).Where(t => Minutes(t.StartTime, false) >= startMinutes && Minutes(t.EndTime, true) <= endMinutes).ToList();
         foreach (var slot in slots) {
             var s = (await _schedules.FindAsync(x => x.CourtId == b.CourtId && x.ScheduleDate == b.BookingDate && x.TimeSlotId == slot.Id)).FirstOrDefault();
-            if (s is null) await _schedules.AddAsync(new Schedule { CourtId = b.CourtId, ScheduleDate = b.BookingDate, TimeSlotId = slot.Id, Status = scheduleStatus, BookingId = b.Id, Notes = b.Notes, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
-            else { s.Status = scheduleStatus; s.BookingId = b.Id; s.Notes = b.Notes; s.UpdatedAt = DateTime.UtcNow; _schedules.Update(s); }
+            var utcNow = _clock.UtcNow.UtcDateTime;
+            if (s is null) await _schedules.AddAsync(new Schedule { CourtId = b.CourtId, ScheduleDate = b.BookingDate, TimeSlotId = slot.Id, Status = scheduleStatus, BookingId = b.Id, Notes = b.Notes, CreatedAt = utcNow, UpdatedAt = utcNow });
+            else { s.Status = scheduleStatus; s.BookingId = b.Id; s.Notes = b.Notes; s.UpdatedAt = utcNow; _schedules.Update(s); }
         }
         await _schedules.SaveChangesAsync();
     }
@@ -223,7 +244,8 @@ public class BookingService : IBookingService
 
     private async Task AddNotificationAsync(Booking b, string courtName)
     {
-        await _notifications.AddAsync(new Notification { BookingId = b.Id, Title = "Upcoming booking", Message = $"{b.CustomerName} · {courtName} · {b.BookingDate:MMM d} {b.StartTime:h:mm tt}", CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.AddDays(10) });
+        var utcNow = _clock.UtcNow.UtcDateTime;
+        await _notifications.AddAsync(new Notification { BookingId = b.Id, Title = "Upcoming booking", Message = $"{b.CustomerName} · {courtName} · {b.BookingDate:MMM d} {b.StartTime:h:mm tt}", CreatedAt = utcNow, ExpiresAt = utcNow.AddDays(10) });
         await _notifications.SaveChangesAsync();
     }
 
@@ -233,7 +255,18 @@ public class BookingService : IBookingService
             : RateType.Booking;
 
     private async Task TrySendConfirmationAsync(Booking b, string courtName) { try { await _email.SendBookingConfirmationAsync(b, courtName); } catch { } }
+    private bool CanReschedule(Booking booking)
+    {
+        // SQL Server may materialize a UTC DateTime with Kind=Unspecified, so restore
+        // the storage contract before comparing it with the current UTC instant.
+        var createdAtUtc = booking.CreatedAt.Kind == DateTimeKind.Utc
+            ? booking.CreatedAt
+            : DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc);
+        var nowUtc = _clock.UtcNow.UtcDateTime;
+
+        return !booking.RescheduledAt.HasValue && nowUtc >= createdAtUtc && nowUtc <= createdAtUtc.AddHours(24);
+    }
     private static bool IsWithinCourtHours(TimeSlot slot, Court court) => slot.StartTime >= court.OpenTime && (court.CloseTime == TimeOnly.MinValue || slot.EndTime <= court.CloseTime);
     private static int Minutes(TimeOnly value, bool midnightAsEnd) => value == TimeOnly.MinValue && midnightAsEnd ? 1440 : value.Hour * 60 + value.Minute;
-    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.TotalAmount, b.AmountPaid, Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName));
+    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt);
 }

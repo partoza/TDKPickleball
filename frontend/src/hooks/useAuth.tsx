@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('token');
     if (token) {
       authService.getMe()
-        .then(res => setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword }))
+        .then(res => setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword, profileImageUrl: res.profileImageUrl }))
         .catch(() => {
           localStorage.removeItem('token');
           setUser(null);
@@ -36,19 +36,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (credentials: Record<string, string>) => {
     const res = await authService.login(credentials);
     localStorage.setItem('token', res.accessToken);
-    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword });
+    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword, profileImageUrl: res.profileImageUrl });
     return res;
   };
 
   const refreshUser = async () => {
     const res = await authService.getMe();
-    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword });
+    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword, profileImageUrl: res.profileImageUrl });
   };
 
   const completeGoogleLogin = async (code: string) => {
     const res = await authService.exchangeGoogleCode(code);
     localStorage.setItem('token', res.accessToken);
-    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword });
+    setUser({ email: res.email, firstName: res.firstName, lastName: res.lastName, role: res.role, mustChangePassword: res.mustChangePassword, profileImageUrl: res.profileImageUrl });
     return res;
   };
 

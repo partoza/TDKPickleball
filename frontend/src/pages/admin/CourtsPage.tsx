@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PencilSquareIcon as Edit2, ArrowPathIcon as LoaderCircle, PlusIcon as Plus, PowerIcon as Power, NoSymbolIcon as PowerOff } from '@heroicons/react/24/outline';
+import { PencilSquareIcon as Edit2, ArrowPathIcon as LoaderCircle, PlusIcon as Plus, PowerIcon as Power, NoSymbolIcon as PowerOff } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
 import { useCourts, useCreateCourt, useUpdateCourt } from '@/hooks/useCourts';
 import { Court } from '@/types';
@@ -11,8 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { AdminTimeSelect, hourlyOptions } from '@/components/admin/AdminFormControls';
+import { getApiErrorMessage } from '@/services/api';
 
 export default function CourtsPage() {
   const { data, isLoading } = useCourts(); const courts = data?.data || [];
@@ -27,16 +29,22 @@ export default function CourtsPage() {
     if (form.name.trim().length < 2) nextErrors.name = 'Enter a court name with at least 2 characters.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
-    const opts = { onSuccess: (r: any) => { if (!r.success) return toast.error(r.message); toast.success(editing ? 'Court updated' : 'Court added'); setEditing(undefined); }, onError: () => toast.error('Unable to save court') };
+    const opts = { onSuccess: (r: any) => { if (!r.success) return toast.error(r.message); toast.success(editing ? 'Court updated' : 'Court added'); setEditing(undefined); }, onError: (error: unknown) => toast.error(getApiErrorMessage(error, 'Unable to save court')) };
     if (editing) update.mutate({ id: editing.id, court: { ...form, isActive: editing.isActive, sortOrder: editing.sortOrder } }, opts); else create.mutate({ ...form, displayName: form.displayName || form.name }, opts);
   };
-  const toggle = (court: Court) => update.mutate({ id: court.id, court: { ...court, isActive: !court.isActive } }, { onSuccess: () => toast.success(`Court ${court.isActive ? 'disabled' : 'enabled'}`) });
+  const toggle = (court: Court) => update.mutate({ id: court.id, court: { ...court, isActive: !court.isActive } }, {
+    onSuccess: response => {
+      if (!response.success) return toast.error(response.message);
+      toast.success(`Court marked ${court.isActive ? 'inactive' : 'active'}`);
+    },
+    onError: error => toast.error(getApiErrorMessage(error, `Court could not be marked ${court.isActive ? 'inactive' : 'active'}`)),
+  });
   const pending = create.isPending || update.isPending;
   const paginatedCourts = courts.slice(page * 10, (page + 1) * 10);
   
-  return <div className="space-y-6"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Courts</h1><p className="mt-1 text-slate-500">Configure each court’s operating schedule.</p></div><Button onClick={() => open()}><Plus className="h-4 w-4" />Add Court</Button></div>
+  return <div className="space-y-6 max-w-[1500px] mx-auto"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Courts</h1><p className="mt-1 text-slate-500">Configure each court’s operating schedule.</p></div><Button onClick={() => open()}><Plus className="h-4 w-4" />Add Court</Button></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>All courts</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-3">{[1,2].map(x => <Skeleton key={x} className="h-14" />)}</div> : <div className="space-y-4">
-      <div className="rounded-xl border hidden md:block"><Table><TableHeader><TableRow><TableHead>Court</TableHead><TableHead>Operating hours</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{paginatedCourts.map(c => <TableRow key={c.id}><TableCell><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.displayName}</div></TableCell><TableCell>{time(c.openTime)}–{time(c.closeTime)}</TableCell><TableCell><Badge className={c.isActive ? 'bg-emerald-600' : ''} variant={c.isActive ? 'default' : 'secondary'}>{c.isActive ? 'Active' : 'Inactive'}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" onClick={() => open(c)}><Edit2 className="h-4 w-4" /></Button><Button size="icon" variant="ghost" onClick={() => toggle(c)}>{c.isActive ? <PowerOff className="h-4 w-4 text-red-600" /> : <Power className="h-4 w-4 text-emerald-600" />}</Button></div></TableCell></TableRow>)}</TableBody></Table></div>
+      <div className="rounded-xl border hidden md:block"><Table><TableHeader><TableRow><TableHead>Court</TableHead><TableHead>Operating hours</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{paginatedCourts.map(c => <TableRow key={c.id}><TableCell><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.displayName}</div></TableCell><TableCell>{time(c.openTime)}–{time(c.closeTime)}</TableCell><TableCell><Badge className={c.isActive ? 'bg-emerald-600' : ''} variant={c.isActive ? 'default' : 'secondary'}>{c.isActive ? 'Active' : 'Inactive'}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(c)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(c)} disabled={update.isPending}>{c.isActive ? <PowerOff className="h-4 w-4 text-red-600" /> : <Power className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{c.isActive ? 'Inactive' : 'Active'}</TooltipContent></Tooltip></TooltipProvider></div></TableCell></TableRow>)}</TableBody></Table></div>
       <div className="grid md:hidden gap-4">
         {paginatedCourts.map(c => (
           <div key={c.id} className="rounded-xl border p-4 space-y-3">
@@ -47,7 +55,7 @@ export default function CourtsPage() {
             <div className="text-sm text-muted-foreground">{time(c.openTime)} - {time(c.closeTime)}</div>
             <div className="flex gap-2 pt-2 border-t">
               <Button variant="outline" className="flex-1 gap-2" onClick={() => open(c)}><Edit2 className="h-4 w-4" /> Edit</Button>
-              <Button variant="outline" className="flex-1 gap-2 text-red-600 hover:text-red-700" onClick={() => toggle(c)}>{c.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />} {c.isActive ? 'Disable' : 'Enable'}</Button>
+              <Button variant="outline" className={cn('flex-1 gap-2', c.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700')} onClick={() => toggle(c)} disabled={update.isPending}>{c.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />} {c.isActive ? 'Inactive' : 'Active'}</Button>
             </div>
           </div>
         ))}

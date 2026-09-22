@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { addMonths, eachDayOfInterval, endOfWeek, format, isBefore, isSameDay, parseISO, startOfMonth, startOfWeek } from 'date-fns';
-import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
@@ -32,7 +32,7 @@ export function AdminTimeSelect({ value, onChange, options, placeholder = 'Selec
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <ClockIcon className="h-4 w-4 shrink-0 text-primary" />
           <span className={cn('min-w-0 flex-1 truncate text-left', !selectedOption && 'text-muted-foreground')}>{selectedOption?.label || placeholder}</span>
-          {selectedOption?.meta && <span className={cn('shrink-0 text-[9px] font-bold uppercase tracking-wide', selectedOption.disabled ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400')}>{selectedOption.meta}</span>}
+          {selectedOption?.meta && <span className={cn('shrink-0 text-[9px] font-bold uppercase tracking-wide', selectedOption.disabled ? 'text-destructive dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{selectedOption.meta}</span>}
         </div>
       </SelectTrigger>
       <SelectContent className="max-h-72">
@@ -40,7 +40,7 @@ export function AdminTimeSelect({ value, onChange, options, placeholder = 'Selec
           <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             <span className="flex w-full items-center justify-between gap-5">
               <span>{option.label}</span>
-              {option.meta && <span className={cn('text-[10px] font-semibold uppercase tracking-wide', option.disabled ? 'text-destructive/70' : 'text-emerald-600')}>{option.meta}</span>}
+              {option.meta && <span className={cn('text-[10px] font-semibold uppercase tracking-wide', option.disabled ? 'text-destructive dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{option.meta}</span>}
             </span>
           </SelectItem>
         ))}
@@ -71,7 +71,7 @@ export function AdminDatePicker({ value, onChange, minDate, invalid, displayRang
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className={cn('h-10 w-full justify-start gap-2 bg-transparent px-3 font-normal shadow-sm', invalid && 'field-invalid')}>
+        <Button type="button" variant="outline" className={cn('h-10 w-full justify-start gap-2 bg-transparent border border-input dark:border-white/10 px-3 font-normal shadow-sm hover:bg-transparent hover:text-accent-foreground', invalid && 'field-invalid')}>
           <CalendarDaysIcon className="h-4 w-4 shrink-0 text-primary" />
           <span>{label}</span>
         </Button>

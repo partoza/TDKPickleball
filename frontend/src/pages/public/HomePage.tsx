@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Star, Quote, } from 'lucide-react';
-import { CheckCircleIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/solid';
+import { ChatBubbleBottomCenterTextIcon as Quote, StarIcon as Star, CheckCircleIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/solid';
 
 const formatPesoAmount = (amount: number) => amount.toLocaleString('en-PH', {
   minimumFractionDigits: 2,
@@ -37,12 +36,12 @@ export default function HomePage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-start items-center">
-            <Button size="lg" className="w-full sm:w-auto text-base md:text-lg h-12 md:h-14 px-6 md:px-8 rounded-full bg-white text-primary font-bold hover:bg-white/90 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200" asChild>
+            <Button size="lg" className="w-full sm:w-auto text-base md:text-lg h-12 md:h-14 px-6 md:px-8 bg-white text-primary font-bold hover:bg-white/90 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200" asChild>
               <Link to={ROUTES.BOOKING}>
                 Book a Court Now
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto text-base md:text-lg h-12 md:h-14 px-6 md:px-8 rounded-full bg-black/10 backdrop-blur-sm border-2 border-white/80 text-white font-bold hover:bg-white hover:text-primary shadow-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200" asChild>
+            <Button size="lg" variant="outline" className="w-full sm:w-auto text-base md:text-lg h-12 md:h-14 px-6 md:px-8 bg-black/10 backdrop-blur-sm border-2 border-white/80 text-white font-bold hover:bg-white hover:text-primary shadow-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200" asChild>
               <Link to={ROUTES.SCHEDULE}>
                 View Schedule
               </Link>
@@ -199,7 +198,7 @@ export default function HomePage() {
               </div>
             </div>
             
-            <Button className="mt-8 md:mt-12 w-full sm:w-auto px-8 md:px-10 hover:scale-105 active:scale-95 transition-all duration-200 h-12 md:h-14 text-base md:text-lg font-bold rounded-full shadow-xl shadow-primary/25" asChild>
+            <Button className="mt-8 md:mt-12 w-full sm:w-auto px-8 md:px-10 hover:scale-105 active:scale-95 transition-all duration-200 h-12 md:h-14 text-base md:text-lg font-bold shadow-xl shadow-primary/25" asChild>
               <a href="https://maps.google.com/?q=Chixboy+Grill,+41+Luisa+Street,+Davao+City,+Davao,+Philippines" target="_blank" rel="noopener noreferrer">
                 Get Directions
               </a>

@@ -18,7 +18,7 @@ export function ratePricingId(rate: Rate, allRates: Rate[]) {
 export function calculateRateQuote(allRates: Rate[], startTime: string, endTime: string, rateType: RateType): RateQuote {
   const start = minutes(startTime);
   const end = minutes(endTime, true);
-  if (!startTime || !endTime || start >= end) return { total: 0, hours: 0, covered: false, lines: [] };
+  if (!startTime || !endTime || startTime.slice(0, 5) === endTime.slice(0, 5) || end - start < 60) return { total: 0, hours: 0, covered: false, lines: [] };
   const rates = allRates.filter(rate => rate.isActive && (rate.rateType || RateType.Booking) === rateType).sort((a, b) => a.startTime.localeCompare(b.startTime));
   const lines: RateQuoteLine[] = [];
   let cursor = start;

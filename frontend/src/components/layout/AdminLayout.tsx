@@ -3,8 +3,8 @@ import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, KeyIcon as Key } from '@heroicons/react/24/outline';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, KeyIcon as Key } from '@heroicons/react/24/solid';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,6 @@ export default function AdminLayout() {
   if (user?.role === 'Staff' && adminOnlyPaths.some(path => location.pathname.startsWith(path))) return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />;
 
   const initials = user ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` : 'JD';
-  const currentSection = location.pathname.split('/').filter(Boolean).at(-1)?.replace('-', ' ') || 'Overview';
 
   const bottomNavItems = [
     { icon: LayoutDashboard, label: 'Overview', href: ROUTES.ADMIN.DASHBOARD },
@@ -72,10 +71,6 @@ export default function AdminLayout() {
           <div className="flex items-center gap-3 min-w-0">
             <img src="/assets/images/tdk-logo.png" alt="Logo" className="h-8 w-auto md:hidden dark:hidden" />
             <img src="/tdk-logo-white.png" alt="Logo" className="h-8 w-auto hidden dark:block dark:md:hidden" />
-            <div className="min-w-0 hidden md:block">
-              <p className="truncate text-[13px] font-semibold capitalize tracking-[-0.01em]">{currentSection}</p>
-              <p className="text-[10px] text-muted-foreground">The Dirty Kitchen · Admin</p>
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="mac-toolbar-button text-muted-foreground hover:text-foreground md:hidden" onClick={toggleTheme} aria-label="Toggle theme">
@@ -95,6 +90,7 @@ export default function AdminLayout() {
                     <span className="text-[10px] text-muted-foreground mt-1">{user?.role || 'Administrator'}</span>
                   </div>
                   <Avatar className="h-8 w-8 border border-border shadow-sm">
+                    {user?.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={`${user.firstName} ${user.lastName}`} />}
                     <AvatarFallback className="bg-primary/5 text-primary text-xs font-semibold">{initials}</AvatarFallback>
                   </Avatar>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />

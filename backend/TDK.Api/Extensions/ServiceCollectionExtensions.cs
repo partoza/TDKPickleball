@@ -20,6 +20,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IRateService, RateService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddSingleton<IProfileImageService, CloudinaryProfileImageService>();
+        services.AddSingleton<IBusinessClock, ManilaBusinessClock>();
         services.AddHostedService<MaintenanceHostedService>();
 
         services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();

@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { CheckIcon as Check, ChevronDownIcon as ChevronDown, ChevronUpIcon as ChevronUp } from "@heroicons/react/24/solid"
 
 import { cn } from "@/lib/utils"
 
@@ -18,7 +18,7 @@ const SelectTrigger = React.forwardRef<
     data-slot="select-trigger"
     ref={ref}
     className={cn(
-      "flex h-9 w-full cursor-pointer items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 data-[state=open]:border-primary data-[state=open]:text-primary transition-colors",
+      "flex h-9 w-full cursor-pointer items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent dark:bg-[#3a3a3c] dark:border-white/10 px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 data-[state=open]:border-primary data-[state=open]:text-primary transition-colors",
       className
     )}
     {...props}

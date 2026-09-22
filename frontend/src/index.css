@@ -132,6 +132,18 @@
     font-size: 13px;
     letter-spacing: -0.01em;
   }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   
   /* Hide number input spinners globally */
   input[type="number"]::-webkit-inner-spin-button,

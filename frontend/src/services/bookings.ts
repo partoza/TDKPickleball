@@ -1,5 +1,6 @@
 import { api } from './api';
 import { Booking, ApiResponse, RateType } from '@/types';
+import { withSeconds } from '@/lib/time-range';
 
 export const bookingsService = {
   getAvailability: async (date: string, courtId: string) => {
@@ -9,7 +10,7 @@ export const bookingsService = {
   createBooking: async (payload: any): Promise<ApiResponse<Booking>> => {
     const mapped = {
       courtId: Number(payload.courtId), bookingDate: payload.bookingDate || payload.date,
-      startTime: payload.startTime, endTime: payload.endTime,
+      startTime: withSeconds(payload.startTime), endTime: withSeconds(payload.endTime),
       customerName: payload.customerName, email: payload.email || payload.customerEmail,
       phone: payload.phone || payload.customerPhone, notes: payload.notes, amountPaid: payload.amountPaid || 0,
       rateType: payload.rateType || RateType.Booking
@@ -37,10 +38,12 @@ export const bookingsService = {
     return data;
   },
   updateBooking: async ({ id, payload }: { id: number; payload: any }): Promise<ApiResponse<Booking>> => {
-    const { data } = await api.put(`/api/admin/bookings/${id}`, payload); return data;
+    const request = { ...payload, startTime: withSeconds(payload.startTime), endTime: withSeconds(payload.endTime) };
+    const { data } = await api.put(`/api/admin/bookings/${id}`, request); return data;
   },
   rescheduleBooking: async ({ id, payload }: { id: number; payload: any }): Promise<ApiResponse<Booking>> => {
-    const { data } = await api.post(`/api/admin/bookings/${id}/reschedule`, payload); return data;
+    const request = { ...payload, startTime: withSeconds(payload.startTime), endTime: withSeconds(payload.endTime) };
+    const { data } = await api.post(`/api/admin/bookings/${id}/reschedule`, request); return data;
   },
   confirmBooking: async (id: number): Promise<ApiResponse<Booking>> => {
     const { data } = await api.post(`/api/admin/bookings/${id}/confirm`);

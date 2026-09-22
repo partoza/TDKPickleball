@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 import { useAdminWeeklySchedules, useBulkUpdate, useUpdateSchedule } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MapPinIcon as MapPin, ArrowPathIcon as LoaderCircle } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MapPinIcon as MapPin, ArrowPathIcon as LoaderCircle } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -14,6 +14,10 @@ import { getApiErrorMessage } from '@/services/api';
 import { Input } from '@/components/ui/input';
 import { useRates } from '@/hooks/useRates';
 import { calculateRateQuote } from '@/lib/rate-calculation';
+import { isValidTimeRange, minimumEndTime, withSeconds } from '@/lib/time-range';
+import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
+import { allocateBatchPayment, BookingBlockErrors, BookingBlockValue, bookingBlocksTotal, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
+import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 
 function getWeekRangeString(start: Date, end: Date) {
   if (start.getFullYear() !== end.getFullYear()) {
@@ -80,7 +84,7 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
         {calendarDays.map(day => {
           const isCurrentMonth = day.getMonth() === viewDate.getMonth();
           const isSelected = format(day, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-          const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+          const isToday = format(day, 'yyyy-MM-dd') === getManilaDate();
           
           return (
             <button
@@ -105,10 +109,13 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number } | null>(null);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | '' } | null>(null);
   const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
+  const [scheduleBlocks, setScheduleBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
+  const [scheduleBlockErrors, setScheduleBlockErrors] = useState<BookingBlockErrors[]>([]);
+  const [savingBatch, setSavingBatch] = useState(false);
   const [viewModalData, setViewModalData] = useState<Schedule | null>(null);
   const bulkUpdateMutation = useBulkUpdate();
   const updateMutation = useUpdateSchedule();
@@ -145,16 +152,59 @@ export default function SchedulePage() {
   const weekSchedules = schedules || [];
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
   const modalQuote = bookingModalData ? calculateRateQuote(rates, bookingModalData.startTimeStr, bookingModalData.endTimeStr, modalRateType) : null;
+  const modalGrandTotal = bookingModalData?.id ? (modalQuote?.covered ? modalQuote.total : 0) : bookingBlocksTotal(scheduleBlocks, rates, modalRateType);
 
-  const handleSaveSchedule = () => {
-    if (!bookingModalData || !activeCourtId) return;
+  const handleSaveSchedule = async () => {
+    if (!bookingModalData) return;
     const needsContact = bookingModalData.status === 'Booked' || bookingModalData.status === 'Training';
     const errors: Record<string, string> = {};
     if (needsContact && !bookingModalData.bookedBy.trim()) errors.bookedBy = 'Booked by is required.';
     if (needsContact && bookingModalData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingModalData.email)) errors.email = 'Enter a valid email address.';
-    if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && bookingModalData.amountPaid < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
+
+    if (!bookingModalData.id) {
+      const rateType = bookingModalData.status === 'Training' ? RateType.Training : RateType.Booking;
+      const nextBlockErrors = validateBookingBlocks(scheduleBlocks, rates, rateType, {
+        requireRate: needsContact,
+      });
+      if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && Number(bookingModalData.amountPaid) < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
+      else if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && Number(bookingModalData.amountPaid) > modalGrandTotal) errors.amountPaid = `Reservation amount cannot exceed the total of ₱${modalGrandTotal.toLocaleString()}.`;
+      setScheduleErrors(errors);
+      setScheduleBlockErrors(nextBlockErrors);
+      if (Object.keys(errors).length || hasBookingBlockErrors(nextBlockErrors)) return;
+
+      setSavingBatch(true);
+      try {
+        const batchAmount = bookingModalData.paymentStatus === BookingStatus.Paid ? modalGrandTotal : Number(bookingModalData.amountPaid || 0);
+        const allocatedPayments = needsContact ? allocateBatchPayment(scheduleBlocks, rates, rateType, batchAmount) : scheduleBlocks.map(() => 0);
+        const results = [];
+        for (const [index, block] of scheduleBlocks.entries()) {
+          results.push(await bulkUpdateMutation.mutateAsync({
+            courtId: Number(block.courtId), date: block.date, startTime: block.startTime, endTime: block.endTime,
+            status: bookingModalData.status as any, notes: bookingModalData.notes,
+            bookedBy: needsContact ? bookingModalData.bookedBy : null,
+            email: needsContact ? bookingModalData.email : null,
+            phone: needsContact ? bookingModalData.phone : null,
+            paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Paid,
+            amountPaid: needsContact ? allocatedPayments[index] : 0,
+          }));
+        }
+        const failed = results.find((response: any) => response?.success === false);
+        if (failed) { toast.error(failed.message || 'One or more schedules could not be saved'); return; }
+        toast.success(`${results.length} ${results.length === 1 ? 'schedule' : 'schedules'} saved`);
+        setScheduleErrors({}); setScheduleBlockErrors([]); setBookingModalData(null);
+      } catch (error: any) {
+        toast.error(error.response?.status === 401 ? 'Your admin session expired. Please sign in again.' : getApiErrorMessage(error, 'Unable to save schedules'));
+      } finally {
+        setSavingBatch(false);
+      }
+      return;
+    }
+
+    if (!activeCourtId) return;
+    if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && Number(bookingModalData.amountPaid) < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
+    else if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && modalQuote?.covered && Number(bookingModalData.amountPaid) > modalQuote.total) errors.amountPaid = `Reservation amount cannot exceed the total of ₱${modalQuote.total.toLocaleString()}.`;
     if (needsContact && !modalQuote?.covered) errors.rate = 'No active rate covers the complete selected schedule.';
-    if (!bookingModalData.endTimeStr.startsWith('00:00') && bookingModalData.startTimeStr >= bookingModalData.endTimeStr) errors.endTimeStr = 'End time must be after start time.';
+    if (!isValidTimeRange(bookingModalData.startTimeStr, bookingModalData.endTimeStr)) errors.endTimeStr = 'End time must be at least 1 hour after start time.';
     setScheduleErrors(errors);
     if (Object.keys(errors).length) return;
     const payload = {
@@ -167,8 +217,8 @@ export default function SchedulePage() {
       bookedBy: needsContact ? bookingModalData.bookedBy : null,
       email: needsContact ? bookingModalData.email : null,
       phone: needsContact ? bookingModalData.phone : null,
-      paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Reserved,
-      amountPaid: needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved ? bookingModalData.amountPaid : 0,
+      paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Paid,
+      amountPaid: needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved ? Number(bookingModalData.amountPaid) : 0,
     };
     const mutation = bookingModalData.id
       ? { mutate: (p: any, o: any) => updateMutation.mutate({ id: bookingModalData.id!, update: p }, o) }
@@ -281,12 +331,14 @@ export default function SchedulePage() {
           <div className="w-full lg:w-auto mt-2 lg:mt-0">
             <button 
               onClick={() => {
+                setScheduleBlocks([createBookingBlock({ courtId: activeCourtId, date: format(currentDate, 'yyyy-MM-dd') })]);
+                setScheduleBlockErrors([]);
                 setBookingModalData({
                   dateStr: format(currentDate, 'yyyy-MM-dd'),
                   startTimeStr: '07:00:00',
                   endTimeStr: '08:00:00',
                   status: 'Booked',
-                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Reserved, amountPaid: 0
+                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: ''
                 });
               }}
               className="h-11 sm:h-9 w-full sm:px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-[14px] sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
@@ -301,7 +353,7 @@ export default function SchedulePage() {
         <div className="md:hidden flex overflow-x-auto gap-2 mb-4 snap-x custom-scrollbar pb-2">
           {weekDays.map(date => {
             const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+            const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
             return (
               <button 
                 key={date.toISOString()}
@@ -334,7 +386,7 @@ export default function SchedulePage() {
               
               {weekDays.map(date => {
                 const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-                const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
                 return (
                   <div 
                     key={date.toISOString()} 
@@ -389,7 +441,8 @@ export default function SchedulePage() {
                          const scheduleRecord = weekSchedules.find(s => s.date === dStr && s.startTime === timeStr);
                          const slot = scheduleRecord?.status === ScheduleStatus.Available ? undefined : scheduleRecord;
                         const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
-                        const isToday = dStr === format(new Date(), 'yyyy-MM-dd');
+                        const isToday = dStr === getManilaDate(new Date(clock));
+                        const isPastStart = isPastManilaStart(dStr, timeStr, new Date(clock));
                         
                         return (
                           <div 
@@ -397,17 +450,25 @@ export default function SchedulePage() {
                             className={cn(
                               "border-l border-slate-200 p-1.5 h-[90px] relative group/cell transition-colors",
                               isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
-                              !slot && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
+                              !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
+                              !slot && isPastStart && "cursor-not-allowed bg-slate-100/70 dark:bg-white/[0.03]",
                               isSelectedDay ? "block" : "hidden md:block"
                             )}
                             onClick={() => {
-                              if (!slot) {
+                              if (!slot && !isPastStart) {
+                                setScheduleBlocks([createBookingBlock({
+                                  courtId: activeCourtId,
+                                  date: dStr,
+                                  startTime: timeStr.slice(0, 5),
+                                  endTime: hour + 1 === 24 ? '00:00' : `${(hour + 1).toString().padStart(2, '0')}:00`,
+                                })]);
+                                setScheduleBlockErrors([]);
                                 setBookingModalData({
                                   dateStr: dStr,
                                   startTimeStr: timeStr,
                                   endTimeStr: hour + 1 === 24 ? '00:00:00' : `${(hour + 1).toString().padStart(2, '0')}:00:00`,
                                   status: 'Booked',
-                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Reserved, amountPaid: 0
+                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: ''
                                 });
                               }
                             }}
@@ -436,7 +497,9 @@ export default function SchedulePage() {
                                 </div>
                               </div>
                               );
-                            })() : (
+                            })() : isPastStart ? (
+                              <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Past</div>
+                            ) : (
                               <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm border border-primary/20">
                                   <Plus className="h-4 w-4" />
@@ -456,12 +519,12 @@ export default function SchedulePage() {
       </div>
 
       {/* Booking Modal */}
-      <Dialog open={!!bookingModalData} onOpenChange={(open) => { if (!open) { setBookingModalData(null); setScheduleErrors({}); } }}>
+      <Dialog open={!!bookingModalData} onOpenChange={(open) => { if (!open) { setBookingModalData(null); setScheduleErrors({}); setScheduleBlockErrors([]); } }}>
         <DialogContent className="schedule-form-modal sm:max-w-[760px] p-0 bg-white text-slate-900 dark:bg-[#2c2c2e] dark:text-slate-100 rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
           
           <div className="px-6 pt-6 pb-2 sm:px-7 sm:pt-7 sm:pb-2 shrink-0">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Schedule</DialogTitle>
+              <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{bookingModalData?.id ? 'Edit Schedule' : 'New Schedule'}</DialogTitle>
               <DialogDescription className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
                 Block out court time or add a new booking.
               </DialogDescription>
@@ -471,8 +534,18 @@ export default function SchedulePage() {
           <div className="px-6 sm:px-7 pb-6 overflow-y-auto custom-scrollbar flex-1">
             {bookingModalData && (
               <div className="schedule-form mt-4 space-y-5">
+                {!bookingModalData.id && <BookingBlocksEditor
+                  blocks={scheduleBlocks}
+                  onChange={blocks => { setScheduleBlocks(blocks); setScheduleBlockErrors([]); setScheduleErrors(current => ({...current, amountPaid: ''})); }}
+                  courts={courts}
+                  rates={rates}
+                  rateType={modalRateType}
+                  errors={scheduleBlockErrors}
+                  showQuote={bookingModalData.status === 'Booked' || bookingModalData.status === 'Training'}
+                  addLabel="Add Another Schedule"
+                />}
                 {/* Vercel-like Data Badge using Brand Palette */}
-                <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-white p-3.5 pl-4 shadow-sm dark:border-primary/30 dark:bg-[#3a3a3c]">
+                {bookingModalData.id && <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-white p-3.5 pl-4 shadow-sm dark:border-primary/30 dark:bg-[#3a3a3c]">
                   <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10">
                     <CalendarIcon className="h-[18px] w-[18px] text-white" />
@@ -483,14 +556,14 @@ export default function SchedulePage() {
                       {format(new Date(bookingModalData.dateStr + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
                     </span>
                   </div>
-                </div>
+                </div>}
 
                 {/* Form Fields */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                  {bookingModalData.id && <div className="grid grid-cols-2 gap-4 sm:col-span-2">
                     <div className="space-y-1.5">
-                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Start Time</label>
-                      <Select value={bookingModalData.startTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, startTimeStr: val}); setScheduleErrors(e => ({...e, startTimeStr: '', endTimeStr: ''})); }}>
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Start Time *</label>
+                      <Select value={bookingModalData.startTimeStr} onValueChange={(val) => { const endTime = isValidTimeRange(val, bookingModalData.endTimeStr) ? bookingModalData.endTimeStr : withSeconds(minimumEndTime(val)); setBookingModalData({...bookingModalData, startTimeStr: val, endTimeStr: endTime}); setScheduleErrors(e => ({...e, startTimeStr: '', endTimeStr: ''})); }}>
                         <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
                           <SelectValue placeholder="Start" />
                         </SelectTrigger>
@@ -514,7 +587,7 @@ export default function SchedulePage() {
                     </div>
                     
                     <div className="space-y-1.5">
-                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">End Time</label>
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">End Time *</label>
                       <Select value={bookingModalData.endTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, endTimeStr: val}); setScheduleErrors(e => ({...e, endTimeStr: ''})); }}>
                         <SelectTrigger aria-invalid={!!scheduleErrors.endTimeStr} className={cn("w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium", scheduleErrors.endTimeStr && "field-invalid")}>
                           <SelectValue placeholder="End" />
@@ -529,7 +602,7 @@ export default function SchedulePage() {
                               return h < 12 ? `${h}AM` : `${h - 12}PM`;
                             };
                             return (
-                              <SelectItem key={hStr} value={hStr} className="text-[13px] font-medium rounded-lg py-2">
+                              <SelectItem key={hStr} value={hStr} disabled={!isValidTimeRange(bookingModalData.startTimeStr, hStr)} className="text-[13px] font-medium rounded-lg py-2">
                                 {formatHourLabel(hour)}
                               </SelectItem>
                             );
@@ -538,10 +611,10 @@ export default function SchedulePage() {
                       </Select>
                       {scheduleErrors.endTimeStr && <p className="field-error" role="alert">{scheduleErrors.endTimeStr}</p>}
                     </div>
-                  </div>
+                  </div>}
 
                   <div className="space-y-1.5">
-                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Status</label>
+                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Status *</label>
                     <Select value={bookingModalData.status} onValueChange={(val) => { setBookingModalData({...bookingModalData, status: val}); setScheduleErrors({}); }}>
                       <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
                         <SelectValue placeholder="Select status" />
@@ -556,7 +629,7 @@ export default function SchedulePage() {
                   </div>
                   
                   <div className="space-y-1.5">
-                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Notes</label>
+                    <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Notes</label>
                     <Input
                       value={bookingModalData.notes}
                       onChange={(e) => setBookingModalData({...bookingModalData, notes: e.target.value})}
@@ -566,12 +639,12 @@ export default function SchedulePage() {
                   </div>
                   {(bookingModalData.status === 'Booked' || bookingModalData.status === 'Training') && (
                     <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2 sm:grid-cols-2 dark:border-white/10 dark:bg-[#323234]">
-                      {modalQuote && <div className={cn("rounded-xl border p-3 sm:col-span-2", modalQuote.covered ? "border-primary/25 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20")}><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{modalQuote.covered ? modalQuote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString()} (${line.pricingId})`).join(' + ') : `No ${modalRateType} rate covers the complete schedule.`}</p></div><p className="shrink-0 text-xl font-bold text-primary">{modalQuote.covered ? `₱${modalQuote.total.toLocaleString()}` : '—'}</p></div></div>}
+                      {bookingModalData.id && modalQuote && <div className={cn("rounded-xl border p-3 sm:col-span-2", modalQuote.covered ? "border-primary/25 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20")}><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{modalQuote.covered ? modalQuote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${modalRateType} rate covers the complete schedule.`}</p></div><p className="shrink-0 text-base font-bold text-primary">{modalQuote.covered ? `₱${modalQuote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p></div></div>}
                       <div className="space-y-1.5 sm:col-span-2"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Booked By *</label><Input aria-invalid={!!scheduleErrors.bookedBy} value={bookingModalData.bookedBy} onChange={e => { setBookingModalData({...bookingModalData, bookedBy: e.target.value}); setScheduleErrors(v => ({...v, bookedBy: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.bookedBy && "field-invalid")} placeholder="Customer or trainee name" />{scheduleErrors.bookedBy && <p className="field-error" role="alert">{scheduleErrors.bookedBy}</p>}</div>
-                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, email: e.target.value}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email (optional)</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, email: e.target.value}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, phone: e.target.value})} className="h-10 text-[13px]" placeholder="Optional phone number" /></div>
-                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? 0 : bookingModalData.amountPaid})}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
-                      {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Reservation Amount</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.amountPaid && "field-invalid")} placeholder="0.00" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment *</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? '' : bookingModalData.amountPaid})}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
+                      {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Reservation Amount</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" max={modalGrandTotal} step="0.01" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: e.target.value === '' ? '' : Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.amountPaid && "field-invalid")} placeholder="0" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}
                     </div>
                   )}
                 </div>
@@ -583,17 +656,17 @@ export default function SchedulePage() {
             <button 
               className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" 
               onClick={() => setBookingModalData(null)}
-              disabled={bulkUpdateMutation.isPending || updateMutation.isPending}
+              disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}
             >
               Cancel
             </button>
             <button 
               onClick={handleSaveSchedule}
-              disabled={bulkUpdateMutation.isPending || updateMutation.isPending}
+              disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}
               className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
             >
               {bookingModalData?.id ? 'Update Schedule' : 'Save Schedule'}
-              {(bulkUpdateMutation.isPending || updateMutation.isPending) && <LoaderCircle className="h-4 w-4 animate-spin" />}
+              {(savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending) && <LoaderCircle className="h-4 w-4 animate-spin" />}
             </button>
           </div>
         </DialogContent>
@@ -622,7 +695,9 @@ export default function SchedulePage() {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date & Time</span>
                     <span className="text-[13px] font-bold text-slate-900">
                       {format(new Date(viewModalData.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')} <br/>
-                      <span className="text-slate-500 font-medium">{viewModalData.startTime} - {viewModalData.endTime}</span>
+                      <span className="text-slate-500 font-medium">
+                        {format(new Date(`2000-01-01T${viewModalData.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${viewModalData.endTime}`), 'h:mm a')}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -636,7 +711,7 @@ export default function SchedulePage() {
                       </span>
                     </div>
                   </div>
-                  {(viewModalData.status === ScheduleStatus.Booked || viewModalData.status === ScheduleStatus.Training) && <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment</label><div className="mt-1 flex items-center gap-2"><span className={cn("rounded-md px-2.5 py-1 text-xs font-bold", viewModalData.paymentStatus === BookingStatus.Paid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{viewModalData.paymentStatus === BookingStatus.Paid ? 'Paid' : 'Reservation'}</span>{viewModalData.paymentStatus !== BookingStatus.Paid && <span className="text-xs font-medium text-slate-600">₱{(viewModalData.amountPaid || 0).toLocaleString()} paid</span>}</div></div>}
+                  {(viewModalData.status === ScheduleStatus.Booked || viewModalData.status === ScheduleStatus.Training) && <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payment</label><div className="mt-1 flex items-center gap-2"><span className={cn("rounded-md px-2.5 py-1 text-xs font-bold shadow-sm", viewModalData.paymentStatus === BookingStatus.Paid ? "bg-emerald-600 text-white" : "bg-amber-500 text-white")}>{viewModalData.paymentStatus === BookingStatus.Paid ? 'Paid' : 'Reservation'}</span>{viewModalData.paymentStatus !== BookingStatus.Paid && <span className="text-xs font-medium text-slate-600">₱{(viewModalData.amountPaid || 0).toLocaleString()} paid</span>}</div></div>}
                   
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Booked By / Notes</label>
@@ -652,7 +727,7 @@ export default function SchedulePage() {
           </div>
           
           <div className="p-4 sm:px-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-            {viewModalData && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || 0 }); setViewModalData(null); }}>Edit Details</button>}
+            {viewModalData && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '' }); setViewModalData(null); }}>Edit Details</button>}
             <button 
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}

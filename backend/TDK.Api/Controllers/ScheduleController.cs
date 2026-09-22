@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using TDK.Application.DTOs.Schedules;
 using TDK.Application.Interfaces;
@@ -17,6 +18,7 @@ public class ScheduleController : ControllerBase
     }
 
     [HttpGet("api/schedule-board")]
+    [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> GetBoard([FromQuery] DateOnly date) => Ok(await _scheduleService.GetBoardAsync(date));
 
     [HttpGet("api/admin/schedules")]

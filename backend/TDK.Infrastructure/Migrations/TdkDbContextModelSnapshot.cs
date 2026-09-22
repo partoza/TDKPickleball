@@ -212,6 +212,9 @@ namespace TDK.Infrastructure.Migrations
                     b.Property<DateTime?>("ReminderSentAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("RescheduledAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time");
 
@@ -684,6 +687,14 @@ namespace TDK.Infrastructure.Migrations
 
                     b.Property<bool>("MustChangePassword")
                         .HasColumnType("bit");
+
+                    b.Property<string>("ProfileImagePublicId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ProfileImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)

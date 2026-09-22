@@ -8,4 +8,6 @@ public class ApplicationUser : IdentityUser
     public string LastName { get; set; } = null!;
     public bool IsActive { get; set; } = true;
     public bool MustChangePassword { get; set; }
+    public string? ProfileImageUrl { get; set; }
+    public string? ProfileImagePublicId { get; set; }
 }

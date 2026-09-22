@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TDK.Domain.Entities;
 using TDK.Domain.Interfaces;
 
@@ -16,5 +17,6 @@ public class TimeSlotController : ControllerBase
     }
 
     [HttpGet]
+    [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> GetAll() => Ok(await _timeSlotRepo.GetAllAsync());
 }

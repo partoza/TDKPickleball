@@ -70,9 +70,10 @@ export interface Booking {
   remainingBalance: number;
   status: BookingStatus;
   bookingType: RateType;
-  notes?: string;
-  createdAt: string;
-  receiptAvailable?: boolean;
+    notes?: string;
+    createdAt: string;
+    rescheduledAt?: string;
+    receiptAvailable?: boolean;
 }
 
 export interface Rate {
@@ -123,6 +124,7 @@ export interface AuthResponse {
   lastName: string;
   role: string;
   mustChangePassword: boolean;
+  profileImageUrl?: string;
 }
 
 export interface SystemUser {
@@ -133,4 +135,5 @@ export interface SystemUser {
   role: 'Admin' | 'Staff';
   isActive: boolean;
   mustChangePassword: boolean;
+  profileImageUrl?: string;
 }

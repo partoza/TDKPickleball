@@ -23,5 +23,7 @@ public class TdkDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        builder.Entity<ApplicationUser>().Property(user => user.ProfileImageUrl).HasMaxLength(2048);
+        builder.Entity<ApplicationUser>().Property(user => user.ProfileImagePublicId).HasMaxLength(255);
     }
 }

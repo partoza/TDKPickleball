@@ -1,130 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { useCreateBooking, useAvailability } from '@/hooks/useBookings';
+import { useCreateBooking } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
 import QRCode from 'react-qr-code';
+import { TDK_ICON_URL } from '@/lib/branding';
 import { Booking, RateType } from '@/types';
-import { CheckCircle2, Clock3, LoaderCircle, Plus, QrCode, Trash2, Upload } from 'lucide-react';
+import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, ArrowPathIcon as LoaderCircle, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload } from '@heroicons/react/24/solid';
 import { calculateRateQuote } from '@/lib/rate-calculation';
 import { cn } from '@/lib/utils';
-import { AdminDatePicker, AdminTimeSelect, formatTimeLabel, TimeOption } from '@/components/admin/AdminFormControls';
+import { formatTimeLabel } from '@/components/admin/AdminFormControls';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
+import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
+import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
 
 const BOOKING_DRAFT_KEY = 'tdk-public-booking-draft';
 
 function FieldError({ message }: { message?: string }) { 
   return message ? <p className="text-[13px] text-red-500 font-medium mt-1.5">{message}</p> : null; 
-}
-
-function BookingBlockItem({ block, index, onChange, onRemove, courts, rates, errors }: any) {
-  const set = (k: string, v: any) => {
-    const updated = { ...block, [k]: v };
-    if (k === 'courtId' || k === 'date') {
-      updated.startTime = '';
-      updated.endTime = '';
-    }
-    if (k === 'startTime') {
-      updated.endTime = '';
-    }
-    onChange(index, updated);
-  };
-
-  const { data: availabilityResponse, isFetching: availabilityLoading } = useAvailability(block.date, block.courtId);
-  const availableSlots = availabilityResponse?.data?.availableSlots || [];
-  const occupiedSlots = availabilityResponse?.data?.occupiedSlots || [];
-  const slots = [...availableSlots.map((slot: any) => ({ ...slot, occupied: false })), ...occupiedSlots.map((slot: any) => ({ ...slot, occupied: true }))].sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
-
-  const startOptions: TimeOption[] = slots.map((slot: any) => ({ value: slot.startTime.slice(0, 5), label: formatTimeLabel(slot.startTime), disabled: slot.occupied, meta: slot.occupied ? 'Occupied' : 'Available' }));
-  const startIndex = slots.findIndex((slot: any) => slot.startTime.slice(0, 5) === block.startTime);
-  const endOptions: TimeOption[] = startIndex < 0 ? [] : slots.slice(startIndex).map((slot: any, idx: number) => {
-    const blocked = slots.slice(startIndex, startIndex + idx + 1).some((candidate: any) => candidate.occupied);
-    return { value: slot.endTime.slice(0, 5), label: formatTimeLabel(slot.endTime), disabled: blocked, meta: blocked ? 'Occupied' : 'Available' };
-  });
-
-  const timeDisabled = !block.courtId || !block.date || availabilityLoading;
-  const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
-
-  return (
-    <div className="relative p-4 rounded-xl border bg-card mb-4 shadow-sm">
-      <div className="absolute top-4 right-4">
-        {onRemove && (
-          <Button type="button" variant="ghost" size="icon" onClick={() => onRemove(index)} className="h-8 w-8 text-muted-foreground hover:text-red-600">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-      <h4 className="font-semibold mb-4 text-sm">Booking Block {index + 1}</h4>
-      
-      <div className="grid gap-4">
-        <div>
-          <Label>Court *</Label>
-          <Select value={block.courtId} onValueChange={v => set('courtId', v)}>
-            <SelectTrigger className={cn(errors?.courtId && 'border-red-500 ring-red-500', 'w-full')}>
-              <SelectValue placeholder="Select court" />
-            </SelectTrigger>
-            <SelectContent>
-              {courts.filter((c: any) => c.isActive).map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldError message={errors?.courtId} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <Label>Date *</Label>
-            <AdminDatePicker invalid={!!errors?.date} minDate={new Date()} value={block.date} onChange={value => set('date', value)} />
-            <FieldError message={errors?.date} />
-          </div>
-          <div>
-            <Label>Start *</Label>
-            <AdminTimeSelect invalid={!!errors?.startTime} value={block.startTime} onChange={value => set('startTime', value)} options={startOptions} disabled={timeDisabled} placeholder={availabilityLoading ? 'Checking…' : 'Select start'} />
-            <FieldError message={errors?.startTime} />
-          </div>
-          <div>
-            <Label>End *</Label>
-            <AdminTimeSelect invalid={!!errors?.endTime} value={block.endTime} onChange={value => set('endTime', value)} options={endOptions} disabled={timeDisabled || !block.startTime} placeholder="Select end" />
-            <FieldError message={errors?.endTime} />
-          </div>
-        </div>
-
-        {block.courtId && block.date && !availabilityLoading && !slots.length && (
-          <p className="rounded-lg bg-primary/5 px-3 py-2 text-xs font-medium text-primary">No configured time slots are available for this court and date.</p>
-        )}
-
-        {!!block.startTime && !!block.endTime && (
-          <div>
-            <div className={cn('rounded-xl border p-3.5', quote.covered ? 'border-primary/20 bg-primary/5' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20')}>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculated total</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {quote.covered 
-                      ? quote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString()}`).join(' + ') 
-                      : `No ${RateType.Booking} rate covers the complete time range.`}
-                  </p>
-                </div>
-                <p className="shrink-0 text-xl font-bold text-primary">
-                  {quote.covered ? `₱${quote.total.toLocaleString()}` : '—'}
-                </p>
-              </div>
-            </div>
-            <FieldError message={errors?.rate} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function groupSlots(slots: any[]) {
@@ -155,7 +54,7 @@ export default function BookingPage() {
   const { user, isLoading: authLoading } = useAuth();
   const isGoogleCustomer = user?.role === 'Customer';
   
-  const [blocks, setBlocks] = useState<any[]>([]);
+  const [blocks, setBlocks] = useState<BookingBlockValue[]>([]);
   const [step, setStep] = useState(1);
   const [customerName, setCustomerName] = useState('');
   const [email, setEmail] = useState('');
@@ -166,6 +65,7 @@ export default function BookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [receiptError, setReceiptError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [paymentExpiresAt, setPaymentExpiresAt] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(10 * 60);
   const [paymentQrUnavailable, setPaymentQrUnavailable] = useState(false);
@@ -181,9 +81,9 @@ export default function BookingPage() {
     try { savedBlocks = JSON.parse(sessionStorage.getItem(BOOKING_DRAFT_KEY) || '{}').blocks || []; } catch { savedBlocks = []; }
     const initial = pickedSlots.length ? groupSlots(pickedSlots) : savedBlocks;
     if (initial.length === 0) {
-      setBlocks([{ courtId: '', date: format(new Date(), 'yyyy-MM-dd'), startTime: '', endTime: '' }]);
+      setBlocks([createBookingBlock()]);
     } else {
-      setBlocks(initial);
+      setBlocks(initial.map((block: Partial<BookingBlockValue>) => createBookingBlock(block)));
     }
   }, []);
 
@@ -194,7 +94,7 @@ export default function BookingPage() {
     try {
       const draft = JSON.parse(sessionStorage.getItem(BOOKING_DRAFT_KEY) || '{}');
       if (Array.isArray(draft.blocks) && draft.blocks.length && draft.resumeStep === 2) {
-        setBlocks(draft.blocks);
+        setBlocks(draft.blocks.map((block: Partial<BookingBlockValue>) => createBookingBlock(block)));
         setStep(2);
       }
     } catch { sessionStorage.removeItem(BOOKING_DRAFT_KEY); }
@@ -208,7 +108,7 @@ export default function BookingPage() {
       setSecondsLeft(remaining);
 
       if (remaining === 0) {
-        setBlocks([{ courtId: '', date: format(new Date(), 'yyyy-MM-dd'), startTime: '', endTime: '' }]);
+        setBlocks([createBookingBlock()]);
         setCustomerName('');
         setEmail('');
         setPhone('');
@@ -218,7 +118,7 @@ export default function BookingPage() {
         setErrors({});
         setPaymentExpiresAt(null);
         sessionStorage.removeItem(BOOKING_DRAFT_KEY);
-        toast.error('Your payment time expired. The booking form was cleared.');
+        setSubmitError('Your payment time expired. The booking form was cleared.');
         navigate('/');
       }
     };
@@ -228,58 +128,10 @@ export default function BookingPage() {
     return () => window.clearInterval(timer);
   }, [step, paymentExpiresAt, navigate]);
 
-  const updateBlock = (index: number, updated: any) => {
-    const newBlocks = [...blocks];
-    newBlocks[index] = updated;
-    setBlocks(newBlocks);
-    
-    // Clear errors for this block
-    if (errors.blocks && errors.blocks[index]) {
-      const newErrors = { ...errors };
-      newErrors.blocks[index] = {};
-      setErrors(newErrors);
-    }
-  };
-
-  const removeBlock = (index: number) => {
-    if (blocks.length <= 1) return;
-    const newBlocks = [...blocks];
-    newBlocks.splice(index, 1);
-    setBlocks(newBlocks);
-    
-    if (errors.blocks) {
-      const newErrors = { ...errors };
-      newErrors.blocks.splice(index, 1);
-      setErrors(newErrors);
-    }
-  };
-
-  const addBlock = () => {
-    setBlocks([...blocks, { courtId: '', date: format(new Date(), 'yyyy-MM-dd'), startTime: '', endTime: '' }]);
-  };
-
   const validateStep1 = () => {
-    let isValid = true;
-    const newErrors: any = {};
-    newErrors.blocks = [];
-
-    blocks.forEach((block, idx) => {
-      const blockErr: any = {};
-      if (!block.courtId) { blockErr.courtId = 'Select a court.'; isValid = false; }
-      if (!block.date) { blockErr.date = 'Date is required.'; isValid = false; }
-      if (!block.startTime) { blockErr.startTime = 'Select a start time.'; isValid = false; }
-      if (!block.endTime) { blockErr.endTime = 'Select an end time.'; isValid = false; }
-      else if (block.endTime !== '00:00' && block.startTime >= block.endTime) { blockErr.endTime = 'End time must be after start time.'; isValid = false; }
-      
-      if (block.startTime && block.endTime && !calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking).covered) {
-        blockErr.rate = 'No active rate covers the complete selected time.';
-        isValid = false;
-      }
-      newErrors.blocks[idx] = blockErr;
-    });
-
-    setErrors(newErrors);
-    return isValid;
+    const blockErrors = validateBookingBlocks(blocks, rates, RateType.Booking);
+    setErrors({ blocks: blockErrors });
+    return !hasBookingBlockErrors(blockErrors);
   };
 
   const validateStep2 = () => {
@@ -365,12 +217,10 @@ export default function BookingPage() {
       
       const successful = results.filter(r => r.success).map(r => r.data!);
       if (successful.length === 0) {
-        toast.error("Failed to submit any bookings. Please try again.");
+        setSubmitError("Failed to submit any bookings. Please try again.");
       } else {
         if (successful.length < blocks.length) {
-          toast.warning(`Successfully booked ${successful.length} out of ${blocks.length} blocks.`);
-        } else {
-          toast.success("All bookings submitted successfully!");
+          setSubmitError(`Successfully booked ${successful.length} out of ${blocks.length} blocks. Some failed.`);
         }
         setCreatedBookings(successful);
         setPaymentExpiresAt(null);
@@ -378,7 +228,7 @@ export default function BookingPage() {
         setStep(4);
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to submit bookings");
+      setSubmitError(error.response?.data?.message || "Failed to submit bookings");
     } finally {
       setIsSubmitting(false);
     }
@@ -389,7 +239,7 @@ export default function BookingPage() {
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <Card className="text-center p-8 border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-900">
           <div className="h-20 w-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <CheckIcon className="h-10 w-10" aria-hidden="true" />
           </div>
           <CardTitle className="text-2xl mb-4 text-green-800 dark:text-green-400">Booking Confirmed!</CardTitle>
           <CardDescription className="text-base text-green-700/80 dark:text-green-500/80 mb-8">
@@ -401,15 +251,19 @@ export default function BookingPage() {
               <div key={i} className="rounded-2xl border bg-white p-5 max-w-[280px] w-full text-left">
                 <p className="text-sm font-semibold mb-1 text-slate-900">{b.courtName}</p>
                 <p className="text-xs text-slate-500 mb-4">{format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(b.startTime)} - {formatTimeLabel(b.endTime)}</p>
-                <div className="flex justify-center mb-4">
-                  <QRCode value={b.bookingReference} size={150} />
+                <div className="relative mx-auto mb-4 h-[150px] w-[150px]">
+                  <QRCode value={b.bookingReference} size={150} level="H" />
+                  <span className="absolute left-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg bg-white p-1.5 shadow-sm">
+                    <img src={TDK_ICON_URL} alt="" className="h-full w-full object-contain" />
+                  </span>
                 </div>
                 <p className="font-mono font-bold text-center text-slate-900">{b.bookingReference}</p>
+                <p className="mt-1 text-center text-sm font-semibold text-slate-700">Booked for {b.customerName}</p>
               </div>
             ))}
           </div>
 
-          <Button onClick={() => { setBlocks([{ courtId: '', date: format(new Date(), 'yyyy-MM-dd'), startTime: '', endTime: '' }]); setCreatedBookings([]); setCustomerName(''); setEmail(''); setPhone(''); setNotes(''); setReceipt(null); setReceiptError(''); setStep(1); }} className="mx-auto">
+          <Button onClick={() => { setBlocks([createBookingBlock()]); setCreatedBookings([]); setCustomerName(''); setEmail(''); setPhone(''); setNotes(''); setReceipt(null); setReceiptError(''); setStep(1); }} className="mx-auto hover:scale-105 transition-all duration-200">
             Book Another Court
           </Button>
         </Card>
@@ -471,22 +325,7 @@ export default function BookingPage() {
           <CardContent className="space-y-6">
             {step === 1 && (
               <div>
-                {blocks.map((block, idx) => (
-                  <BookingBlockItem 
-                    key={idx} 
-                    block={block} 
-                    index={idx} 
-                    onChange={updateBlock} 
-                    onRemove={blocks.length > 1 ? removeBlock : undefined} 
-                    courts={courts} 
-                    rates={rates} 
-                    errors={errors?.blocks?.[idx]} 
-                  />
-                ))}
-                
-                <Button type="button" variant="outline" className="w-full mt-2 border-dashed" onClick={addBlock}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Another Booking
-                </Button>
+                <BookingBlocksEditor blocks={blocks} onChange={setBlocks} courts={courts} rates={rates} rateType={RateType.Booking} errors={errors?.blocks} />
               </div>
             )}
 
@@ -500,7 +339,7 @@ export default function BookingPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">Email Address (optional)</Label>
                     <Input id="email" type="email" value={email} readOnly aria-readonly="true" className={cn('cursor-not-allowed bg-muted/60', errors.email && 'border-red-500 ring-red-500')} />
                     <p className="text-xs text-muted-foreground">Verified by Google and used for this booking.</p>
                     <FieldError message={errors.email} />
@@ -528,7 +367,7 @@ export default function BookingPage() {
                           <div>
                             <span className="font-medium">{courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
                             <span className="text-muted-foreground ml-2">
-                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {b.startTime} - {b.endTime}
+                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
                             </span>
                           </div>
                           <span className="font-medium text-primary">
@@ -565,7 +404,7 @@ export default function BookingPage() {
                   <div className="rounded-2xl border bg-muted/20 p-5 text-center">
                     <div className="mx-auto mb-4 flex h-10 w-fit items-center gap-2 rounded-full bg-primary/10 px-4 text-sm font-semibold text-primary"><QrCode className="h-4 w-4" /> QR Ph</div>
                     {!paymentQrUnavailable ? (
-                      <img src="/assets/images/qrph-payment.png" alt="QR Ph merchant payment code" className="mx-auto aspect-square w-full max-w-[250px] rounded-2xl border bg-white object-contain p-3 shadow-sm" onError={() => setPaymentQrUnavailable(true)} />
+                      <img src="/assets/images/payment-method.png" alt="Payment QR code" className="mx-auto aspect-square w-full max-w-[250px] rounded-2xl border bg-white object-contain p-3 shadow-sm" onError={() => setPaymentQrUnavailable(true)} />
                     ) : (
                       <div className="mx-auto flex aspect-square w-full max-w-[250px] flex-col items-center justify-center rounded-2xl border border-dashed bg-background p-6 text-muted-foreground">
                         <QrCode className="mb-3 h-16 w-16" />
@@ -579,7 +418,7 @@ export default function BookingPage() {
                   <div className="space-y-4">
                     <div className="rounded-2xl border bg-card p-5">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount to pay</p>
-                      <p className="mt-1 text-3xl font-bold text-primary">₱{blocks.reduce((total, block) => { const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking); return total + (quote.covered ? quote.total : 0); }, 0).toLocaleString()}</p>
+                      <p className="mt-1 text-xl font-bold text-primary">₱{blocks.reduce((total, block) => { const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking); return total + (quote.covered ? quote.total : 0); }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       <p className="mt-2 text-sm text-muted-foreground">For {blocks.length} booking {blocks.length === 1 ? 'schedule' : 'schedules'}</p>
                     </div>
 
@@ -600,26 +439,34 @@ export default function BookingPage() {
             )}
           </CardContent>
           
-          <CardFooter className="flex justify-between border-t p-6 bg-slate-50/50 rounded-b-xl">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleBack} 
-              disabled={step === 1 || isSubmitting}
-            >
-              Back
-            </Button>
-            
-            {step < 3 ? (
-              <Button type="button" onClick={handleNext}>
-                Next Step
-              </Button>
-            ) : (
-              <Button type="submit" disabled={isSubmitting}>
-                Submit Receipt & Confirm
-                {isSubmitting && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
-              </Button>
+          <CardFooter className="flex flex-col border-t p-6 bg-slate-50/50 rounded-b-xl gap-4">
+            {submitError && (
+              <div className="w-full rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 text-center">
+                {submitError}
+              </div>
             )}
+            <div className="flex justify-between w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBack}
+                disabled={step === 1 || isSubmitting}
+                className="hover:scale-105 transition-all duration-200"
+              >
+                Back
+              </Button>
+
+              {step < 3 ? (
+                <Button type="button" onClick={handleNext} className="hover:scale-105 transition-all duration-200">
+                  Next Step
+                </Button>
+              ) : (
+                <Button type="submit" disabled={isSubmitting} className="hover:scale-105 transition-all duration-200">
+                  Submit Receipt & Confirm
+                  {isSubmitting && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
+                </Button>
+              )}
+            </div>
           </CardFooter>
         </form>
       </Card>

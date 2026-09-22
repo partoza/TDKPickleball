@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using TDK.Application.DTOs.Auth;
 using TDK.Application.Interfaces;
+using TDK.Api.Validation;
 
 namespace TDK.Api.Controllers;
 
@@ -26,6 +28,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("Authentication")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
         var result = await _authService.LoginAsync(request);
@@ -33,6 +36,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting("Authentication")]
     public async Task<IActionResult> Refresh(RefreshRequest request) => Ok(await _authService.RefreshAsync(""));
 
     [HttpPost("logout")]
@@ -51,8 +55,24 @@ public class AuthController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    [HttpPost("profile-image")]
+    [Authorize]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ProfileImageValidator.MaximumRequestBytes)]
+    public async Task<IActionResult> UpdateProfileImage([FromForm] IFormFile? image, CancellationToken cancellationToken)
+    {
+        var validation = await ProfileImageValidator.ValidateAsync(image, cancellationToken);
+        if (!validation.IsValid) return BadRequest(new { success = false, message = validation.Error });
+
+        await using var content = image!.OpenReadStream();
+        var result = await _authService.UpdateProfileImageAsync(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!, content, validation.FileName, validation.ContentType, cancellationToken);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
     [HttpGet("google/start")]
     [AllowAnonymous]
+    [EnableRateLimiting("Authentication")]
     public IActionResult StartGoogleLogin()
     {
         if (string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientId"]) || string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientSecret"]))
@@ -62,6 +82,7 @@ public class AuthController : ControllerBase
 
     [HttpGet("google/complete")]
     [AllowAnonymous]
+    [EnableRateLimiting("Authentication")]
     public async Task<IActionResult> CompleteGoogleLogin()
     {
         var external = await HttpContext.AuthenticateAsync("GoogleExternal");
@@ -86,6 +107,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("google/exchange")]
     [AllowAnonymous]
+    [EnableRateLimiting("Authentication")]
     public IActionResult ExchangeGoogleCode(GoogleExchangeRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Code) || !_cache.TryGetValue<AuthResponse>($"google-login:{request.Code}", out var response) || response is null)
