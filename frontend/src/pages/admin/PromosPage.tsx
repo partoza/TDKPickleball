@@ -1,9 +1,10 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { usePromos } from '@/hooks/usePromos';
-import { Promo, DiscountType } from '@/types';
+import { Promo, DiscountType, RateType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -23,7 +24,9 @@ export default function PromosPage() {
     value: '' as string | number,
     startDate: '',
     endDate: '',
-    maxUses: '',
+    appliesTo: 'All' as RateType | 'All',
+    isLimitedUses: false,
+    maxUses: '' as string | number,
     isActive: true,
   });
 
@@ -41,7 +44,9 @@ export default function PromosPage() {
         value: promo.value,
         startDate: promo.startDate ? promo.startDate.split('T')[0] : '',
         endDate: promo.endDate ? promo.endDate.split('T')[0] : '',
-        maxUses: promo.maxUses?.toString() || '',
+        appliesTo: promo.appliesTo || 'All',
+        isLimitedUses: promo.maxUses != null,
+        maxUses: promo.maxUses != null ? promo.maxUses.toString() : '',
         isActive: promo.isActive,
       });
     } else {
@@ -53,6 +58,8 @@ export default function PromosPage() {
         value: '',
         startDate: '',
         endDate: '',
+        appliesTo: 'All',
+        isLimitedUses: false,
         maxUses: '',
         isActive: true,
       });
@@ -67,7 +74,8 @@ export default function PromosPage() {
       value: Number(form.value),
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
-      maxUses: form.maxUses ? Number(form.maxUses) : undefined,
+      maxUses: form.isLimitedUses && form.maxUses ? Number(form.maxUses) : undefined,
+      appliesTo: form.appliesTo === 'All' ? undefined : form.appliesTo,
     };
 
     const success = editing 
@@ -128,10 +136,7 @@ export default function PromosPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="maxUses">Max Uses (Optional)</Label>
-              <Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" />
-            </div>
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
 
             {editing && (
               <div className="flex items-center gap-2">
@@ -165,6 +170,7 @@ export default function PromosPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Code</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Discount</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Applies To</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Valid Dates</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Usage</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Status</TableHead>
@@ -185,7 +191,10 @@ export default function PromosPage() {
                       {promo.type === DiscountType.Percentage ? `${promo.value}%` : `â‚±${promo.value.toFixed(2)}`}
                     </div>
                   </TableCell>
-                  <TableCell>
+                    <TableCell className="text-slate-600 dark:text-slate-400 font-medium">
+                      {promo.appliesTo ? promo.appliesTo : "All Rates"}
+                    </TableCell>
+                    <TableCell>
                     <div className="flex items-center gap-2 text-xs">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       {promo.startDate || promo.endDate ? (
@@ -228,6 +237,18 @@ export default function PromosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

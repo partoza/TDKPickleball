@@ -111,6 +111,7 @@ export interface Promo {
   endDate?: string;
   maxUses?: number;
   currentUses: number;
+  appliesTo?: RateType;
   isActive: boolean;
 }
 

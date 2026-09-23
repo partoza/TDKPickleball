@@ -12,6 +12,7 @@ public record PromoDto(
     DateTime? EndDate,
     int? MaxUses,
     int CurrentUses,
+    RateType? AppliesTo,
     bool IsActive
 );
 
@@ -22,7 +23,8 @@ public record CreatePromoRequest(
     decimal Value,
     DateTime? StartDate,
     DateTime? EndDate,
-    int? MaxUses
+    int? MaxUses,
+    RateType? AppliesTo
 );
 
 public record UpdatePromoRequest(
@@ -33,5 +35,6 @@ public record UpdatePromoRequest(
     DateTime? StartDate,
     DateTime? EndDate,
     int? MaxUses,
+    RateType? AppliesTo,
     bool IsActive
 );
