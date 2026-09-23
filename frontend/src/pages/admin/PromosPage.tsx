@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { usePromos } from '@/hooks/usePromos';
 import { Promo, DiscountType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PlusIcon as Plus, EllipsisHorizontalIcon as MoreHorizontal, ReceiptPercentIcon as Percent, CalendarDaysIcon as Calendar, UsersIcon as Users } from '@heroicons/react/24/solid';
 import { format } from 'date-fns';
+import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 
 export default function PromosPage() {
   const { promos, loading, fetchPromos, createPromo, updatePromo, deletePromo } = usePromos();
@@ -19,7 +20,7 @@ export default function PromosPage() {
     code: '',
     description: '',
     type: DiscountType.Percentage,
-    value: 0,
+    value: '' as string | number,
     startDate: '',
     endDate: '',
     maxUses: '',
@@ -49,7 +50,7 @@ export default function PromosPage() {
         code: '',
         description: '',
         type: DiscountType.Percentage,
-        value: 0,
+        value: '',
         startDate: '',
         endDate: '',
         maxUses: '',
@@ -111,25 +112,19 @@ export default function PromosPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Discount Type</Label>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                  <button type="button" className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors ${form.type === DiscountType.Percentage ? 'bg-white dark:bg-slate-950 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`} onClick={() => setForm({...form, type: DiscountType.Percentage})}>%</button>
-                  <button type="button" className={`flex-1 text-sm py-1.5 rounded-md font-medium transition-colors ${form.type === DiscountType.FixedAmount ? 'bg-white dark:bg-slate-950 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`} onClick={() => setForm({...form, type: DiscountType.FixedAmount})}>₱</button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="value">Value *</Label>
-                <Input id="value" type="number" step="0.01" min="0" value={form.value} onChange={(e) => setForm({ ...form, value: Number(e.target.value) })} required />
+                <div className="mac-segmented flex w-full rounded-lg p-0.5"><Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${form.type === DiscountType.Percentage ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setForm({...form, type: DiscountType.Percentage})}>%</Button><Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${form.type === DiscountType.FixedAmount ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setForm({...form, type: DiscountType.FixedAmount})}>₱</Button></div></div><div className="space-y-2"><Label htmlFor="value">Value *</Label>
+                <Input id="value" type="number" step="0.01" min="0" placeholder="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value === '' ? '' : Number(e.target.value) })} required />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input id="startDate" type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                <AdminDatePicker value={form.startDate} onChange={(val) => setForm({ ...form, startDate: val })} placeholder="dd/mm/yyyy" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endDate">End Date</Label>
-                <Input id="endDate" type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+                <AdminDatePicker value={form.endDate} onChange={(val) => setForm({ ...form, endDate: val })} placeholder="dd/mm/yyyy" />
               </div>
             </div>
 
@@ -187,7 +182,7 @@ export default function PromosPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                      {promo.type === DiscountType.Percentage ? `${promo.value}%` : `₱${promo.value.toFixed(2)}`}
+                      {promo.type === DiscountType.Percentage ? `${promo.value}%` : `â‚±${promo.value.toFixed(2)}`}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -233,3 +228,6 @@ export default function PromosPage() {
     </div>
   );
 }
+
+
+
