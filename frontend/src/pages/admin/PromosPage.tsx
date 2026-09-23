@@ -142,7 +142,7 @@ export default function PromosPage() {
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={!form.code.trim() || form.value <= 0}>{editing ? 'Save changes' : 'Create Promo'}</Button>
+              <Button type="submit" disabled={!form.code.trim() || Number(form.value) <= 0}>{editing ? 'Save changes' : 'Create Promo'}</Button>
             </div>
           </form>
         </DialogContent>
