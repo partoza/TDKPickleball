@@ -153,7 +153,7 @@ export default function PromosPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <div className="rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
         {loading && !promos.length ? (
           <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>
         ) : promos.length === 0 ? (

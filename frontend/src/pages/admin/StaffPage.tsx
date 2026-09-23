@@ -221,7 +221,7 @@ export default function StaffPage() {
         <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Internal' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Internal')}>Internal Staff</Button>
         <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Trainer' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Trainer')}>Coaches</Button>
       </div>
-        <div className="mt-6 rounded-xl border bg-card text-card-foreground shadow-sm">
+        <div className="mt-6 rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
           {loading && !staff.length ? (
             <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>
           ) : filteredStaff.length === 0 ? (

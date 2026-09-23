@@ -127,7 +127,7 @@ export default function AdminsPage() {
     <Card className="rounded-2xl">
       <CardHeader><CardTitle>Team accounts</CardTitle><CardDescription>{users.length}/{maximumTeamAccounts} accounts used. The limit is one primary administrator plus five additional users.</CardDescription></CardHeader>
       <CardContent>{isLoading ? <div className="space-y-3">{[1, 2].map(x => <Skeleton key={x} className="h-16 rounded-xl" />)}</div> :
-        <div className="grid gap-3">{users.map(user => <div key={user.id} className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-3">{users.map(user => <div key={user.id} className="flex flex-col gap-3 rounded-xl border dark:border-white/10 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-11 w-11 border"><AvatarImage src={user.profileImageUrl} alt={`${user.firstName} ${user.lastName}`} /><AvatarFallback className="bg-primary/10 font-semibold text-primary">{initials(user.firstName, user.lastName)}</AvatarFallback></Avatar>
             <div><p className="font-semibold">{user.firstName} {user.lastName}</p><p className="flex items-center gap-1 text-xs text-muted-foreground"><EnvelopeIcon className="h-3.5 w-3.5" />{user.email}</p></div>
@@ -146,7 +146,7 @@ export default function AdminsPage() {
       <DialogContent>
         <DialogHeader><DialogTitle>Add team member</DialogTitle><DialogDescription>A temporary password will be generated and sent to their email. SMTP must be configured.</DialogDescription></DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2 flex items-center gap-4 rounded-xl border p-3">
+          <div className="sm:col-span-2 flex items-center gap-4 rounded-xl border dark:border-white/10 p-3">
             <Avatar className="h-16 w-16 border"><AvatarImage src={imagePreview} alt="Selected profile" /><AvatarFallback><PhotoIcon className="h-6 w-6 text-muted-foreground" /></AvatarFallback></Avatar>
             <div className="min-w-0 flex-1"><Label htmlFor="profile-image">Profile picture</Label><Input id="profile-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => chooseImage(event.target.files?.[0])} /><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP · maximum 5 MB</p>{errors.profileImage && <p className="field-error">{errors.profileImage}</p>}</div>
           </div>

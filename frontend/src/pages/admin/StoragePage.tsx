@@ -129,7 +129,7 @@ export default function StoragePage() {
     <Card className="rounded-2xl">
       <CardHeader><CardTitle className="flex items-center gap-2"><ClockIcon className="h-5 w-5 text-primary" />Deletion history</CardTitle><CardDescription>Permanent cleanup activity is retained as an audit record, including who performed it.</CardDescription></CardHeader>
       <CardContent>
-        {historyQuery.isLoading ? <div className="space-y-3">{[1, 2, 3].map(item => <Skeleton key={item} className="h-12 rounded-xl" />)}</div> : historyQuery.isError ? <p className="text-sm text-destructive dark:text-white" role="alert">{storageError(historyQuery.error, 'Deletion history is unavailable.')}</p> : history.length ? <div className="overflow-x-auto rounded-xl border">
+        {historyQuery.isLoading ? <div className="space-y-3">{[1, 2, 3].map(item => <Skeleton key={item} className="h-12 rounded-xl" />)}</div> : historyQuery.isError ? <p className="text-sm text-destructive dark:text-white" role="alert">{storageError(historyQuery.error, 'Deletion history is unavailable.')}</p> : history.length ? <div className="overflow-x-auto rounded-xl border dark:border-white/10">
           <Table>
             <TableHeader><TableRow><TableHead>Deleted on</TableHead><TableHead>Date range</TableHead><TableHead>Records</TableHead><TableHead>Receipts</TableHead><TableHead>Deleted by</TableHead></TableRow></TableHeader>
             <TableBody>{history.map(item => <TableRow key={item.id}>
@@ -157,7 +157,7 @@ export default function StoragePage() {
           </div>
           <p className="text-xs text-muted-foreground">Selected booking dates: {formatDate(fromDate)} – {formatDate(throughDate)}. Current periods are capped at today.</p>
           {!validRange && <p className="text-sm text-destructive dark:text-white" role="alert">The start period must be on or before the end period.</p>}
-          <div className="rounded-xl border bg-muted/30 p-4">
+          <div className="rounded-xl border dark:border-white/10 bg-muted/30 p-4">
             {!validRange ? <p className="text-sm text-muted-foreground">Choose a valid date range to see matching records.</p> : previewQuery.isFetching ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowPathIcon className="h-4 w-4 animate-spin" />Checking matching records…</div> : preview && hasMatchingPreview ? <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Completed bookings</span><strong>{preview.eligibleBookingCount.toLocaleString()}</strong></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Receipt files</span><strong>{preview.receiptCount.toLocaleString()}</strong></div>
@@ -180,7 +180,7 @@ export default function StoragePage() {
 }
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
-  return <div className="rounded-xl border bg-card p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-white">{label}</p><p className="mt-2 text-2xl font-bold dark:text-white">{value}</p><p className="mt-1 text-xs text-muted-foreground dark:text-white">{note}</p></div>;
+  return <div className="rounded-xl border dark:border-white/10 bg-card p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-white">{label}</p><p className="mt-2 text-2xl font-bold dark:text-white">{value}</p><p className="mt-1 text-xs text-muted-foreground dark:text-white">{note}</p></div>;
 }
 
 function ErrorCard({ message }: { message: string }) {

@@ -88,7 +88,7 @@ export default function RatesPage() {
     <Card className="rounded-2xl"><CardHeader><CardTitle>Pricing schedule</CardTitle></CardHeader><CardContent>
       {isLoading ? <div className="space-y-3">{[1, 2].map(x => <Skeleton key={x} className="h-14" />)}</div> :
         <div className="space-y-4">
-          <div className="rounded-xl border hidden md:block"><Table><TableHeader><TableRow>
+          <div className="rounded-xl border dark:border-white/10 hidden md:block"><Table><TableHeader><TableRow>
             <TableHead>Pricing ID</TableHead><TableHead>Rate type</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Rate / hour</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader><TableBody>{rates.slice(page * 10, (page + 1) * 10).map(rate => <TableRow key={rate.id}>
             <TableCell className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</TableCell>
@@ -101,7 +101,7 @@ export default function RatesPage() {
           
           <div className="grid md:hidden gap-4">
             {rates.slice(page * 10, (page + 1) * 10).map(rate => (
-              <div key={rate.id} className="rounded-xl border p-4 space-y-3">
+              <div key={rate.id} className="rounded-xl border dark:border-white/10 p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</span><RateTypeBadge type={rate.rateType || RateType.Booking} /></div>
                   <span className="font-semibold text-lg">₱{rate.pricePerHour.toLocaleString()}</span>
@@ -110,7 +110,7 @@ export default function RatesPage() {
                   <span>{time(rate.startTime)} - {time(rate.endTime)}</span>
                   <Badge className={rate.isActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''} variant={rate.isActive ? 'default' : 'secondary'}>{rate.isActive ? 'Active' : 'Inactive'}</Badge>
                 </div>
-                <div className="flex gap-2 pt-2 border-t">
+                <div className="flex gap-2 pt-2 border-t dark:border-white/10">
                   <Button variant="outline" className="flex-1 gap-2" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /> Edit</Button>
                   <Button variant="outline" className={cn('flex-1 gap-2', rate.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700')} onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4" /> : <PowerIcon className="h-4 w-4" />} {rate.isActive ? 'Inactive' : 'Active'}</Button>
                 </div>
