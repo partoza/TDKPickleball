@@ -21,7 +21,7 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
   }, []);
 
   const todayStr = format(now, 'yyyy-MM-dd');
-  const timeStr = now.toTimeString().slice(0, 5);
+  const timeStr = now.toTimeString().slice(0, 8);
 
   const activeBooking = bookings.find(b => 
     b.courtId === court.id && 
@@ -215,6 +215,11 @@ export default function DashboardPage() {
         <Stat icon={Clock3} label="Upcoming" value={upcoming.length.toString()} note={upcoming[0] ? `${upcoming[0].courtName} · ${upcoming[0].customerName}` : 'No'} />
       </div>
     )}
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 mb-6">
+      {courts.filter(c => c.isActive).map(court => (
+        <LiveCourtCard key={court.id} court={court} bookings={bookings} staff={staff} />
+      ))}
+    </div>
     <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
       <section className="rounded-2xl border bg-white p-6 shadow-sm">
         <div>
