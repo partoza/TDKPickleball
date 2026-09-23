@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 import { useAdminWeeklySchedules, useBulkUpdate, useUpdateSchedule } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
@@ -260,7 +260,7 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header */}
       <div className="mb-6 pl-1">
@@ -795,4 +795,5 @@ export default function SchedulePage() {
     </div>
   );
 }
+
 

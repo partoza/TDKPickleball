@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { PencilSquareIcon as Edit2, ArrowPathIcon as LoaderCircle, PlusIcon as Plus, PowerIcon as Power, NoSymbolIcon as PowerOff } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
 import { useCourts, useCreateCourt, useUpdateCourt } from '@/hooks/useCourts';
@@ -42,7 +42,7 @@ export default function CourtsPage() {
   const pending = create.isPending || update.isPending;
   const paginatedCourts = courts.slice(page * 10, (page + 1) * 10);
   
-  return <div className="space-y-6 max-w-[1500px] mx-auto"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Courts</h1><p className="mt-1 text-slate-500">Configure each court’s operating schedule.</p></div><Button onClick={() => open()}><Plus className="h-4 w-4" />Add Court</Button></div>
+  return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Courts</h1><p className="mt-1 text-slate-500">Configure each court’s operating schedule.</p></div><Button onClick={() => open()}><Plus className="h-4 w-4" />Add Court</Button></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>All courts</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-3">{[1,2].map(x => <Skeleton key={x} className="h-14" />)}</div> : <div className="space-y-4">
       <div className="rounded-xl border dark:border-white/10 hidden md:block"><Table><TableHeader><TableRow><TableHead>Court</TableHead><TableHead>Operating hours</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{paginatedCourts.map(c => <TableRow key={c.id}><TableCell><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.displayName}</div></TableCell><TableCell>{time(c.openTime)}–{time(c.closeTime)}</TableCell><TableCell><Badge className={c.isActive ? 'bg-emerald-600' : ''} variant={c.isActive ? 'default' : 'secondary'}>{c.isActive ? 'Active' : 'Inactive'}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(c)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(c)} disabled={update.isPending}>{c.isActive ? <PowerOff className="h-4 w-4 text-red-600" /> : <Power className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{c.isActive ? 'Inactive' : 'Active'}</TooltipContent></Tooltip></TooltipProvider></div></TableCell></TableRow>)}</TableBody></Table></div>
       <div className="grid md:hidden gap-4">
@@ -81,3 +81,4 @@ function time(value?: string) {
   const hour = hourValue % 12 || 12;
   return `${hour}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
+

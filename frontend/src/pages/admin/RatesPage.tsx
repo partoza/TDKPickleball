@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { format } from 'date-fns';
 import { PencilSquareIcon as Edit2, ArrowPathIcon as LoaderCircle, PlusIcon as Plus, PowerIcon, NoSymbolIcon } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
@@ -78,7 +78,7 @@ export default function RatesPage() {
     disabled: !isValidTimeRange(form.startTime, option.value),
   }));
 
-  return <div className="space-y-6 max-w-[1500px] mx-auto">
+  return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex items-end justify-between">
       <div><h1 className="text-3xl font-bold tracking-tight">Rates</h1><p className="mt-1 text-slate-500">Customize pricing for bookings, training, and free play.</p></div>
       <Button onClick={() => open()}><Plus className="h-4 w-4" />Add Rate</Button>
@@ -157,3 +157,4 @@ function pricingId(rate: Rate, rates: Rate[]) {
   const siblings = rates.filter(item => (item.rateType || RateType.Booking) === type).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.id - b.id);
   return `${prefix}-${siblings.findIndex(item => item.id === rate.id) + 1}`;
 }
+

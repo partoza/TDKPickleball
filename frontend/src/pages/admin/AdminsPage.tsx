@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowPathIcon, EnvelopeIcon, NoSymbolIcon, PhotoIcon, PlusIcon, PowerIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
@@ -118,7 +118,7 @@ export default function AdminsPage() {
     if (!Object.keys(next).length) create.mutate({ ...form, image: profileImage });
   };
 
-  return <div className="space-y-6 max-w-[1500px] mx-auto">
+  return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><h1 className="text-3xl font-bold tracking-tight">User management</h1><p className="mt-1 text-muted-foreground">Create administrator and staff access with secure first-login setup.</p></div>
       <Button onClick={openDialog} disabled={limitReached}><PlusIcon className="h-4 w-4" />Add User</Button>
@@ -168,3 +168,4 @@ function initials(firstName: string, lastName: string) {
 function Field({ label, value, error, type = 'text', onChange }: { label: string; value: string; error?: string; type?: string; onChange: (value: string) => void }) {
   return <div><Label>{label} *</Label><Input type={type} value={value} aria-invalid={!!error} onChange={event => onChange(event.target.value)} />{error && <p className="field-error">{error}</p>}</div>;
 }
+

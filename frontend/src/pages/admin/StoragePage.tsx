@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { format, startOfMonth, subMonths } from 'date-fns';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -84,7 +84,7 @@ export default function StoragePage() {
   const usedPercent = Math.min(100, status?.usedPercent ?? 0);
   const thresholdPercent = status ? Math.min(100, status.warningThresholdMegabytes / status.limitMegabytes * 100) : 87.9;
 
-  return <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
+  return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Data storage</h1>
@@ -196,3 +196,4 @@ function storageError(error: unknown, fallback: string) {
 function formatMb(value: number) { return value.toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function formatDate(value: string) { return format(new Date(`${value}T00:00:00`), 'MMM d, yyyy'); }
 function formatDateTime(value: string) { return format(new Date(value), 'MMM d, yyyy · h:mm a'); }
+

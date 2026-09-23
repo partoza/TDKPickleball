@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isWithinInterval, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
@@ -80,7 +80,7 @@ export default function DashboardPage() {
   }).join(' ');
   const areaD = `${pathD} L ${((points.length - 1 + 0.5) / points.length) * 100},100 L ${((0 + 0.5) / points.length) * 100},100 Z`;
 
-  return <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
+  return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
@@ -221,3 +221,4 @@ function Upcoming({ booking: b }: { booking: Booking }) {
     </div>
   ); 
 }
+

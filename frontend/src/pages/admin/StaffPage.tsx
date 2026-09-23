@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useStaff } from '@/hooks/useStaff';
 import { StaffProfile, StaffType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -124,7 +124,7 @@ export default function StaffPage() {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Internal & Trainer</h2>
@@ -286,3 +286,4 @@ export default function StaffPage() {
     </div>
   );
 }
+
