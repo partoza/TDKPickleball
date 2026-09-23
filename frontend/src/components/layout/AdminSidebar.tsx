@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Squares2X2Icon as LayoutDashboard,
@@ -51,7 +51,7 @@ export default function AdminSidebar() {
   const systemItems = [
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
-    { icon: Users, label: 'Internal & Trainer', href: ROUTES.ADMIN.STAFF },
+    { icon: Users, label: 'Internal', href: ROUTES.ADMIN.STAFF },
     { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
@@ -148,3 +148,4 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+

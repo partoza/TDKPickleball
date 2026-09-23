@@ -276,9 +276,9 @@ export default function BookingsPage() {
               <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { setForm({...form, rateType: value as RateType}); setBlockErrors([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
               {(form.rateType === RateType.Training || form.rateType === RateType.Internal) && (
                 <div>
-                  <Label>{form.rateType === RateType.Training ? 'Coach' : 'Internal Staff'}</Label>
+                  <Label>{form.rateType === RateType.Training ? 'Trainer' : 'Internal'}</Label>
                   <Select value={form.staffProfileId?.toString() || 'none'} onValueChange={value => setForm({...form, staffProfileId: value !== 'none' ? Number(value) : null})}>
-                    <SelectTrigger><SelectValue placeholder={`Select ${form.rateType === RateType.Training ? 'coach' : 'staff'}`} /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={`Select ${form.rateType === RateType.Training ? 'Trainer' : 'internal'}`} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {staff.filter(s => s.type === (form.rateType === RateType.Training ? StaffType.Trainer : StaffType.Internal)).map(s => (
@@ -497,4 +497,5 @@ function BookingFields({ form, setForm, courts, rates = [], promos = [], include
       <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => set('rateType', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div><div><Label>Booked by *</Label><Input aria-invalid={!!errors.customerName} className={cn(errors.customerName && 'field-invalid')} value={form.customerName} onChange={e => set('customerName', e.target.value)} placeholder="e.g. John Doe" /><FieldError message={errors.customerName} /></div><div><Label>Email (optional)</Label><Input aria-invalid={!!errors.email} className={cn(errors.email && 'field-invalid')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="e.g. john@example.com" /><FieldError message={errors.email} /></div><div><Label>Phone</Label><Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="e.g. 09123456789" /></div><div><Label>Amount paid</Label><Input aria-invalid={!!errors.amountPaid} className={cn(errors.amountPaid && 'field-invalid')} type="number" min="0" max={quote.covered ? finalTotal : undefined} step="0.01" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value === '' ? '' : Number(e.target.value))} placeholder="0" /><FieldError message={errors.amountPaid} /></div><div><Label>Notes</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes or requests" /></div></>}
   </div>;
 }
+
 

@@ -663,11 +663,11 @@ export default function SchedulePage() {
                   {(bookingModalData.status === 'Training' || bookingModalData.status === 'Internal') && (
                     <div className="space-y-1.5">
                       <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">
-                        {bookingModalData.status === 'Training' ? 'Coach' : 'Internal Staff'}
+                        {bookingModalData.status === 'Training' ? 'Trainer' : 'Internal'}
                       </label>
                       <Select value={bookingModalData.staffProfileId?.toString() || 'none'} onValueChange={(val) => setBookingModalData({...bookingModalData, staffProfileId: val && val !== 'none' ? Number(val) : null})}>
                         <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
-                          <SelectValue placeholder={`Select ${bookingModalData.status === 'Training' ? 'coach' : 'staff'}`} />
+                          <SelectValue placeholder={`Select ${bookingModalData.status === 'Training' ? 'Trainer' : 'internal'}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-slate-200 shadow-lg">
                           <SelectItem value="none">None</SelectItem>
@@ -795,5 +795,6 @@ export default function SchedulePage() {
     </div>
   );
 }
+
 
 

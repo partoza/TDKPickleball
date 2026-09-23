@@ -13,12 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EllipsisHorizontalIcon as MoreHorizontal, PencilIcon as Pencil, PlusIcon as Plus, TrashIcon as Trash } from '@heroicons/react/24/solid';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 export default function StaffPage() {
 
@@ -127,7 +121,7 @@ export default function StaffPage() {
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Internal & Trainer</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Internal</h2>
           <p className="text-muted-foreground mt-1">Manage internal and trainer profiles</p>
         </div>
         <Button onClick={() => handleOpen()} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-10 px-6 shrink-0 shadow-sm transition-all">
@@ -147,42 +141,30 @@ export default function StaffPage() {
             <div className="space-y-2">
               <Label>Profile Picture (Optional)</Label>
               <div className="flex items-center gap-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button type="button" className="group relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 border border-slate-200 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:bg-slate-800 dark:border-slate-700">
-                      {form.profilePictureUrl ? (
-                        <img src={form.profilePictureUrl} alt="Preview" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center font-semibold text-lg tracking-widest text-slate-400 dark:text-slate-500">
-                          {form.name ? getInitials(form.name) : <Plus className="h-6 w-6" />}
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                        <Pencil className="h-4 w-4" />
-                      </div>
+                <label className="group relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-full bg-slate-100 border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 dark:bg-slate-800 dark:border-slate-700 transition-all hover:border-primary/50">
+                  {form.profilePictureUrl ? (
+                    <img src={form.profilePictureUrl} alt="Preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center font-semibold text-lg tracking-widest text-slate-400 dark:text-slate-500">
+                      {form.name ? getInitials(form.name) : <Plus className="h-5 w-5 text-slate-400 group-hover:text-primary transition-colors" />}
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <Pencil className="h-4 w-4" />
+                  </div>
+                </label>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Upload photo</span>
+                  <span className="text-xs text-muted-foreground mt-0.5">JPG, GIF or PNG. Max 2MB.</span>
+                  {form.profilePictureUrl && (
+                    <button type="button" onClick={() => setForm({ ...form, profilePictureUrl: undefined })} className="text-xs text-red-500 hover:text-red-600 hover:underline text-left w-fit mt-1.5 font-medium transition-colors">
+                      Remove photo
                     </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem asChild>
-                      <label className="cursor-pointer flex items-center w-full">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Upload Picture
-                        <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                      </label>
-                    </DropdownMenuItem>
-                    {form.profilePictureUrl && (
-                      <DropdownMenuItem onClick={() => setForm({ ...form, profilePictureUrl: undefined })} className="text-red-600 focus:text-red-600">
-                        <Trash className="mr-2 h-4 w-4" />
-                        Remove Picture
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <div className="text-xs text-muted-foreground">
-                  <p>Recommended size: 256x256px.</p>
-                  <p>JPG or PNG under 2MB.</p>
+                  )}
                 </div>
               </div>
+
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
@@ -286,4 +268,8 @@ export default function StaffPage() {
     </div>
   );
 }
+
+
+
+
 

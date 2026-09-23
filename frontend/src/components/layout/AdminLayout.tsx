@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -66,7 +66,7 @@ export default function AdminLayout() {
   const othersItems = user?.role === 'Admin' ? [
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
-    { icon: Users, label: 'Internal & Trainer', href: ROUTES.ADMIN.STAFF },
+    { icon: Users, label: 'Internal', href: ROUTES.ADMIN.STAFF },
     { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
   ] : [];
@@ -183,3 +183,4 @@ export default function AdminLayout() {
     </div>
   );
 }
+
