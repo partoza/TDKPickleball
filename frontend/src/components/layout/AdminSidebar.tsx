@@ -52,7 +52,7 @@ export default function AdminSidebar() {
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
     { icon: Users, label: 'Staff & Coaches', href: ROUTES.ADMIN.STAFF },
-    { icon: Percent, label: 'Promos', href: '/admin/promos' },
+    { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
   ];
