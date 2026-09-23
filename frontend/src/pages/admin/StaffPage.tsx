@@ -127,8 +127,8 @@ export default function StaffPage() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Staff & Coaches</h2>
-          <p className="text-muted-foreground mt-1">Manage internal staff and trainers</p>
+          <h2 className="text-3xl font-bold tracking-tight">Internal & Trainer</h2>
+          <p className="text-muted-foreground mt-1">Manage internal and trainer profiles</p>
         </div>
         <Button onClick={() => handleOpen()} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-10 px-6 shrink-0 shadow-sm transition-all">
           <Plus className="mr-2 h-4 w-4" /> Add Profile
@@ -140,7 +140,7 @@ export default function StaffPage() {
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Profile' : 'Add Profile'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Update the details below.' : 'Add a new staff member or coach.'}
+              {editing ? 'Update the details below.' : 'Add a new internal or trainer profile.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -218,8 +218,8 @@ export default function StaffPage() {
       </Dialog>
 
       <div className="mac-segmented flex w-full lg:w-[400px] rounded-lg p-0.5">
-        <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Internal' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Internal')}>Internal Staff</Button>
-        <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Trainer' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Trainer')}>Coaches</Button>
+        <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Internal' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Internal')}>Internal</Button>
+        <Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === 'Trainer' ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setActiveTab('Trainer')}>Trainer</Button>
       </div>
         <div className="mt-6 rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
           {loading && !staff.length ? (
@@ -230,7 +230,7 @@ export default function StaffPage() {
                 <Plus className="h-6 w-6 text-slate-400" />
               </div>
               <h3 className="text-lg font-medium">No profiles found</h3>
-              <p className="text-muted-foreground mt-1 max-w-sm">You haven't added any {activeTab === 'Internal' ? 'internal staff' : 'coaches'} yet.</p>
+              <p className="text-muted-foreground mt-1 max-w-sm">You haven't added any {activeTab === 'Internal' ? 'internal' : 'trainer'} profiles yet.</p>
             </div>
           ) : (
             <Table>
