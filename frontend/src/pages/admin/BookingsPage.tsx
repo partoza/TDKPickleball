@@ -375,10 +375,77 @@ function canReschedule(booking: Booking) {
   return Number.isFinite(createdAt) && elapsed >= 0 && elapsed <= 24 * 60 * 60 * 1000;
 }
 function time(value: string) { return format(new Date(`2000-01-01T${value}`), 'h:mm a'); }
-function BookingDetails({ booking: b }: { booking: Booking }) { return <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 text-sm"><Detail k="Type" v={b.bookingType || RateType.Booking} /><Detail k="Listed" v={format(new Date(b.createdAt), 'MMMM d, yyyy h:mm a')} /><Detail k="Booked by" v={b.customerName} /><Detail k="Email" v={b.email || '—'} /><Detail k="Phone" v={b.phone || '—'} /><Detail k="Court" v={b.courtName} /><Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} /><Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} />{b.discountAmount > 0 && <><Detail k="Subtotal" v={`₱${b.subtotal.toLocaleString()}`} /><Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} /></>}<Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} /><Detail k="Payment" v={b.status === 'Cancelled' ? `₱${b.amountPaid.toLocaleString()} paid · no remaining balance` : `₱${b.amountPaid.toLocaleString()} paid · ₱${b.remainingBalance.toLocaleString()} remaining`} /><Detail k="Status" v={b.status} /></div>; }
+function BookingDetails({ booking: b }: { booking: Booking }) { 
+  const isCancelled = b.status === 'Cancelled';
+  return (
+    <div className="space-y-4 text-sm mt-2">
+      <div className="rounded-xl border dark:border-white/10 bg-white dark:bg-[#2c2c2e] overflow-hidden shadow-sm">
+        <div className="bg-slate-50/80 dark:bg-[#252527] px-4 py-2 border-b dark:border-white/10 font-semibold text-slate-800 dark:text-slate-200">
+          Customer
+        </div>
+        <div className="p-4 grid gap-3">
+          <Detail k="Name" v={b.customerName} />
+          <Detail k="Email" v={b.email || '—'} />
+          <Detail k="Phone" v={b.phone || '—'} />
+        </div>
+      </div>
+
+      <div className="rounded-xl border dark:border-white/10 bg-white dark:bg-[#2c2c2e] overflow-hidden shadow-sm">
+        <div className="bg-slate-50/80 dark:bg-[#252527] px-4 py-2 border-b dark:border-white/10 font-semibold text-slate-800 dark:text-slate-200">
+          Reservation
+        </div>
+        <div className="p-4 grid gap-3">
+          <Detail k="Court" v={b.courtName} />
+          <Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} />
+          <Detail k="Type" v={b.bookingType || RateType.Booking} />
+          <Detail k="Status" v={b.status} />
+          <Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} />
+          <Detail k="Listed on" v={format(new Date(b.createdAt), 'MMM d, yyyy h:mm a')} />
+        </div>
+      </div>
+
+      <div className="rounded-xl border dark:border-white/10 bg-white dark:bg-[#2c2c2e] overflow-hidden shadow-sm">
+        <div className="bg-slate-50/80 dark:bg-[#252527] px-4 py-2 border-b dark:border-white/10 font-semibold text-slate-800 dark:text-slate-200">
+          Payment
+        </div>
+        <div className="p-4 grid gap-3">
+          {b.discountAmount > 0 ? (
+            <>
+              <Detail k="Subtotal" v={`₱${b.subtotal.toLocaleString()}`} />
+              <Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />
+              <div className="border-t dark:border-white/10 pt-3 mt-1">
+                <Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" />
+              </div>
+            </>
+          ) : (
+            <Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" />
+          )}
+          
+          <div className="border-t dark:border-white/10 pt-3 mt-1 space-y-3">
+            <Detail 
+              k="Amount Paid" 
+              v={`₱${b.amountPaid.toLocaleString()}`} 
+              valueClass="text-emerald-600 dark:text-emerald-400 font-semibold"
+            />
+            {!isCancelled && (
+              <Detail 
+                k="Balance" 
+                v={b.remainingBalance > 0 ? `₱${b.remainingBalance.toLocaleString()}` : 'Fully Paid'} 
+                valueClass={b.remainingBalance > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}
+              />
+            )}
+            {isCancelled && (
+              <Detail k="Balance" v="No remaining balance (Cancelled)" valueClass="text-slate-500" />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function BalanceStatus({ booking }: { booking: Booking }) { return booking.status === 'Cancelled' ? <div className="text-xs font-medium text-slate-500">Cancelled · no remaining balance</div> : <div className={booking.remainingBalance ? 'text-xs text-amber-600' : 'text-xs text-emerald-600'}>{booking.remainingBalance ? `₱${booking.remainingBalance.toLocaleString()} remaining` : 'Fully paid'}</div>; }
 function BookingTypeBadge({ type }: { type?: RateType }) { const value = type || RateType.Booking; return <Badge variant="outline" className={value === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : 'border-primary bg-primary text-primary-foreground'}>{value}</Badge>; }
-function Detail({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{v}</span></div>; }
+function Detail({ k, v, valueClass }: { k: string; v: string; valueClass?: string }) { return <div className="flex justify-between gap-4 items-center"><span className="text-slate-500 dark:text-slate-400">{k}</span><span className={cn("text-right font-medium text-slate-900 dark:text-slate-100", valueClass)}>{v}</span></div>; }
 function FieldError({ message }: { message?: string }) { return message ? <p className="field-error" role="alert">{message}</p> : null; }
 function BookingFields({ form, setForm, courts, rates = [], promos = [], includeContact = false, errors = {}, setErrors, availability, availabilityLoading, currentBooking, now = Date.now() }: any) {
   const set = (k: string, v: any) => { setForm((f: any) => ({ ...f, [k]: v })); setErrors?.((current: any) => ({ ...current, [k]: '', ...(k === 'startTime' ? { endTime: '' } : {}) })); };
