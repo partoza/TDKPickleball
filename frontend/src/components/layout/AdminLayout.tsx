@@ -3,7 +3,7 @@ import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, KeyIcon as Key } from '@heroicons/react/24/solid';
+import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, KeyIcon as Key, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database } from '@heroicons/react/24/solid';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -60,8 +60,16 @@ export default function AdminLayout() {
     { icon: LayoutDashboard, label: 'Overview', href: ROUTES.ADMIN.DASHBOARD },
     { icon: Calendar, label: 'Schedule', href: ROUTES.ADMIN.SCHEDULE },
     { icon: Ticket, label: 'Bookings', href: ROUTES.ADMIN.BOOKINGS },
-    ...(user?.role === 'Admin' ? [{ icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES }, { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS }] : []),
+    ...(user?.role === 'Admin' ? [{ icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS }] : []),
   ];
+
+  const othersItems = user?.role === 'Admin' ? [
+    { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
+    { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
+    { icon: Users, label: 'Internal & Trainer', href: ROUTES.ADMIN.STAFF },
+    { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
+    { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
+  ] : [];
 
   return (
     <div className="admin-shell flex min-h-screen">
@@ -136,6 +144,40 @@ export default function AdminLayout() {
               </Link>
             );
           })}
+
+          {othersItems.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "flex flex-col items-center justify-center w-16 h-full gap-1 transition-colors",
+                    othersItems.some(i => location.pathname.startsWith(i.href)) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <div className={cn(
+                    "flex items-center justify-center p-1 rounded-full transition-all",
+                    othersItems.some(i => location.pathname.startsWith(i.href)) ? "bg-primary/10" : "bg-transparent"
+                  )}>
+                    <More className="h-6 w-6" />
+                  </div>
+                  <span className="text-[10px] font-medium tracking-wide">Others</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" sideOffset={16} className="w-56">
+                {othersItems.map(item => {
+                  const isItemActive = location.pathname.startsWith(item.href);
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link to={item.href} className={cn("flex items-center gap-3 py-2 cursor-pointer", isItemActive && "text-primary font-medium")}>
+                        <item.icon className={cn("h-4 w-4", isItemActive && "text-primary")} />
+                        {item.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </nav>
     </div>
