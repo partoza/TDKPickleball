@@ -8,7 +8,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { BookingStatus, RateType, Schedule, ScheduleStatus } from '@/types';
+import { BookingStatus, RateType, Schedule, ScheduleStatus, StaffType } from '@/types';
+import { useStaff } from '@/hooks/useStaff';
+import { usePromos } from '@/hooks/usePromos';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/services/api';
 import { Input } from '@/components/ui/input';
@@ -111,7 +113,7 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | '' } | null>(null);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; staffProfileId: number | null; promoId: number | null } | null>(null);
   const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
   const [scheduleBlocks, setScheduleBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [scheduleBlockErrors, setScheduleBlockErrors] = useState<BookingBlockErrors[]>([]);
@@ -124,7 +126,9 @@ export default function SchedulePage() {
   const courts = courtsRes?.data || [];
   const { data: ratesRes } = useRates();
   const rates = ratesRes?.data || [];
-  
+  const { staff, fetchStaff } = useStaff(); 
+  const { promos, fetchPromos } = usePromos();
+  useEffect(() => { fetchStaff(); fetchPromos(); }, [fetchStaff, fetchPromos]);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
 
   useEffect(() => {
@@ -143,6 +147,11 @@ export default function SchedulePage() {
   const prevWeek = () => setCurrentDate(addDays(currentDate, -7));
   const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
   const today = () => setCurrentDate(new Date());
+  const getInitials = (name: string) => {
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
@@ -152,7 +161,17 @@ export default function SchedulePage() {
   const weekSchedules = schedules || [];
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
   const modalQuote = bookingModalData ? calculateRateQuote(rates, bookingModalData.startTimeStr, bookingModalData.endTimeStr, modalRateType) : null;
-  const modalGrandTotal = bookingModalData?.id ? (modalQuote?.covered ? modalQuote.total : 0) : bookingBlocksTotal(scheduleBlocks, rates, modalRateType);
+  
+  let batchDiscount = 0;
+  if (!bookingModalData?.id && bookingModalData?.promoId && promos) {
+    const promo = promos.find((p: any) => p.id === bookingModalData.promoId);
+    if (promo) {
+      const rawGrandTotal = bookingBlocksTotal(scheduleBlocks, rates, modalRateType);
+      batchDiscount = promo.type === 'Percentage' ? (rawGrandTotal * (promo.value / 100)) : promo.value;
+      if (batchDiscount > rawGrandTotal) batchDiscount = rawGrandTotal;
+    }
+  }
+  const modalGrandTotal = bookingModalData?.id ? (modalQuote?.covered ? modalQuote.total : 0) : Math.max(0, bookingBlocksTotal(scheduleBlocks, rates, modalRateType) - batchDiscount);
 
   const handleSaveSchedule = async () => {
     if (!bookingModalData) return;
@@ -186,6 +205,8 @@ export default function SchedulePage() {
             phone: needsContact ? bookingModalData.phone : null,
             paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Paid,
             amountPaid: needsContact ? allocatedPayments[index] : 0,
+            staffProfileId: bookingModalData.staffProfileId,
+            promoId: needsContact ? bookingModalData.promoId : null,
           }));
         }
         const failed = results.find((response: any) => response?.success === false);
@@ -219,6 +240,7 @@ export default function SchedulePage() {
       phone: needsContact ? bookingModalData.phone : null,
       paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Paid,
       amountPaid: needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved ? Number(bookingModalData.amountPaid) : 0,
+      staffProfileId: bookingModalData.staffProfileId,
     };
     const mutation = bookingModalData.id
       ? { mutate: (p: any, o: any) => updateMutation.mutate({ id: bookingModalData.id!, update: p }, o) }
@@ -338,7 +360,7 @@ export default function SchedulePage() {
                   startTimeStr: '07:00:00',
                   endTimeStr: '08:00:00',
                   status: 'Booked',
-                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: ''
+                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', staffProfileId: null, promoId: null
                 });
               }}
               className="h-11 sm:h-9 w-full sm:px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-[14px] sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
@@ -468,7 +490,7 @@ export default function SchedulePage() {
                                   startTimeStr: timeStr,
                                   endTimeStr: hour + 1 === 24 ? '00:00:00' : `${(hour + 1).toString().padStart(2, '0')}:00:00`,
                                   status: 'Booked',
-                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: ''
+                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', staffProfileId: null, promoId: null
                                 });
                               }
                             }}
@@ -543,6 +565,7 @@ export default function SchedulePage() {
                   errors={scheduleBlockErrors}
                   showQuote={bookingModalData.status === 'Booked' || bookingModalData.status === 'Training'}
                   addLabel="Add Another Schedule"
+                  discount={batchDiscount}
                 />}
                 {/* Vercel-like Data Badge using Brand Palette */}
                 {bookingModalData.id && <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-white p-3.5 pl-4 shadow-sm dark:border-primary/30 dark:bg-[#3a3a3c]">
@@ -563,7 +586,7 @@ export default function SchedulePage() {
                   {bookingModalData.id && <div className="grid grid-cols-2 gap-4 sm:col-span-2">
                     <div className="space-y-1.5">
                       <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Start Time *</label>
-                      <Select value={bookingModalData.startTimeStr} onValueChange={(val) => { const endTime = isValidTimeRange(val, bookingModalData.endTimeStr) ? bookingModalData.endTimeStr : withSeconds(minimumEndTime(val)); setBookingModalData({...bookingModalData, startTimeStr: val, endTimeStr: endTime}); setScheduleErrors(e => ({...e, startTimeStr: '', endTimeStr: ''})); }}>
+                      <Select disabled={!!bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training')} value={bookingModalData.startTimeStr} onValueChange={(val) => { const endTime = isValidTimeRange(val, bookingModalData.endTimeStr) ? bookingModalData.endTimeStr : withSeconds(minimumEndTime(val)); setBookingModalData({...bookingModalData, startTimeStr: val, endTimeStr: endTime}); setScheduleErrors(e => ({...e, startTimeStr: '', endTimeStr: ''})); }}>
                         <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
                           <SelectValue placeholder="Start" />
                         </SelectTrigger>
@@ -588,7 +611,7 @@ export default function SchedulePage() {
                     
                     <div className="space-y-1.5">
                       <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">End Time *</label>
-                      <Select value={bookingModalData.endTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, endTimeStr: val}); setScheduleErrors(e => ({...e, endTimeStr: ''})); }}>
+                      <Select disabled={!!bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training')} value={bookingModalData.endTimeStr} onValueChange={(val) => { setBookingModalData({...bookingModalData, endTimeStr: val}); setScheduleErrors(e => ({...e, endTimeStr: ''})); }}>
                         <SelectTrigger aria-invalid={!!scheduleErrors.endTimeStr} className={cn("w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium", scheduleErrors.endTimeStr && "field-invalid")}>
                           <SelectValue placeholder="End" />
                         </SelectTrigger>
@@ -615,7 +638,7 @@ export default function SchedulePage() {
 
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Status *</label>
-                    <Select value={bookingModalData.status} onValueChange={(val) => { setBookingModalData({...bookingModalData, status: val}); setScheduleErrors({}); }}>
+                    <Select disabled={!!bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training')} value={bookingModalData.status} onValueChange={(val) => { setBookingModalData({...bookingModalData, status: val}); setScheduleErrors({}); }}>
                       <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -623,7 +646,7 @@ export default function SchedulePage() {
                         <SelectItem value="Booked" className="text-[13px] font-medium rounded-lg py-2">Booked</SelectItem>
                         <SelectItem value="Training" className="text-[13px] font-medium rounded-lg py-2">Training</SelectItem>
                         <SelectItem value="Unavailable" className="text-[13px] font-medium rounded-lg py-2">Unavailable</SelectItem>
-                        <SelectItem value="FreePlay" className="text-[13px] font-medium rounded-lg py-2">Free Play</SelectItem>
+                        <SelectItem value="Internal" className="text-[13px] font-medium rounded-lg py-2">Internal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -637,12 +660,44 @@ export default function SchedulePage() {
                       className="w-full h-10 text-[13px]" 
                     />
                   </div>
+                  {(bookingModalData.status === 'Training' || bookingModalData.status === 'Internal') && (
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">
+                        {bookingModalData.status === 'Training' ? 'Coach' : 'Internal Staff'}
+                      </label>
+                      <Select value={bookingModalData.staffProfileId?.toString() || 'none'} onValueChange={(val) => setBookingModalData({...bookingModalData, staffProfileId: val && val !== 'none' ? Number(val) : null})}>
+                        <SelectTrigger className="w-full h-10 rounded-xl border-slate-200 shadow-sm focus:ring-primary/20 text-[13px] font-medium">
+                          <SelectValue placeholder={`Select ${bookingModalData.status === 'Training' ? 'coach' : 'staff'}`} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-200 shadow-lg">
+                          <SelectItem value="none">None</SelectItem>
+                          {staff.filter(s => s.type === (bookingModalData.status === 'Training' ? StaffType.Trainer : StaffType.Internal)).map(s => (
+                            <SelectItem key={s.id} value={s.id.toString()} className="text-[13px] font-medium rounded-lg py-2">
+                              <div className="flex items-center gap-2">
+                                {s.profilePictureUrl ? (
+                                  <img src={s.profilePictureUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full bg-[#2a2e25] flex items-center justify-center text-[#88cc22] font-bold text-[10px] tracking-wider">
+                                    {getInitials(s.name)}
+                                  </div>
+                                )}
+                                <span>{s.name} <span className="text-muted-foreground ml-1">({s.type === StaffType.Trainer ? 'Trainer' : 'Internal'})</span></span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {(bookingModalData.status === 'Booked' || bookingModalData.status === 'Training') && (
                     <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2 sm:grid-cols-2 dark:border-white/10 dark:bg-[#323234]">
                       {bookingModalData.id && modalQuote && <div className={cn("rounded-xl border p-3 sm:col-span-2", modalQuote.covered ? "border-primary/25 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20")}><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{modalQuote.covered ? modalQuote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${modalRateType} rate covers the complete schedule.`}</p></div><p className="shrink-0 text-base font-bold text-primary">{modalQuote.covered ? `₱${modalQuote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p></div></div>}
                       <div className="space-y-1.5 sm:col-span-2"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Booked By *</label><Input aria-invalid={!!scheduleErrors.bookedBy} value={bookingModalData.bookedBy} onChange={e => { setBookingModalData({...bookingModalData, bookedBy: e.target.value}); setScheduleErrors(v => ({...v, bookedBy: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.bookedBy && "field-invalid")} placeholder="Customer or trainee name" />{scheduleErrors.bookedBy && <p className="field-error" role="alert">{scheduleErrors.bookedBy}</p>}</div>
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email (optional)</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, email: e.target.value}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, phone: e.target.value})} className="h-10 text-[13px]" placeholder="Optional phone number" /></div>
+                      {!bookingModalData.id && (
+                        <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Promo Code (Optional)</label><Select value={bookingModalData.promoId?.toString() || 'none'} onValueChange={value => setBookingModalData({...bookingModalData, promoId: value !== 'none' ? Number(value) : null})}><SelectTrigger className="h-10"><SelectValue placeholder="Select promo" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{promos.filter((p: any) => p.isActive).map((p: any) => (<SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>))}</SelectContent></Select></div>
+                      )}
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment *</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? '' : bookingModalData.amountPaid})}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
                       {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Reservation Amount</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" max={modalGrandTotal} step="0.01" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: e.target.value === '' ? '' : Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px]", scheduleErrors.amountPaid && "field-invalid")} placeholder="0" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}
                     </div>
@@ -727,7 +782,7 @@ export default function SchedulePage() {
           </div>
           
           <div className="p-4 sm:px-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-            {viewModalData && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '' }); setViewModalData(null); }}>Edit Details</button>}
+            {viewModalData && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', staffProfileId: viewModalData.staffProfileId || null, promoId: null }); setViewModalData(null); }}>Edit Details</button>}
             <button 
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}

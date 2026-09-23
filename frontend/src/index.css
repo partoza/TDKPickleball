@@ -289,6 +289,10 @@
 .admin-shell [data-slot="button"]:hover { box-shadow: var(--mac-shadow-md); }
 .admin-shell [data-slot="button"]:active { transform: scale(0.92); }
 
+.storage-delete-button,
+.admin-shell .storage-delete-button { color: #fff !important; }
+.storage-delete-button:disabled { opacity: .72; }
+
 /* Global button scale */
 button:active {
   transform: scale(0.92);

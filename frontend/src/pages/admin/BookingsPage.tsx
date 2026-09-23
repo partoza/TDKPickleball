@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { Scanner } from '@yudiel/react-qr-scanner';
@@ -29,8 +29,11 @@ import { allocateBatchPayment, BookingBlockErrors, BookingBlockValue, bookingBlo
 import { getApiErrorMessage } from '@/services/api';
 import { TDK_ICON_URL } from '@/lib/branding';
 import { getManilaDate, getManilaDateAsLocalDate, isPastManilaStart } from '@/lib/manila-time';
+import { useStaff } from '@/hooks/useStaff';
+import { StaffType } from '@/types';
+import { usePromos } from '@/hooks/usePromos';
 
-const emptyForm = { courtId: '', bookingDate: getManilaDate(), startTime: '', endTime: '', customerName: '', email: '', phone: '', notes: '', amountPaid: '' as number | string, paymentStatus: BookingStatus.Paid, rateType: RateType.Booking };
+const emptyForm = { courtId: '', bookingDate: getManilaDate(), startTime: '', endTime: '', customerName: '', email: '', phone: '', notes: '', amountPaid: '' as number | string, paymentStatus: BookingStatus.Paid, rateType: RateType.Booking, staffProfileId: null as number | null, promoId: null as number | null };
 
 export default function BookingsPage() {
   const { data: response, isLoading } = useBookings();
@@ -43,13 +46,16 @@ export default function BookingsPage() {
   const [qrBooking, setQrBooking] = useState<Booking | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  
+  const { staff, fetchStaff } = useStaff();
+  const { promos, fetchPromos } = usePromos();
+  useEffect(() => { fetchStaff(); fetchPromos(); }, [fetchStaff, fetchPromos]);
 
   const downloadQr = async () => {
     if (!qrBooking || !qrRef.current || downloading) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(qrRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
-      const data = canvas.toDataURL('image/png');
+      const data = await toPng(qrRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
       const a = document.createElement('a');
       a.href = data;
       a.download = `${qrBooking.bookingReference}-QR.png`;
@@ -71,6 +77,11 @@ export default function BookingsPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [addBlocks, setAddBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [blockErrors, setBlockErrors] = useState<BookingBlockErrors[]>([]);
+  const getInitials = (name: string) => {
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
   const [creatingBatch, setCreatingBatch] = useState(false);
   const [scanResult, setScanResult] = useState<Booking | null>(null);
   const [scanError, setScanError] = useState('');
@@ -99,7 +110,16 @@ export default function BookingsPage() {
     .filter(b => !scheduleDate || b.bookingDate === scheduleDate), [bookings, search, courtFilter, statusFilter, paymentFilter, scheduleDate]);
   const paginatedBookings = filteredBookings.slice(page * 10, (page + 1) * 10);
   const totalRemaining = useMemo(() => filteredBookings.reduce((sum, b) => b.status === 'Cancelled' ? sum : sum + b.remainingBalance, 0), [filteredBookings]);
-  const addGrandTotal = bookingBlocksTotal(addBlocks, rates, form.rateType);
+  const rawGrandTotal = bookingBlocksTotal(addBlocks, rates, form.rateType);
+  let batchDiscount = 0;
+  if (form.promoId && promos) {
+    const promo = promos.find((p: any) => p.id === form.promoId);
+    if (promo) {
+      batchDiscount = promo.type === 'Percentage' ? (rawGrandTotal * (promo.value / 100)) : promo.value;
+      if (batchDiscount > rawGrandTotal) batchDiscount = rawGrandTotal;
+    }
+  }
+  const addGrandTotal = rawGrandTotal - batchDiscount;
   const hasFilters = !!search || courtFilter !== 'all' || statusFilter !== 'all' || paymentFilter !== 'all' || !!scheduleDate;
   const validate = (includeContact = true) => {
     const errors: Record<string, string> = {};
@@ -137,7 +157,7 @@ export default function BookingsPage() {
         results.push(await create.mutateAsync({
           courtId: Number(block.courtId), bookingDate: block.date, startTime: block.startTime, endTime: block.endTime,
           customerName: form.customerName, email: form.email, phone: form.phone, notes: form.notes,
-          amountPaid: allocatedPayments[index], rateType: form.rateType,
+          amountPaid: allocatedPayments[index], rateType: form.rateType, staffProfileId: form.staffProfileId, promoId: form.promoId
         }));
       }
       const failed = results.find(result => !result.success);
@@ -242,18 +262,55 @@ export default function BookingsPage() {
     </div>}</CardContent></Card>
 
     <Dialog open={showAdd} onOpenChange={open => { setShowAdd(open); if (!open) { setFormErrors({}); setBlockErrors([]); } }}>
-      <DialogContent className="sm:max-w-3xl p-0 gap-0 flex flex-col max-h-[90vh] overflow-hidden bg-background text-foreground">
-        <div className="px-6 pt-6 pb-2 shrink-0">
+      <DialogContent className="schedule-form-modal sm:max-w-[760px] p-0 bg-white text-slate-900 dark:bg-[#2c2c2e] dark:text-slate-100 rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="px-6 pt-6 pb-2 sm:px-7 sm:pt-7 sm:pb-2 shrink-0">
           <DialogHeader>
-            <DialogTitle>Add booking</DialogTitle>
-            <DialogDescription>Add one or more schedules. Each block is checked for availability and overlap before saving.</DialogDescription>
+            <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Add booking</DialogTitle>
+            <DialogDescription className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Add one or more schedules. Each block is checked for availability and overlap before saving.</DialogDescription>
           </DialogHeader>
         </div>
-        <div className="px-6 overflow-y-auto custom-scrollbar flex-1 py-4">
+        <div className="px-6 sm:px-7 pb-6 overflow-y-auto custom-scrollbar flex-1 mt-4">
           <div className="space-y-5">
-            <BookingBlocksEditor blocks={addBlocks} onChange={blocks => { setAddBlocks(blocks); setBlockErrors([]); setFormErrors(current => ({...current, amountPaid: ''})); }} courts={courts} rates={rates} rateType={form.rateType} errors={blockErrors} />
+            <BookingBlocksEditor blocks={addBlocks} onChange={blocks => { setAddBlocks(blocks); setBlockErrors([]); setFormErrors(current => ({...current, amountPaid: ''})); }} courts={courts} rates={rates} rateType={form.rateType} errors={blockErrors} discount={batchDiscount} />
             <section className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm sm:grid-cols-2 sm:p-5 dark:border-white/10 dark:bg-[#323234]">
-              <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { setForm({...form, rateType: value as RateType}); setBlockErrors([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div>
+              <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { setForm({...form, rateType: value as RateType}); setBlockErrors([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
+              {(form.rateType === RateType.Training || form.rateType === RateType.Internal) && (
+                <div>
+                  <Label>{form.rateType === RateType.Training ? 'Coach' : 'Internal Staff'}</Label>
+                  <Select value={form.staffProfileId?.toString() || 'none'} onValueChange={value => setForm({...form, staffProfileId: value !== 'none' ? Number(value) : null})}>
+                    <SelectTrigger><SelectValue placeholder={`Select ${form.rateType === RateType.Training ? 'coach' : 'staff'}`} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {staff.filter(s => s.type === (form.rateType === RateType.Training ? StaffType.Trainer : StaffType.Internal)).map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            {s.profilePictureUrl ? (
+                              <img src={s.profilePictureUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-[#2a2e25] flex items-center justify-center text-[#88cc22] font-bold text-[10px] tracking-wider">
+                                {getInitials(s.name)}
+                              </div>
+                            )}
+                            <span>{s.name} <span className="text-muted-foreground ml-1">({s.type === StaffType.Trainer ? 'Trainer' : 'Internal'})</span></span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div>
+                <Label>Promo Code (Optional)</Label>
+                <Select value={form.promoId?.toString() || 'none'} onValueChange={value => setForm({...form, promoId: value !== 'none' ? Number(value) : null})}>
+                  <SelectTrigger><SelectValue placeholder="Select promo code" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {promos.filter((p: any) => p.isActive).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div><Label>Booked by *</Label><Input aria-invalid={!!formErrors.customerName} className={cn(formErrors.customerName && 'field-invalid')} value={form.customerName} onChange={event => { setForm({...form, customerName: event.target.value}); setFormErrors(current => ({...current, customerName: ''})); }} placeholder="e.g. John Doe" /><FieldError message={formErrors.customerName} /></div>
               <div><Label>Email (optional)</Label><Input aria-invalid={!!formErrors.email} className={cn(formErrors.email && 'field-invalid')} type="email" value={form.email} onChange={event => { setForm({...form, email: event.target.value}); setFormErrors(current => ({...current, email: ''})); }} placeholder="e.g. john@example.com" /><FieldError message={formErrors.email} /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={event => setForm({...form, phone: event.target.value})} placeholder="e.g. 09123456789" /></div>
@@ -263,10 +320,22 @@ export default function BookingsPage() {
             </section>
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-border shrink-0 bg-muted/40">
-          <Button onClick={save} disabled={busy} className="w-full h-11 font-bold text-[14px]">
-            Save {addBlocks.length} {addBlocks.length === 1 ? 'Booking' : 'Bookings'}{busy && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
-          </Button>
+        <div className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+          <button 
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" 
+            onClick={() => setShowAdd(false)}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={save}
+            disabled={busy}
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
+          >
+            Save Booking
+            {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -289,7 +358,7 @@ export default function BookingsPage() {
       </DialogContent>
     </Dialog>
     <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}><DialogContent><DialogHeader><DialogTitle>{selected?.bookingReference}</DialogTitle><DialogDescription>Complete booking details</DialogDescription></DialogHeader>{selected && <BookingDetails booking={selected} />}</DialogContent></Dialog>
-    <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-6 object-contain" /><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><span className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-xl p-2 border" style={{ backgroundColor: '#ffffff', borderColor: '#f1f5f9' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="h-full w-full object-contain" /></span></div><p className="mt-6 font-mono text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.bookingReference}</p><p className="mt-1 text-sm" style={{ color: '#475569' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
+    <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-3 object-contain" /><p className="mb-6 font-bold text-center uppercase tracking-wider" style={{ color: '#861721', fontSize: '12px' }}>Scan this to verify your booking</p><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] w-[56px] h-[56px]" style={{ backgroundColor: '#ffffff' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="w-[38px] h-[38px] object-contain" /></div></div><p className="mt-6 text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
     <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} />}</DialogContent></Dialog>
     <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoaderCircle className="h-4 w-4 animate-spin" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
   </div>;
@@ -306,12 +375,12 @@ function canReschedule(booking: Booking) {
   return Number.isFinite(createdAt) && elapsed >= 0 && elapsed <= 24 * 60 * 60 * 1000;
 }
 function time(value: string) { return format(new Date(`2000-01-01T${value}`), 'h:mm a'); }
-function BookingDetails({ booking: b }: { booking: Booking }) { return <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 text-sm"><Detail k="Type" v={b.bookingType || RateType.Booking} /><Detail k="Listed" v={format(new Date(b.createdAt), 'MMMM d, yyyy h:mm a')} /><Detail k="Booked by" v={b.customerName} /><Detail k="Email" v={b.email || '—'} /><Detail k="Phone" v={b.phone || '—'} /><Detail k="Court" v={b.courtName} /><Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} /><Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} /><Detail k="Payment" v={b.status === 'Cancelled' ? `₱${b.amountPaid.toLocaleString()} paid · no remaining balance` : `₱${b.amountPaid.toLocaleString()} paid · ₱${b.remainingBalance.toLocaleString()} remaining`} /><Detail k="Status" v={b.status} /></div>; }
+function BookingDetails({ booking: b }: { booking: Booking }) { return <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 text-sm"><Detail k="Type" v={b.bookingType || RateType.Booking} /><Detail k="Listed" v={format(new Date(b.createdAt), 'MMMM d, yyyy h:mm a')} /><Detail k="Booked by" v={b.customerName} /><Detail k="Email" v={b.email || '—'} /><Detail k="Phone" v={b.phone || '—'} /><Detail k="Court" v={b.courtName} /><Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} /><Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} />{b.discountAmount > 0 && <><Detail k="Subtotal" v={`₱${b.subtotal.toLocaleString()}`} /><Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} /></>}<Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} /><Detail k="Payment" v={b.status === 'Cancelled' ? `₱${b.amountPaid.toLocaleString()} paid · no remaining balance` : `₱${b.amountPaid.toLocaleString()} paid · ₱${b.remainingBalance.toLocaleString()} remaining`} /><Detail k="Status" v={b.status} /></div>; }
 function BalanceStatus({ booking }: { booking: Booking }) { return booking.status === 'Cancelled' ? <div className="text-xs font-medium text-slate-500">Cancelled · no remaining balance</div> : <div className={booking.remainingBalance ? 'text-xs text-amber-600' : 'text-xs text-emerald-600'}>{booking.remainingBalance ? `₱${booking.remainingBalance.toLocaleString()} remaining` : 'Fully paid'}</div>; }
 function BookingTypeBadge({ type }: { type?: RateType }) { const value = type || RateType.Booking; return <Badge variant="outline" className={value === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : 'border-primary bg-primary text-primary-foreground'}>{value}</Badge>; }
 function Detail({ k, v }: { k: string; v: string }) { return <div className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{v}</span></div>; }
 function FieldError({ message }: { message?: string }) { return message ? <p className="field-error" role="alert">{message}</p> : null; }
-function BookingFields({ form, setForm, courts, rates = [], includeContact = false, errors = {}, setErrors, availability, availabilityLoading, currentBooking, now = Date.now() }: any) {
+function BookingFields({ form, setForm, courts, rates = [], promos = [], includeContact = false, errors = {}, setErrors, availability, availabilityLoading, currentBooking, now = Date.now() }: any) {
   const set = (k: string, v: any) => { setForm((f: any) => ({ ...f, [k]: v })); setErrors?.((current: any) => ({ ...current, [k]: '', ...(k === 'startTime' ? { endTime: '' } : {}) })); };
   const currentRangeContains = (slot: any) => currentBooking && String(currentBooking.courtId) === form.courtId && currentBooking.bookingDate === form.bookingDate && slot.startTime.slice(0, 5) >= currentBooking.startTime.slice(0, 5) && slot.startTime.slice(0, 5) < currentBooking.endTime.slice(0, 5);
   const availableSlots = availability?.availableSlots || [];
@@ -330,11 +399,34 @@ function BookingFields({ form, setForm, courts, rates = [], includeContact = fal
   const timeDisabled = !form.courtId || !form.bookingDate || availabilityLoading;
   const quote = calculateRateQuote(rates, form.startTime, form.endTime, form.rateType || RateType.Booking);
 
+  let discount = 0;
+  if (quote.covered && form.promoId && promos) {
+    const promo = promos.find((p: any) => p.id === form.promoId);
+    if (promo) {
+      discount = promo.type === 'Percentage' ? (quote.total * (promo.value / 100)) : promo.value;
+      if (discount > quote.total) discount = quote.total;
+    }
+  }
+  const finalTotal = quote.covered ? quote.total - discount : 0;
+
   return <div className="grid gap-4 py-2">
     <div><Label>Court *</Label><Select value={form.courtId} onValueChange={v => { set('courtId', v); set('startTime', ''); set('endTime', ''); }}><SelectTrigger aria-invalid={!!errors.courtId} className={cn(errors.courtId && 'field-invalid')}><SelectValue placeholder="Select court" /></SelectTrigger><SelectContent>{courts.filter((c: any) => c.isActive).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select><FieldError message={errors.courtId} /></div>
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><div><Label>Date *</Label><AdminDatePicker invalid={!!errors.bookingDate} minDate={getManilaDateAsLocalDate(new Date(now))} value={form.bookingDate} onChange={value => { set('bookingDate', value); set('startTime', ''); set('endTime', ''); }} /><FieldError message={errors.bookingDate} /></div><div><Label>Start *</Label><AdminTimeSelect invalid={!!errors.startTime} value={form.startTime} onChange={value => { set('startTime', value); set('endTime', ''); }} options={startOptions} disabled={timeDisabled} placeholder={availabilityLoading ? 'Checking…' : 'Select start'} /><FieldError message={errors.startTime} /></div><div><Label>End *</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} onChange={value => set('endTime', value)} options={endOptions} disabled={timeDisabled || !form.startTime} placeholder="Select end" /><FieldError message={errors.endTime} /></div></div>
     {form.courtId && form.bookingDate && !availabilityLoading && !slots.length && <p className="rounded-lg bg-primary/5 px-3 py-2 text-xs font-medium text-primary">No configured time slots are available for this court and date.</p>}
-    {!!form.startTime && !!form.endTime && <div><div className={cn('rounded-xl border p-3.5', quote.covered ? 'border-primary/20 bg-primary/5' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20')}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{quote.covered ? quote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${form.rateType || RateType.Booking} rate covers the complete time range.`}</p></div><p className="shrink-0 text-base font-bold text-primary">{quote.covered ? `₱${quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p></div></div><FieldError message={errors.rate} /></div>}
-    {includeContact && <><div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => set('rateType', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div><div><Label>Booked by *</Label><Input aria-invalid={!!errors.customerName} className={cn(errors.customerName && 'field-invalid')} value={form.customerName} onChange={e => set('customerName', e.target.value)} placeholder="e.g. John Doe" /><FieldError message={errors.customerName} /></div><div><Label>Email (optional)</Label><Input aria-invalid={!!errors.email} className={cn(errors.email && 'field-invalid')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="e.g. john@example.com" /><FieldError message={errors.email} /></div><div><Label>Phone</Label><Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="e.g. 09123456789" /></div><div><Label>Amount paid</Label><Input aria-invalid={!!errors.amountPaid} className={cn(errors.amountPaid && 'field-invalid')} type="number" min="0" max={quote.covered ? quote.total : undefined} step="0.01" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value === '' ? '' : Number(e.target.value))} placeholder="0" /><FieldError message={errors.amountPaid} /></div><div><Label>Notes</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes or requests" /></div></>}
+    {!!form.startTime && !!form.endTime && <div><div className={cn('rounded-xl border p-3.5', quote.covered ? 'border-primary/20 bg-primary/5' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20')}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{quote.covered ? quote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${form.rateType || RateType.Booking} rate covers the complete time range.`}</p></div><div className="text-right"><p className="shrink-0 text-base font-bold text-primary">{quote.covered ? (discount > 0 ? <><span className="line-through text-muted-foreground font-normal text-sm mr-2">₱{quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>₱{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</> : `₱${quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) : '—'}</p></div></div></div><FieldError message={errors.rate} /></div>}
+    {includeContact && <>
+      <div>
+        <Label>Promo Code (Optional)</Label>
+        <Select value={form.promoId?.toString() || 'none'} onValueChange={value => set('promoId', value !== 'none' ? Number(value) : null)}>
+          <SelectTrigger><SelectValue placeholder="Select promo code" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {promos.filter((p: any) => p.isActive).map((p: any) => (
+              <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => set('rateType', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div><div><Label>Booked by *</Label><Input aria-invalid={!!errors.customerName} className={cn(errors.customerName && 'field-invalid')} value={form.customerName} onChange={e => set('customerName', e.target.value)} placeholder="e.g. John Doe" /><FieldError message={errors.customerName} /></div><div><Label>Email (optional)</Label><Input aria-invalid={!!errors.email} className={cn(errors.email && 'field-invalid')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="e.g. john@example.com" /><FieldError message={errors.email} /></div><div><Label>Phone</Label><Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="e.g. 09123456789" /></div><div><Label>Amount paid</Label><Input aria-invalid={!!errors.amountPaid} className={cn(errors.amountPaid && 'field-invalid')} type="number" min="0" max={quote.covered ? finalTotal : undefined} step="0.01" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value === '' ? '' : Number(e.target.value))} placeholder="0" /><FieldError message={errors.amountPaid} /></div><div><Label>Notes</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes or requests" /></div></>}
   </div>;
 }

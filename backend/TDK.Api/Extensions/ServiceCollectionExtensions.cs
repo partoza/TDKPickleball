@@ -19,6 +19,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IRateService, RateService>();
+        services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IPromoService, PromoService>();
+        services.AddScoped<IStorageManagementService, StorageManagementService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddSingleton<IProfileImageService, CloudinaryProfileImageService>();
         services.AddSingleton<IBusinessClock, ManilaBusinessClock>();

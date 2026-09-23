@@ -3,7 +3,7 @@ export enum ScheduleStatus {
   Training = 'Training',
   Booked = 'Booked',
   Unavailable = 'Unavailable',
-  FreePlay = 'FreePlay'
+  Internal = 'Internal'
 }
 
 export enum BookingStatus {
@@ -16,7 +16,22 @@ export enum BookingStatus {
 export enum RateType {
   Booking = 'Booking',
   Training = 'Training',
-  FreePlay = 'FreePlay'
+  Internal = 'Internal'
+}
+
+export enum StaffType {
+  Internal = 0,
+  Trainer = 1
+}
+
+export interface StaffProfile {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  type: StaffType;
+  isActive: boolean;
+  profilePictureUrl?: string;
 }
 
 export interface Court {
@@ -52,6 +67,7 @@ export interface Schedule {
   paymentStatus?: BookingStatus;
   amountPaid?: number;
   totalAmount?: number;
+  staffProfileId?: number;
 }
 
 export interface Booking {
@@ -65,15 +81,37 @@ export interface Booking {
   bookingDate: string;
   startTime: string;
   endTime: string;
+  subtotal: number;
+  discountAmount: number;
   totalAmount: number;
   amountPaid: number;
   remainingBalance: number;
   status: BookingStatus;
   bookingType: RateType;
-    notes?: string;
-    createdAt: string;
-    rescheduledAt?: string;
-    receiptAvailable?: boolean;
+  notes?: string;
+  createdAt: string;
+  rescheduledAt?: string;
+  receiptAvailable?: boolean;
+  staffProfileId?: number;
+  promoId?: number;
+}
+
+export enum DiscountType {
+  Percentage = 'Percentage',
+  FixedAmount = 'FixedAmount'
+}
+
+export interface Promo {
+  id: number;
+  code: string;
+  description: string;
+  type: DiscountType;
+  value: number;
+  startDate?: string;
+  endDate?: string;
+  maxUses?: number;
+  currentUses: number;
+  isActive: boolean;
 }
 
 export interface Rate {
@@ -136,4 +174,34 @@ export interface SystemUser {
   isActive: boolean;
   mustChangePassword: boolean;
   profileImageUrl?: string;
+}
+
+export interface StorageStatus {
+  usedMegabytes: number;
+  limitMegabytes: number;
+  warningThresholdMegabytes: number;
+  usedPercent: number;
+  isHealthy: boolean;
+  completedBookingCount: number;
+  checkedAtUtc: string;
+}
+
+export interface BookingCleanupPreview {
+  fromDate: string;
+  throughDate: string;
+  eligibleBookingCount: number;
+  receiptCount: number;
+  oldestBookingDate?: string;
+}
+
+export interface BookingCleanupHistory {
+  id: number;
+  selectedFromDate?: string;
+  deletedThroughDate: string;
+  oldestBookingDate?: string;
+  deletedBookingCount: number;
+  deletedReceiptCount: number;
+  deletedByName: string;
+  deletedByEmail: string;
+  deletedAtUtc: string;
 }

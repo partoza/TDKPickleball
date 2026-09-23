@@ -25,7 +25,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerWithJwt();
 
 builder.Services.AddDbContext<TdkDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), ServerVersion.Parse("8.0.32-mysql")));
 
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddMemoryCache();
@@ -127,3 +127,5 @@ static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, TimeSpan windo
     QueueLimit = 0,
     AutoReplenishment = true
 };
+
+

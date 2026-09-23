@@ -16,14 +16,15 @@ public class BookingService : IBookingService
     private readonly IRepository<TimeSlot> _timeSlots;
     private readonly IRepository<Court> _courts;
     private readonly IRepository<Notification> _notifications;
+    private readonly IRepository<Promo> _promos;
     private readonly IRateService _rates;
     private readonly IEmailService _email;
     private readonly IBusinessClock _clock;
 
-    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRateService rates, IEmailService email, IBusinessClock clock)
+    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRepository<Promo> promos, IRateService rates, IEmailService email, IBusinessClock clock)
     {
         _bookings = bookings; _schedules = schedules; _timeSlots = timeSlots; _courts = courts;
-        _notifications = notifications; _rates = rates; _email = email; _clock = clock;
+        _notifications = notifications; _promos = promos; _rates = rates; _email = email; _clock = clock;
     }
 
     public async Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId)
@@ -47,8 +48,26 @@ public class BookingService : IBookingService
         if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
         var court = await _courts.GetByIdAsync(request.CourtId);
         if (court is null) return ApiResponse<BookingDto>.Fail("Court not found");
-        var total = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, request.RateType);
-        if (total <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+        var subtotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, request.RateType);
+        if (subtotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+
+        decimal discount = 0;
+        if (request.PromoId.HasValue)
+        {
+            var promo = await _promos.GetByIdAsync(request.PromoId.Value);
+            if (promo == null || !promo.IsActive) return ApiResponse<BookingDto>.Fail("Invalid or inactive promo");
+            if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value) return ApiResponse<BookingDto>.Fail("Promo usage limit reached");
+            var now = _clock.UtcNow.UtcDateTime;
+            if (promo.StartDate.HasValue && promo.StartDate.Value > now) return ApiResponse<BookingDto>.Fail("Promo is not yet valid");
+            if (promo.EndDate.HasValue && promo.EndDate.Value < now) return ApiResponse<BookingDto>.Fail("Promo has expired");
+            
+            discount = promo.Type == DiscountType.Percentage ? (subtotal * (promo.Value / 100)) : promo.Value;
+            if (discount > subtotal) discount = subtotal;
+            promo.CurrentUses++;
+            _promos.Update(promo);
+        }
+
+        var total = subtotal - discount;
         if (request.AmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
         if (request.AmountPaid > total) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{total:N2}");
         var paid = request.AmountPaid;
@@ -56,8 +75,8 @@ public class BookingService : IBookingService
             BookingReference = await GenerateReferenceAsync(), CourtId = request.CourtId,
             CustomerName = request.CustomerName.Trim(), Email = request.Email?.Trim() ?? "", Phone = request.Phone?.Trim(),
             BookingDate = request.BookingDate, StartTime = request.StartTime, EndTime = request.EndTime,
-            TotalAmount = total, AmountPaid = paid, Status = paid >= total ? BookingStatus.Paid : BookingStatus.Reserved,
-            Notes = request.Notes?.Trim(), CreatedAt = _clock.UtcNow.UtcDateTime
+            Subtotal = subtotal, DiscountAmount = discount, TotalAmount = total, AmountPaid = paid, Status = paid >= total ? BookingStatus.Paid : BookingStatus.Reserved,
+            Notes = request.Notes?.Trim(), CreatedAt = _clock.UtcNow.UtcDateTime, StaffProfileId = request.StaffProfileId, PromoId = request.PromoId
         };
         await _bookings.AddAsync(booking); await _bookings.SaveChangesAsync();
         await AssignScheduleAsync(booking, request.RateType); await AddNotificationAsync(booking, court.Name); await TrySendConfirmationAsync(booking, court.Name);
@@ -94,8 +113,39 @@ public class BookingService : IBookingService
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
         var rateType = await GetRateTypeAsync(id);
-        var newTotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
-        if (newTotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+        var subtotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
+        if (subtotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
+
+        decimal discount = 0;
+        if (request.PromoId.HasValue)
+        {
+            var promo = await _promos.GetByIdAsync(request.PromoId.Value);
+            if (promo == null || !promo.IsActive) return ApiResponse<BookingDto>.Fail("Invalid or inactive promo");
+            
+            if (b.PromoId != request.PromoId.Value) 
+            {
+                if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value) return ApiResponse<BookingDto>.Fail("Promo usage limit reached");
+                var now = _clock.UtcNow.UtcDateTime;
+                if (promo.StartDate.HasValue && promo.StartDate.Value > now) return ApiResponse<BookingDto>.Fail("Promo is not yet valid");
+                if (promo.EndDate.HasValue && promo.EndDate.Value < now) return ApiResponse<BookingDto>.Fail("Promo has expired");
+                
+                promo.CurrentUses++;
+                _promos.Update(promo);
+            }
+            
+            discount = promo.Type == DiscountType.Percentage ? (subtotal * (promo.Value / 100)) : promo.Value;
+            if (discount > subtotal) discount = subtotal;
+        } 
+        else if (b.PromoId.HasValue) 
+        {
+            var oldPromo = await _promos.GetByIdAsync(b.PromoId.Value);
+            if (oldPromo != null) {
+                oldPromo.CurrentUses = Math.Max(0, oldPromo.CurrentUses - 1);
+                _promos.Update(oldPromo);
+            }
+        }
+
+        var newTotal = subtotal - discount;
         if (request.AmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
         if (request.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{newTotal:N2}");
         var moved = b.CourtId != request.CourtId || b.BookingDate != request.BookingDate || b.StartTime != request.StartTime || b.EndTime != request.EndTime;
@@ -110,8 +160,8 @@ public class BookingService : IBookingService
         var utcNow = _clock.UtcNow.UtcDateTime;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
         b.CustomerName = request.CustomerName.Trim(); b.Email = request.Email?.Trim() ?? ""; b.Phone = request.Phone?.Trim(); b.Notes = request.Notes?.Trim();
-        b.TotalAmount = newTotal; b.AmountPaid = request.AmountPaid;
-        b.Status = request.Status; b.UpdatedAt = utcNow; if (moved) b.RescheduledAt = utcNow; _bookings.Update(b); await _bookings.SaveChangesAsync();
+        b.Subtotal = subtotal; b.DiscountAmount = discount; b.TotalAmount = newTotal; b.AmountPaid = request.AmountPaid; b.PromoId = request.PromoId;
+        b.Status = request.Status; b.StaffProfileId = request.StaffProfileId; b.UpdatedAt = utcNow; if (moved) b.RescheduledAt = utcNow; _bookings.Update(b); await _bookings.SaveChangesAsync();
         if (moved) await AssignScheduleAsync(b, rateType);
         return ApiResponse<BookingDto>.Ok(ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", rateType), "Booking updated");
     }
@@ -268,5 +318,5 @@ public class BookingService : IBookingService
     }
     private static bool IsWithinCourtHours(TimeSlot slot, Court court) => slot.StartTime >= court.OpenTime && (court.CloseTime == TimeOnly.MinValue || slot.EndTime <= court.CloseTime);
     private static int Minutes(TimeOnly value, bool midnightAsEnd) => value == TimeOnly.MinValue && midnightAsEnd ? 1440 : value.Hour * 60 + value.Minute;
-    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt);
+    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.StaffProfileId, b.PromoId);
 }

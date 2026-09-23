@@ -19,20 +19,20 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={4000}
       gap={8}
       icons={{
-        success: <CheckCircleIcon className="h-5 w-5 text-primary" />,
+        success: <CheckCircleIcon className="h-5 w-5 text-emerald-500" />,
         error: <ExclamationCircleIcon className="h-5 w-5 text-red-500" />,
         warning: <ExclamationTriangleIcon className="h-5 w-5 text-amber-500" />,
-        info: <InformationCircleIcon className="h-5 w-5 text-primary" />,
+        info: <InformationCircleIcon className="h-5 w-5 text-blue-500" />,
       }}
       toastOptions={{
         classNames: {
           toast:
-            "mac-toast group toast group-[.toaster]:bg-background/95 group-[.toaster]:text-foreground group-[.toaster]:border-border",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-foreground group-[.toaster]:text-background group-[.toaster]:border-foreground/10 group-[.toaster]:shadow-2xl group-[.toaster]:rounded-xl font-medium",
+          description: "group-[.toast]:text-background/80 text-sm",
           actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground font-semibold rounded-md",
           cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground font-semibold rounded-md",
         },
       }}
       {...props}

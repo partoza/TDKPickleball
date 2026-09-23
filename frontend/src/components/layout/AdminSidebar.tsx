@@ -11,6 +11,8 @@ import {
   SunIcon as Sun,
   MoonIcon as Moon,
   UsersIcon as Users,
+  CircleStackIcon as Database,
+  ReceiptPercentIcon as Percent,
 } from '@heroicons/react/24/solid';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -49,7 +51,10 @@ export default function AdminSidebar() {
   const systemItems = [
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
+    { icon: Users, label: 'Staff & Coaches', href: ROUTES.ADMIN.STAFF },
+    { icon: Percent, label: 'Promos', href: '/admin/promos' },
     { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
+    { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
   ];
 
   const renderNavGroup = (title: string, items: typeof platformItems) => (

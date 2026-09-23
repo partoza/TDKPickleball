@@ -95,17 +95,21 @@ public class SmtpEmailService : IEmailService
             int logoH = (int)((float)logoImage.Height / logoImage.Width * logoW);
             g.DrawImage(logoImage, (width - logoW) / 2, 30, logoW, logoH);
 
-            int qrSize = 320;
-            g.DrawImage(qrImage, (width - qrSize) / 2, 30 + logoH + 20, qrSize, qrSize);
-
-            using var fontRef = new System.Drawing.Font("Arial", 18, System.Drawing.FontStyle.Bold);
-            using var brushRef = new System.Drawing.SolidBrush(System.Drawing.Color.Black);
             var stringFormat = new System.Drawing.StringFormat { Alignment = System.Drawing.StringAlignment.Center };
-            g.DrawString(booking.BookingReference, fontRef, brushRef, new System.Drawing.RectangleF(0, 30 + logoH + 20 + qrSize + 15, width, 30), stringFormat);
+            
+            int textY = 30 + logoH + 20;
+            using var fontScan = new System.Drawing.Font("Arial", 12, System.Drawing.FontStyle.Bold);
+            using var brushScan = new System.Drawing.SolidBrush(System.Drawing.ColorTranslator.FromHtml(BrandRed));
+            g.DrawString("SCAN THIS TO VERIFY YOUR BOOKING", fontScan, brushScan, new System.Drawing.RectangleF(0, textY, width, 25), stringFormat);
 
-            using var fontName = new System.Drawing.Font("Arial", 14, System.Drawing.FontStyle.Regular);
-            using var brushName = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 71, 85, 105)); // slate-600
-            g.DrawString(booking.CustomerName, fontName, brushName, new System.Drawing.RectangleF(0, 30 + logoH + 20 + qrSize + 45, width, 30), stringFormat);
+            int qrY = textY + 30;
+            int qrSize = 320;
+            g.DrawImage(qrImage, (width - qrSize) / 2, qrY, qrSize, qrSize);
+
+            int nameY = qrY + qrSize + 25;
+            using var fontName = new System.Drawing.Font("Arial", 20, System.Drawing.FontStyle.Bold);
+            using var brushName = new System.Drawing.SolidBrush(System.Drawing.Color.Black);
+            g.DrawString(booking.CustomerName, fontName, brushName, new System.Drawing.RectangleF(0, nameY, width, 35), stringFormat);
 
             using var ms = new MemoryStream();
             bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
@@ -180,23 +184,29 @@ public class SmtpEmailService : IEmailService
 
             <div style="margin:0 0 24px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                {(booking.DiscountAmount > 0 ? $"""
+                <tr><td style="padding-top:9px;color:#777777;font-size:13px;">Subtotal</td><td align="right" style="padding-top:9px;color:#111111;font-size:14px;">PHP {booking.Subtotal:N2}</td></tr>
+                <tr><td style="padding-top:9px;color:#777777;font-size:13px;">Discount</td><td align="right" style="padding-top:9px;color:#111111;font-size:14px;">-PHP {booking.DiscountAmount:N2}</td></tr>
+                """ : "")}
                 <tr><td style="padding-top:9px;color:#777777;font-size:13px;">Total</td><td align="right" style="padding-top:9px;color:#111111;font-size:14px;font-weight:700;">PHP {booking.TotalAmount:N2}</td></tr>
                 <tr><td style="padding-top:9px;color:#777777;font-size:13px;">Paid</td><td align="right" style="padding-top:9px;color:#111111;font-size:14px;font-weight:700;">PHP {booking.AmountPaid:N2}</td></tr>
                 <tr><td style="padding-top:9px;color:#777777;font-size:13px;">Remaining</td><td align="right" style="padding-top:9px;color:{BrandRed};font-size:14px;font-weight:700;">PHP {remaining:N2}</td></tr>
               </table>
             </div>
 
-            <div style="margin:24px 0 0;padding-top:24px;border-top:1px solid #eeeeee;">
-              <div style="margin-bottom:14px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#777777;">Booking QR</div>
-              <div style="width:168px;height:168px;margin:0;">
-                <img src="cid:tdk-booking-qr" width="168" height="168" alt="Booking verification QR code" style="display:block;width:168px;height:168px;margin:0;border:0;" />
+            <div style="margin:32px 0 0;padding-top:32px;border-top:1px solid #eeeeee;text-align:center;">
+              <div style="margin:0 auto; max-width:280px;">
+                <img src="cid:tdk-booking-qr" width="280" height="343" alt="Booking verification QR code" style="display:block;width:100%;height:auto;margin:0 auto;border:1px solid #e7e7e7;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.05);" />
               </div>
-              <div style="margin-top:16px;font-family:SFMono-Regular,Consolas,Liberation Mono,monospace;font-size:15px;font-weight:700;letter-spacing:.08em;color:#111111;">{Encode(booking.BookingReference)}</div>
-              <p style="margin:8px 0 0;color:#555555;font-size:13px;font-weight:700;line-height:1.5;">Booked for {Encode(booking.CustomerName)}</p>
-              <p style="margin:4px 0 0;color:#888888;font-size:12px;line-height:1.5;">Show this code when you arrive.</p>
+              <a href="cid:tdk-booking-qr" download="TDK-Ticket.png" style="display:inline-block;margin-top:16px;color:{BrandRed};font-size:14px;font-weight:700;text-decoration:none;">
+                <span style="display:inline-block;vertical-align:middle;margin-right:6px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </span>
+                <span style="display:inline-block;vertical-align:middle;">Download Ticket</span>
+              </a>
             </div>
 
-            <div style="margin-top:24px;">{Button(verifyUrl, "Verify booking")}</div>
+            <div style="margin-top:32px;text-align:center;">{Button(verifyUrl, "Verify booking")}</div>
             """;
         return WrapEmail(content, booking.BookingReference);
     }
@@ -208,24 +218,30 @@ public class SmtpEmailService : IEmailService
         """;
 
     private static string Button(string url, string label) => $"""
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:9px;background:#111111;"><a href="{Encode(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">{Encode(label)}</a></td></tr></table>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:9px;background:{BrandRed};"><a href="{Encode(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">{Encode(label)}</a></td></tr></table>
         """;
 
     private static string WrapEmail(string content, string preheader) => $"""
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
         <body style="margin:0;padding:0;background:#ffffff;color:#111111;">
           <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{Encode(preheader)}</div>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;"><tr><td align="left" style="padding:32px 24px;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;">
-              <tr><td align="left" style="padding:0 0 24px;"><img src="{BrandLogoUrl}" width="190" alt="The Dirty Kitchen Pickleball Court" style="display:block;width:190px;max-width:100%;height:auto;border:0;" /></td></tr>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;"><tr><td align="center" style="padding:32px 24px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;text-align:left;">
+              <tr><td align="center" style="padding:0 0 24px;"><img src="{BrandLogoUrl}" width="190" alt="The Dirty Kitchen Pickleball Court" style="display:block;width:190px;max-width:100%;height:auto;border:0;margin:0 auto;" /></td></tr>
               <tr><td style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">{content}</td></tr>
-              <tr><td align="left" style="padding:24px 0 0;border-top:1px solid #eeeeee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#888888;font-size:11px;line-height:1.6;margin-top:24px;display:block;">The Dirty Kitchen Pickleball Court<br>Automated booking email • Please do not reply.</td></tr>
+              <tr><td align="center" style="padding:24px 0 0;border-top:1px solid #eeeeee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#888888;font-size:11px;line-height:1.6;margin-top:24px;display:block;">The Dirty Kitchen Pickleball Court</td></tr>
             </table>
           </td></tr></table>
         </body></html>
         """;
 
-    private static string BuildPlainText(Booking booking, string courtName, bool isReminder) => $"""
+    private static string BuildPlainText(Booking booking, string courtName, bool isReminder)
+    {
+        var breakdown = booking.DiscountAmount > 0 
+            ? $"\n        Subtotal: PHP {booking.Subtotal:N2}\n        Discount: -PHP {booking.DiscountAmount:N2}"
+            : "";
+
+        return $"""
         {(isReminder ? "Your pickleball schedule starts in one hour." : "Your pickleball schedule is confirmed.")}
 
         Reference: {booking.BookingReference}
@@ -233,14 +249,15 @@ public class SmtpEmailService : IEmailService
         Court: {courtName}
         Date: {booking.BookingDate:MMMM d, yyyy}
         Time: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}
-        Status: {booking.Status}
+        Status: {booking.Status}{breakdown}
         Total: PHP {booking.TotalAmount:N2}
         Paid: PHP {booking.AmountPaid:N2}
         Remaining: PHP {Math.Max(0, booking.TotalAmount - booking.AmountPaid):N2}
 
         Present your booking reference or QR code when you arrive.
         """;
+    }
 
-    private string GetFrontendUrl() => (_configuration["Frontend:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
+    private string GetFrontendUrl() => (_configuration["Frontend:BaseUrl"] ?? "https://thedirtykitchen.vercel.app").TrimEnd('/');
     private static string Encode(string? value) => WebUtility.HtmlEncode(value ?? "");
 }

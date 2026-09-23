@@ -14,7 +14,7 @@ export const STATUS_COLORS: Record<ScheduleStatus, string> = {
   [ScheduleStatus.Training]: 'bg-orange-500 text-white border-orange-600 dark:bg-orange-600 dark:text-white dark:border-orange-500',
   [ScheduleStatus.Booked]: 'bg-primary text-white border-primary dark:text-white',
   [ScheduleStatus.Unavailable]: 'bg-slate-600 text-white border-slate-700 dark:bg-slate-700 dark:text-white dark:border-slate-600',
-  [ScheduleStatus.FreePlay]: 'bg-violet-600 text-white border-violet-700 dark:bg-violet-500 dark:text-white dark:border-violet-400',
+  [ScheduleStatus.Internal]: 'bg-violet-600 text-white border-violet-700 dark:bg-violet-500 dark:text-white dark:border-violet-400',
 };
 
 export const STATUS_LABELS: Record<ScheduleStatus, string> = {
@@ -22,7 +22,7 @@ export const STATUS_LABELS: Record<ScheduleStatus, string> = {
   [ScheduleStatus.Training]: 'Training',
   [ScheduleStatus.Booked]: 'Booked',
   [ScheduleStatus.Unavailable]: 'Unavailable',
-  [ScheduleStatus.FreePlay]: 'Free Play',
+  [ScheduleStatus.Internal]: 'Internal',
 };
 
 export const ROUTES = {
@@ -39,8 +39,11 @@ export const ROUTES = {
     SCHEDULE: '/tdkadmin/schedule',
     BOOKINGS: '/tdkadmin/bookings',
     RATES: '/tdkadmin/rates',
+    PROMOS: '/tdkadmin/promos',
     COURTS: '/tdkadmin/courts',
     ADMINS: '/tdkadmin/admins',
+    STAFF: '/tdkadmin/staff',
+    STORAGE: '/tdkadmin/storage',
     WELCOME: '/tdkadmin/welcome',
     PROFILE: '/tdkadmin/profile',
   }

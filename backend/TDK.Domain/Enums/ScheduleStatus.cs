@@ -6,5 +6,5 @@ public enum ScheduleStatus
     Training = 1,
     Booked = 2,
     Unavailable = 3,
-    FreePlay = 4
+    Internal = 4
 }

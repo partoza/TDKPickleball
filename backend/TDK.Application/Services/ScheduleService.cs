@@ -74,7 +74,7 @@ public class ScheduleService : IScheduleService
         var bookings = (await _bookingRepo.GetAllAsync()).Where(b => query.Any(s => s.BookingId == b.Id)).ToDictionary(b => b.Id);
         return ApiResponse<IEnumerable<ScheduleDto>>.Ok(query.Select(s => {
             slots.TryGetValue(s.TimeSlotId, out var slot); courts.TryGetValue(s.CourtId, out var court); bookings.TryGetValue(s.BookingId ?? 0, out var booking);
-            return new ScheduleDto(s.Id, s.CourtId, court?.Name ?? "Court", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0);
+            return new ScheduleDto(s.Id, s.CourtId, court?.Name ?? "Court", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.StaffProfileId);
         }));
     }
 
@@ -84,7 +84,7 @@ public class ScheduleService : IScheduleService
         if (s == null) return ApiResponse<ScheduleDto>.Fail("Not found");
         var slot = await _timeSlotRepo.GetByIdAsync(s.TimeSlotId);
         var booking = s.BookingId.HasValue ? await _bookingRepo.GetByIdAsync(s.BookingId.Value) : null;
-        return ApiResponse<ScheduleDto>.Ok(new ScheduleDto(s.Id, s.CourtId, "", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0));
+        return ApiResponse<ScheduleDto>.Ok(new ScheduleDto(s.Id, s.CourtId, "", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.StaffProfileId));
     }
 
     public async Task<ApiResponse<ScheduleDto>> CreateAsync(int courtId, DateOnly date, int timeSlotId)
@@ -129,6 +129,7 @@ public class ScheduleService : IScheduleService
             bookingToUpdate.Notes = request.Notes?.Trim();
             bookingToUpdate.AmountPaid = request.PaymentStatus == BookingStatus.Paid ? bookingToUpdate.TotalAmount : request.AmountPaid;
             bookingToUpdate.Status = bookingToUpdate.AmountPaid >= bookingToUpdate.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
+            bookingToUpdate.StaffProfileId = request.StaffProfileId;
             bookingToUpdate.UpdatedAt = DateTime.UtcNow;
             _bookingRepo.Update(bookingToUpdate);
             await _bookingRepo.SaveChangesAsync();
@@ -164,7 +165,7 @@ public class ScheduleService : IScheduleService
             if (request.PaymentStatus == BookingStatus.Reserved && request.AmountPaid < 0) return ApiResponse<bool>.Fail("Reservation amount cannot be negative");
             if (request.PaymentStatus == BookingStatus.Reserved && request.AmountPaid > total) return ApiResponse<bool>.Fail($"Reservation amount cannot exceed the total amount of ₱{total:N2}");
             var amountPaid = request.PaymentStatus == BookingStatus.Paid ? total : request.AmountPaid;
-            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType));
+            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.StaffProfileId, request.PromoId));
             if (!created.Success || created.Data is null) return ApiResponse<bool>.Fail(created.Message, created.Errors);
             if (request.Status == ScheduleStatus.Training)
             {

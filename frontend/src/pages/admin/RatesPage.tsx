@@ -134,7 +134,7 @@ export default function RatesPage() {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader><DialogTitle>{editing ? 'Edit rate' : 'Add rate'}</DialogTitle><DialogDescription>Choose who this price applies to, its time range, and hourly amount.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.FreePlay}>Free Play</SelectItem></SelectContent></Select></div>
+          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
           <div><Label>Start time</Label><AdminTimeSelect value={form.startTime} options={hourlyOptions(0, 23)} onChange={value => { setForm({ ...form, startTime: value, endTime: isValidTimeRange(value, form.endTime) ? form.endTime : minimumEndTime(value) }); setErrors(e => ({...e, endTime: ''})); }} /></div>
           <div><Label>End time</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} options={endTimeOptions} onChange={value => { setForm({ ...form, endTime: value }); setErrors(e => ({...e, endTime: ''})); }} />{errors.endTime && <p className="field-error" role="alert">{errors.endTime}</p>}</div>
           <div className="sm:col-span-2"><Label>Hourly rate (₱)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="1" step="0.01" value={form.pricePerHour} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder="0" />{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
@@ -146,8 +146,8 @@ export default function RatesPage() {
 }
 
 function RateTypeBadge({ type }: { type: RateType }) {
-  const colors = type === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : type === RateType.FreePlay ? 'border-violet-700 bg-violet-600 text-white' : 'border-primary bg-primary text-primary-foreground';
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold border ${colors}`}>{type === RateType.FreePlay ? 'Free Play' : type}</span>;
+  const colors = type === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : type === RateType.Internal ? 'border-violet-700 bg-violet-600 text-white' : 'border-primary bg-primary text-primary-foreground';
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold border ${colors}`}>{type === RateType.Internal ? 'Internal' : type}</span>;
 }
 
 function time(value: string) { return format(new Date(`2000-01-01T${value}`), 'h:mm a'); }

@@ -21,6 +21,7 @@ type Props = {
   errors?: BookingBlockErrors[];
   showQuote?: boolean;
   addLabel?: string;
+  discount?: number;
 };
 
 function ErrorText({ children }: { children?: string }) {
@@ -81,7 +82,7 @@ function BookingBlockCard({ block, blocks, index, count, update, remove, courts,
   </section>;
 }
 
-export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking' }: Props) {
+export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking', discount = 0 }: Props) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -90,6 +91,7 @@ export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType,
   const update = (index: number, changes: Partial<BookingBlockValue>) => onChange(blocks.map((block, blockIndex) => blockIndex === index ? { ...block, ...changes } : block));
   const remove = (index: number) => onChange(blocks.filter((_, blockIndex) => blockIndex !== index));
   const grandTotal = bookingBlocksTotal(blocks, rates, rateType);
+  const finalTotal = Math.max(0, grandTotal - discount);
   const conflictErrors = getBookingBlockConflictErrors(blocks);
   return <div className="space-y-4">
     {blocks.map((block, index) => <BookingBlockCard key={block.id || index} block={block} blocks={blocks} index={index} count={blocks.length} update={update} remove={remove} courts={courts} rates={rates} rateType={rateType} errors={{ ...errors[index], ...conflictErrors[index] }} showQuote={showQuote} now={now} />)}
@@ -100,7 +102,17 @@ export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType,
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total amount</p>
           <p className="text-[13px] text-muted-foreground">Combined total for {blocks.length} {blocks.length === 1 ? 'booking block' : 'booking blocks'}</p>
         </div>
-        <p className="shrink-0 text-xl font-bold text-primary">₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <div className="text-right">
+          {discount > 0 ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <p className="text-xs text-muted-foreground line-through">₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-[11px] text-emerald-600 font-semibold">-₱{discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} discount</p>
+              <p className="text-xl font-bold text-primary">₱{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+          ) : (
+            <p className="shrink-0 text-xl font-bold text-primary">₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          )}
+        </div>
       </div>
     )}
   </div>;

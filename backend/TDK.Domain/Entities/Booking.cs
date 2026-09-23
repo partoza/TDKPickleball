@@ -13,6 +13,8 @@ public class Booking
     public DateOnly BookingDate { get; set; }
     public TimeOnly StartTime { get; set; }
     public TimeOnly EndTime { get; set; }
+    public decimal Subtotal { get; set; }
+    public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal AmountPaid { get; set; }
     public BookingStatus Status { get; set; }
@@ -24,6 +26,11 @@ public class Booking
     public string? ReceiptFileName { get; set; }
     public string? ReceiptContentType { get; set; }
     
+    public int? StaffProfileId { get; set; }
+    public int? PromoId { get; set; }
+    
     public Court Court { get; set; } = null!;
+    public StaffProfile? StaffProfile { get; set; }
+    public Promo? Promo { get; set; }
     public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }
