@@ -1,4 +1,5 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useMemo, useState, useEffect } from 'react';
+import { useStaff } from '@/hooks/useStaff';
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isWithinInterval, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
@@ -12,11 +13,114 @@ import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
+function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booking[], staff: any[] }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayStr = format(now, 'yyyy-MM-dd');
+  const timeStr = now.toTimeString().slice(0, 5);
+
+  const activeBooking = bookings.find(b => 
+    b.courtId === court.id && 
+    b.bookingDate === todayStr && 
+    b.startTime <= timeStr && 
+    b.endTime > timeStr && 
+    b.status !== 'Cancelled'
+  );
+
+  const formatHour = (hStr: string) => {
+    const [h, m] = hStr.split(':');
+    let hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+    return {hour}:{m} {ampm}";
+  };
+
+  const getRemainingTime = (end: string) => {
+    const [eh, em] = end.split(':');
+    const endT = new Date(now);
+    endT.setHours(parseInt(eh), parseInt(em), 0, 0);
+    const diff = endT.getTime() - now.getTime();
+    if (diff <= 0) return 'Ending soon';
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(mins / 60);
+    if (hrs > 0) return {hrs}h {mins % 60}m left";
+    return {mins} min left";
+  };
+
+  return (
+    <div className="rounded-2xl border bg-card p-5 shadow-sm relative overflow-hidden transition-all group">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="font-bold text-lg">{court.name}</h3>
+          {activeBooking ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Currently in use</span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">Available</span>
+          )}
+        </div>
+        {activeBooking && (
+          <div className="text-right">
+            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</div>
+          </div>
+        )}
+      </div>
+
+      {activeBooking ? (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3 space-y-2 border border-slate-100 dark:border-white/5">
+          {activeBooking.bookingType === RateType.Training ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Trainee:</span>
+                <span className="font-semibold">{activeBooking.customerName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Trainer:</span>
+                <span className="font-semibold">{staff.find(s => s.id === activeBooking.staffProfileId)?.name || 'N/A'}</span>
+              </div>
+            </>
+          ) : activeBooking.bookingType === RateType.Internal ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Internal:</span>
+                <span className="font-semibold">{staff.find(s => s.id === activeBooking.staffProfileId)?.name || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Reference:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{activeBooking.customerName}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Player:</span>
+              <span className="font-semibold">{activeBooking.customerName}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 text-center text-sm text-muted-foreground">
+          {(() => {
+            const nextBooking = bookings.find(b => b.courtId === court.id && b.bookingDate === todayStr && b.startTime > timeStr && b.status !== 'Cancelled');
+            if (nextBooking) return Next booking at {formatHour(nextBooking.startTime)}";
+            return 'No upcoming bookings today';
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 type Range = 'day'|'week'|'month';
 export default function DashboardPage() {
   const { user } = useAuth();
   const [range, setRange] = useState<Range>('month'); const [anchor, setAnchor] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const { data: bookingResponse, isLoading } = useBookings(); const { data: courtResponse } = useCourts();
+  const { data: bookingResponse, isLoading } = useBookings(); const { data: courtResponse } = useCourts(); const { staff } = useStaff();
   const bookings = bookingResponse?.data || []; const courts = courtResponse?.data || [];
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const interval = range === 'day' ? { start: startOfDay(anchorDate), end: endOfDay(anchorDate) } : range === 'week' ? { start: startOfWeek(anchorDate), end: endOfWeek(anchorDate) } : { start: startOfMonth(anchorDate), end: endOfMonth(anchorDate) };
@@ -221,4 +325,8 @@ function Upcoming({ booking: b }: { booking: Booking }) {
     </div>
   ); 
 }
+
+
+
+
 
