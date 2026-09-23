@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useStaff } from '@/hooks/useStaff';
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isWithinInterval, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/solid';
@@ -36,7 +36,7 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
     let hour = parseInt(h);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     hour = hour % 12 || 12;
-    return {hour}:{m} {ampm}";
+    return `${hour}:${m} ${ampm}`;
   };
 
   const getRemainingTime = (end: string) => {
@@ -47,8 +47,8 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
     if (diff <= 0) return 'Ending soon';
     const mins = Math.floor(diff / 60000);
     const hrs = Math.floor(mins / 60);
-    if (hrs > 0) return {hrs}h {mins % 60}m left";
-    return {mins} min left";
+    if (hrs > 0) return `${hrs}h ${mins % 60}m left`;
+    return `${mins} min left`;
   };
 
   return (
@@ -105,7 +105,7 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
         <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 text-center text-sm text-muted-foreground">
           {(() => {
             const nextBooking = bookings.find(b => b.courtId === court.id && b.bookingDate === todayStr && b.startTime > timeStr && b.status !== 'Cancelled');
-            if (nextBooking) return Next booking at {formatHour(nextBooking.startTime)}";
+            if (nextBooking) return `Next booking at ${formatHour(nextBooking.startTime)}`;
             return 'No upcoming bookings today';
           })()}
         </div>
