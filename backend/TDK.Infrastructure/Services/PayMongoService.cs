@@ -69,7 +69,7 @@ public class PayMongoService : IPayMongoService
                             quantity = 1
                         }
                     },
-                    payment_method_types = new[] { "gcash", "paymaya", "card" },
+                    payment_method_types = new[] { "qrph", "gcash", "paymaya", "card", "dob" },
                     reference_number = referenceNumber,
                     success_url = successUrl
                 }
