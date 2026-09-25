@@ -42,7 +42,7 @@ export const bookingsService = {
     const { data } = await api.post('/api/booking-requests/with-receipt', form);
     return data;
   },
-  submitPublicPayMongoRequest: async (payload: any): Promise<ApiResponse<{ requestReference: string; checkoutUrl: string; submittedAt: string }>> => {
+  submitPublicPayMongoRequest: async (payload: any): Promise<ApiResponse<{ requestReference: string; checkoutUrl: string; submittedAt: string; bookingReferences?: string[] }>> => {
     const request = {
       customerName: payload.customerName,
       phone: payload.phone || '',

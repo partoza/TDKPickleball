@@ -5,6 +5,7 @@ import HomePage from '@/pages/public/HomePage';
 import SchedulePage from '@/pages/public/SchedulePage';
 import BookingPage from '@/pages/public/BookingPage';
 import VerifyPage from '@/pages/public/VerifyPage';
+import SuccessPage from '@/pages/public/SuccessPage';
 import ContactPage from '@/pages/public/ContactPage';
 import GoogleLoginPage from '@/pages/public/GoogleLoginPage';
 import GoogleCallbackPage from '@/pages/public/GoogleCallbackPage';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.SCHEDULE.substring(1), element: <SchedulePage /> },
       { path: ROUTES.BOOKING.substring(1), element: <BookingPage /> },
       { path: ROUTES.VERIFY.substring(1), element: <VerifyPage /> },
+      { path: ROUTES.SUCCESS.substring(1), element: <SuccessPage /> },
       { path: ROUTES.CONTACT.substring(1), element: <ContactPage /> },
       { path: ROUTES.LOGIN.substring(1), element: <GoogleLoginPage /> },
       { path: ROUTES.GOOGLE_CALLBACK.substring(1), element: <GoogleCallbackPage /> },

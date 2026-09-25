@@ -241,6 +241,9 @@ export default function BookingPage() {
         });
         
         if (result.success && result.data?.checkoutUrl) {
+          if (result.data.bookingReferences) {
+            sessionStorage.setItem('PM_TDK_REFS', JSON.stringify(result.data.bookingReferences));
+          }
           window.location.href = result.data.checkoutUrl;
         } else {
           setSubmitError(result.message || 'Failed to initialize payment.');

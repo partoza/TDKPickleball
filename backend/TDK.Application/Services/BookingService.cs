@@ -168,6 +168,7 @@ public class BookingService : IBookingService
             return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Failed to initialize payment: " + ex.Message);
         }
 
+        var createdRefs = new List<string>();
         foreach (var schedule in request.Schedules)
         {
             var createReq = new CreateBookingRequest(
@@ -185,10 +186,13 @@ public class BookingService : IBookingService
                 null,
                 request.PaddleRentalQuantity
             );
-            await CreateAsync(createReq, false); 
+            var res = await CreateAsync(createReq, false); 
+            if (res.Success && res.Data != null) {
+                createdRefs.Add(res.Data.BookingReference);
+            }
         }
 
-        return ApiResponse<PublicPayMongoRequestResponseDto>.Ok(new(requestReference, checkoutUrl, submittedAt));
+        return ApiResponse<PublicPayMongoRequestResponseDto>.Ok(new(requestReference, checkoutUrl, submittedAt, createdRefs));
     }
 
     public async Task<ApiResponse<BookingDto>> CreateAsync(CreateBookingRequest request, bool sendConfirmation = true)

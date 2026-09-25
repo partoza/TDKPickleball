@@ -39,10 +39,13 @@ public class PayMongoService : IPayMongoService
 
     public async Task<string> CreateLinkAsync(decimal amount, string description, string referenceNumber, CancellationToken cancellationToken = default)
     {
+        var baseUrl = _configuration.GetValue<string>("Frontend:BaseUrl")?.TrimEnd('/') ?? "http://localhost:5173";
+        var successUrl = $"{baseUrl}/success?pmRef={referenceNumber}";
+        
         if (string.IsNullOrEmpty(_secretKey))
         {
             _logger.LogWarning("PayMongo:SecretKey is not configured. Simulating a checkout link.");
-            return $"https://simulate.paymongo.com/checkout?ref={referenceNumber}";
+            return $"{successUrl}&simulated=true";
         }
 
         var amountInCents = (int)Math.Round(amount * 100, MidpointRounding.AwayFromZero);
@@ -53,15 +56,28 @@ public class PayMongoService : IPayMongoService
             {
                 attributes = new
                 {
-                    amount = amountInCents,
-                    description,
-                    remarks = referenceNumber
+                    send_email_receipt = true,
+                    show_description = true,
+                    show_line_items = true,
+                    line_items = new[]
+                    {
+                        new
+                        {
+                            currency = "PHP",
+                            amount = amountInCents,
+                            name = description,
+                            quantity = 1
+                        }
+                    },
+                    payment_method_types = new[] { "gcash", "paymaya", "card" },
+                    reference_number = referenceNumber,
+                    success_url = successUrl
                 }
             }
         };
 
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("links", content, cancellationToken);
+        var response = await _httpClient.PostAsync("checkout_sessions", content, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)

@@ -31,6 +31,7 @@ export const ROUTES = {
   SCHEDULE: '/schedule',
   BOOKING: '/booking',
   VERIFY: '/verify',
+  SUCCESS: '/success',
   CONTACT: '/contact',
   LOGIN: '/login',
   GOOGLE_CALLBACK: '/auth/google/callback',

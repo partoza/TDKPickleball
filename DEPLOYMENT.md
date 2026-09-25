@@ -46,6 +46,7 @@ Jwt__CustomerSessionHours=2
 
 SeedAdmin__Email=<INITIAL_ADMIN_EMAIL>
 SeedAdmin__Password=<STRONG_INITIAL_ADMIN_PASSWORD>
+SeedAdmin__ResetPassword=false
 
 Smtp__Host=smtp.gmail.com
 Smtp__Port=587
@@ -76,7 +77,7 @@ The values in `appsettings.json` and `appsettings.Production.json` remain defaul
 
 Copy the Cloudinary cloud name, API key, and API secret from the same Product Environment. If Cloudinary reports an invalid signature, the API secret does not match the selected cloud/key; replace all three values together and restart the API application so the hosting process reloads them.
 
-After the first administrator is created, change that administrator's password. The bootstrap variables only create the account if it does not already exist; remove them afterward or replace them with values kept securely in the hosting control panel.
+After the first administrator is created, sign in and change that administrator's password, then remove all `SeedAdmin__*` variables. If an existing seed administrator must be recovered, temporarily set `SeedAdmin__ResetPassword=true`, restart the application, sign in with the configured seed password, change it immediately, and remove the seed variables. Never leave the reset switch enabled because every application restart would restore the configured bootstrap password.
 
 ## 4. Publish the API
 

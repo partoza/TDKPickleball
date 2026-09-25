@@ -42,12 +42,14 @@ public class PayMongoWebhookController : ControllerBase
             var data = doc.RootElement.GetProperty("data");
             var type = data.GetProperty("attributes").GetProperty("type").GetString();
 
-            if (type == "link.payment.paid")
+            if (type == "link.payment.paid" || type == "checkout_session.payment.paid")
             {
-                var linkId = data.GetProperty("attributes").GetProperty("data").GetProperty("id").GetString();
-                var remarks = data.GetProperty("attributes").GetProperty("data").GetProperty("attributes").GetProperty("remarks").GetString();
-                var amountPaidCents = data.GetProperty("attributes").GetProperty("data").GetProperty("attributes").GetProperty("amount").GetDecimal();
-                var amountPaid = amountPaidCents / 100m;
+                var dataObj = data.GetProperty("attributes").GetProperty("data");
+                var attrs = dataObj.GetProperty("attributes");
+                
+                string? remarks = null;
+                if (attrs.TryGetProperty("remarks", out var rem) && rem.ValueKind == JsonValueKind.String) remarks = rem.GetString();
+                else if (attrs.TryGetProperty("reference_number", out var refNum) && refNum.ValueKind == JsonValueKind.String) remarks = refNum.GetString();
 
                 if (!string.IsNullOrEmpty(remarks))
                 {
