@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error: any) => error?.response?.status !== 401 && failureCount < 1,
       refetchOnWindowFocus: false,
     },
   },

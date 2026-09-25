@@ -17,13 +17,14 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(x => x.Phone).HasMaxLength(30);
         builder.Property(x => x.Subtotal).HasPrecision(18, 2);
         builder.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+        builder.Property(x => x.PaddleRentalFee).HasPrecision(18, 2);
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2);
         builder.Property(x => x.AmountPaid).HasPrecision(18, 2);
         builder.Property(x => x.ReceiptFileName).HasMaxLength(100);
         builder.Property(x => x.ReceiptContentType).HasMaxLength(50);
 
         builder.HasOne(x => x.Court).WithMany(c => c.Bookings).HasForeignKey(x => x.CourtId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne(x => x.StaffProfile).WithMany().HasForeignKey(x => x.StaffProfileId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasOne(x => x.InternalCoachProfile).WithMany().HasForeignKey(x => x.InternalCoachProfileId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(x => x.Promo).WithMany(p => p.Bookings).HasForeignKey(x => x.PromoId).OnDelete(DeleteBehavior.SetNull);
     }
 }

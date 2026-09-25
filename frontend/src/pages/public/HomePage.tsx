@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ChatBubbleBottomCenterTextIcon as Quote, StarIcon as Star, CheckCircleIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/solid';
+import { ChatBubbleBottomCenterTextIcon as Quote, StarIcon as Star, CheckCircleIcon, MapPinIcon, ClockIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
+
+const COOKIE_CONSENT_KEY = 'tdk-cookie-consent';
 
 const formatPesoAmount = (amount: number) => amount.toLocaleString('en-PH', {
   minimumFractionDigits: 2,
@@ -10,6 +13,16 @@ const formatPesoAmount = (amount: number) => amount.toLocaleString('en-PH', {
 });
 
 export default function HomePage() {
+  const [cookieConsent, setCookieConsent] = useState<'accepted' | 'declined' | null>(() => {
+    const saved = localStorage.getItem(COOKIE_CONSENT_KEY);
+    return saved === 'accepted' || saved === 'declined' ? saved : null;
+  });
+
+  const chooseCookieConsent = (choice: 'accepted' | 'declined') => {
+    localStorage.setItem(COOKIE_CONSENT_KEY, choice);
+    setCookieConsent(choice);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -139,7 +152,7 @@ export default function HomePage() {
         
         {/* Full Screen Map */}
         <div className="absolute inset-0 z-0">
-          <iframe 
+          {cookieConsent === 'accepted' ? <iframe
             src="https://maps.google.com/maps?q=Chixboy%20Grill,%2041%20Luisa%20Street,%20Davao%20City,%20Davao,%20Philippines&t=&z=15&ie=UTF8&iwloc=&output=embed" 
             width="100%" 
             height="100%" 
@@ -149,7 +162,7 @@ export default function HomePage() {
             referrerPolicy="no-referrer-when-downgrade"
             title="Google Maps Location"
             className="w-full h-full object-cover pointer-events-none"
-          ></iframe>
+          ></iframe> : <div className="flex h-full w-full items-center justify-center bg-muted/40 px-6 text-center"><div className="max-w-md rounded-3xl border bg-background/95 p-7 shadow-lg"><ShieldCheckIcon className="mx-auto h-10 w-10 text-primary" /><h3 className="mt-3 text-xl font-bold">Map privacy protected</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Google Maps stays disabled until you allow optional third-party cookies.</p><Button className="mt-5" variant="outline" onClick={() => chooseCookieConsent('accepted')}>Allow cookies and show map</Button></div></div>}
         </div>
 
         {/* Pulsing Map Pin Over Chixboy Grill (Centered in iframe) */}
@@ -206,6 +219,19 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {cookieConsent === null && <div className="fixed bottom-3 left-3 right-3 z-[100] max-w-sm rounded-2xl border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-auto" role="dialog" aria-live="polite" aria-label="Cookie permission">
+        <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 rounded-full bg-primary/10 p-1.5 text-primary"><ShieldCheckIcon className="h-4 w-4" /></div>
+            <div><h2 className="text-sm font-bold text-foreground">Your cookie choices</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Optional services such as Google Maps may use cookies. You can decline and continue using the site.</p></div>
+          </div>
+          <div className="flex gap-2 pl-9">
+            <Button size="sm" className="h-8 flex-1 text-xs" variant="outline" onClick={() => chooseCookieConsent('declined')}>Decline</Button>
+            <Button size="sm" className="h-8 flex-1 text-xs" onClick={() => chooseCookieConsent('accepted')}>Accept</Button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }

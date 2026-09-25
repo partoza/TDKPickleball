@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using TDK.Application.DTOs.Common;
 using TDK.Application.DTOs.Schedules;
 using TDK.Application.Interfaces;
 
@@ -11,10 +12,12 @@ namespace TDK.Api.Controllers;
 public class ScheduleController : ControllerBase
 {
     private readonly IScheduleService _scheduleService;
+    private readonly IAuthService _authService;
 
-    public ScheduleController(IScheduleService scheduleService)
+    public ScheduleController(IScheduleService scheduleService, IAuthService authService)
     {
         _scheduleService = scheduleService;
+        _authService = authService;
     }
 
     [HttpGet("api/schedule-board")]
@@ -37,9 +40,18 @@ public class ScheduleController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> Update(long id, UpdateScheduleRequest request) => Ok(await _scheduleService.UpdateAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier)!));
 
-    [HttpDelete("api/admin/schedules/{id}")]
-    [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Delete(long id) => Ok(await _scheduleService.DeleteAsync(id));
+    [HttpPost("api/admin/schedules/{id}/delete")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(long id, [FromBody] DeleteScheduleRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(ApiResponse<bool>.Fail("Admin email and password are required"));
+
+        var verification = await _authService.VerifyAdminCredentialsAsync(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);
+        if (!verification.Success) return Ok(verification);
+        return Ok(await _scheduleService.DeleteAsync(id));
+    }
 
     [HttpPost("api/admin/schedules/bulk-update")]
     [Authorize(Roles = "Admin,Staff")]

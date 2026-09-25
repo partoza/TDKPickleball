@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using TDK.Application.DTOs.Rates;
 using TDK.Application.Interfaces;
+using TDK.Application.DTOs.Auth;
+using System.Security.Claims;
 
 namespace TDK.Api.Controllers;
 
@@ -10,10 +12,12 @@ namespace TDK.Api.Controllers;
 public class RateController : ControllerBase
 {
     private readonly IRateService _rateService;
+    private readonly IAuthService _authService;
 
-    public RateController(IRateService rateService)
+    public RateController(IRateService rateService, IAuthService authService)
     {
         _rateService = rateService;
+        _authService = authService;
     }
 
     [HttpGet("api/rates")]
@@ -36,11 +40,13 @@ public class RateController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpDelete("api/admin/rates/{id}")]
+    [HttpPost("api/admin/rates/{id}/delete")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, AdminCredentialRequest request)
     {
+        var verification = await _authService.VerifyAdminCredentialsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);
+        if (!verification.Success) return BadRequest(verification);
         var result = await _rateService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 }

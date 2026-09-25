@@ -15,7 +15,7 @@ export const storageService = {
     return data;
   },
   async cleanup(fromDate: string, throughDate: string) {
-    const { data } = await api.post<ApiResponse<{ deletedBookingCount: number; deletedReceiptCount: number; fromDate: string; throughDate: string }>>('/api/admin/storage/cleanup', {
+    const { data } = await api.post<ApiResponse<{ deletedBookingCount: number; deletedScheduleCount: number; deletedReceiptCount: number; fromDate: string; throughDate: string }>>('/api/admin/storage/cleanup', {
       fromDate,
       throughDate,
       confirmation: 'DELETE',

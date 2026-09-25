@@ -343,10 +343,50 @@ button:active {
 .dark .text-slate-600, .dark .text-slate-500, .dark .text-slate-400 { color: var(--mac-secondary) !important; }
 .dark .bg-slate-50, .dark .bg-slate-50\/50, .dark .bg-slate-50\/60 { background-color: rgba(58,58,60,.48) !important; }
 
-.mac-loading { display: flex; gap: 7px; }
-.mac-loading span { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); animation: mac-pulse 900ms ease-in-out infinite; }
-.mac-loading span:nth-child(2) { animation-delay: 120ms; }
-.mac-loading span:nth-child(3) { animation-delay: 240ms; }
+.page-loading-mascot {
+  width: clamp(110px, 18vw, 180px);
+  height: auto;
+  object-fit: contain;
+  animation: mascot-loading 1.15s ease-in-out infinite;
+  transform-origin: 50% 80%;
+  filter: drop-shadow(0 14px 18px rgb(0 0 0 / 18%));
+}
+
+.loading-indicator {
+  position: relative;
+  display: inline-block;
+  color: currentColor;
+}
+.loading-indicator::before,
+.loading-indicator::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: 999px;
+}
+.loading-indicator::before {
+  border: max(1.5px, 0.12em) solid currentColor;
+  opacity: .18;
+}
+.loading-indicator::after {
+  border: max(1.5px, 0.12em) solid transparent;
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 30%, transparent));
+  animation: loading-indicator-spin .72s cubic-bezier(.55,.15,.45,.85) infinite;
+}
+
+@keyframes loading-indicator-spin { to { transform: rotate(360deg); } }
+
+@keyframes mascot-loading {
+  0%, 100% { transform: translateY(0) rotate(-3deg) scale(1); }
+  50% { transform: translateY(-14px) rotate(3deg) scale(1.035); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loading-mascot { animation: none; }
+  .loading-indicator::after { animation-duration: 1.6s; }
+}
 
 @keyframes mac-content-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes mac-pulse { 0%, 100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }

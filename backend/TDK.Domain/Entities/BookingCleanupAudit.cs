@@ -7,6 +7,7 @@ public class BookingCleanupAudit
     public DateOnly DeletedThroughDate { get; set; }
     public DateOnly? OldestBookingDate { get; set; }
     public int DeletedBookingCount { get; set; }
+    public int DeletedScheduleCount { get; set; }
     public int DeletedReceiptCount { get; set; }
     public string DeletedByUserId { get; set; } = null!;
     public string DeletedByName { get; set; } = null!;

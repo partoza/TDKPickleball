@@ -13,13 +13,15 @@ import LoginPage from '@/pages/admin/LoginPage';
 import DashboardPage from '@/pages/admin/DashboardPage';
 import AdminSchedulePage from '@/pages/admin/SchedulePage';
 import BookingsPage from '@/pages/admin/BookingsPage';
+import RevenuePage from '@/pages/admin/RevenuePage';
 import RatesPage from '@/pages/admin/RatesPage';
 import PromosPage from '@/pages/admin/PromosPage';
 import CourtsPage from '@/pages/admin/CourtsPage';
 import AdminsPage from '@/pages/admin/AdminsPage';
 import PasswordPage from '@/pages/admin/PasswordPage';
 import StoragePage from '@/pages/admin/StoragePage';
-import StaffPage from '@/pages/admin/StaffPage';
+import InternalCoachesPage from '@/pages/admin/InternalCoachesPage';
+import AdminWidgetPage from '@/pages/admin/AdminWidgetPage';
 import { ROUTES } from '@/lib/constants';
 
 export const router = createBrowserRouter([
@@ -44,6 +46,7 @@ export const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
   },
   { path: ROUTES.ADMIN.WELCOME, element: <PasswordPage forced />, errorElement: <NotFoundPage /> },
+  { path: ROUTES.ADMIN.WIDGET, element: <AdminWidgetPage />, errorElement: <NotFoundPage /> },
   {
     path: ROUTES.ADMIN.LOGIN, // Base admin path
     element: <AdminLayout />,
@@ -52,11 +55,12 @@ export const router = createBrowserRouter([
       { path: ROUTES.ADMIN.DASHBOARD.replace('/tdkadmin/', ''), element: <DashboardPage /> },
       { path: ROUTES.ADMIN.SCHEDULE.replace('/tdkadmin/', ''), element: <AdminSchedulePage /> },
       { path: ROUTES.ADMIN.BOOKINGS.replace('/tdkadmin/', ''), element: <BookingsPage /> },
+      { path: ROUTES.ADMIN.REVENUE.replace('/tdkadmin/', ''), element: <RevenuePage /> },
       { path: ROUTES.ADMIN.RATES.replace('/tdkadmin/', ''), element: <RatesPage /> },
       { path: 'promos', element: <PromosPage /> },
       { path: ROUTES.ADMIN.COURTS.replace('/tdkadmin/', ''), element: <CourtsPage /> },
       { path: ROUTES.ADMIN.ADMINS.replace('/tdkadmin/', ''), element: <AdminsPage /> },
-      { path: ROUTES.ADMIN.STAFF.replace('/tdkadmin/', ''), element: <StaffPage /> },
+      { path: ROUTES.ADMIN.INTERNAL_COACHES.replace('/tdkadmin/', ''), element: <InternalCoachesPage /> },
       { path: ROUTES.ADMIN.STORAGE.replace('/tdkadmin/', ''), element: <StoragePage /> },
       { path: ROUTES.ADMIN.PROFILE.replace('/tdkadmin/', ''), element: <PasswordPage /> },
       { path: '*', element: <NotFoundPage /> },

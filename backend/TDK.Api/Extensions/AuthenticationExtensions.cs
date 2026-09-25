@@ -1,8 +1,4 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;
-using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +41,11 @@ public static class AuthenticationExtensions
             {
                 OnTokenValidated = async context =>
                 {
+                    var isVerifiedPublicEmail = context.Principal?.IsInRole("Customer") == true &&
+                        context.Principal.FindFirstValue("auth_provider") == "google_email_verification" &&
+                        !string.IsNullOrWhiteSpace(context.Principal.FindFirstValue(ClaimTypes.Email));
+                    if (isVerifiedPublicEmail) return;
+
                     var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                     if (string.IsNullOrWhiteSpace(userId))
                     {
@@ -56,32 +57,7 @@ public static class AuthenticationExtensions
                     if (user is null || !user.IsActive) context.Fail("User account is inactive");
                 }
             };
-        })
-        .AddCookie("GoogleExternal", options =>
-        {
-            options.Cookie.Name = "tdk.google.external";
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = SameSiteMode.Lax;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         });
-
-        var googleClientId = config["Authentication:Google:ClientId"];
-        var googleClientSecret = config["Authentication:Google:ClientSecret"];
-        if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
-        {
-            authentication.AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
-            {
-                options.SignInScheme = "GoogleExternal";
-                options.ClientId = googleClientId;
-                options.ClientSecret = googleClientSecret;
-                options.CallbackPath = "/signin-google";
-                options.CorrelationCookie.SameSite = SameSiteMode.None;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.ClaimActions.MapJsonKey("email_verified", "verified_email");
-                options.SaveTokens = false;
-            });
-        }
 
         return services;
     }

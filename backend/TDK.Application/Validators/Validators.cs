@@ -29,6 +29,7 @@ public class CreateBookingValidator : AbstractValidator<CreateBookingRequest>
             .WithMessage("Booking date cannot be in the past");
         RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.PaddleRentalQuantity).InclusiveBetween(0, 50);
     }
 }
 
@@ -42,6 +43,7 @@ public class UpdateScheduleValidator : AbstractValidator<UpdateScheduleRequest>
         RuleFor(x => x.Phone).MaximumLength(30);
         RuleFor(x => x.PaymentStatus).Must(x => x is TDK.Domain.Enums.BookingStatus.Paid or TDK.Domain.Enums.BookingStatus.Reserved);
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.PaddleRentalQuantity).InclusiveBetween(0, 50);
     }
 }
 
@@ -72,6 +74,7 @@ public class BulkUpdateValidator : AbstractValidator<BulkUpdateRequest>
         RuleFor(x => x.CourtId).GreaterThan(0);
         RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.PaddleRentalQuantity).InclusiveBetween(0, 50);
         RuleFor(x => x.BookedBy).NotEmpty().MaximumLength(150).When(x => x.Status is TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Training);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.Phone).MaximumLength(30);

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using TDK.Application.DTOs.Courts;
 using TDK.Application.Interfaces;
+using TDK.Application.DTOs.Auth;
+using System.Security.Claims;
 
 namespace TDK.Api.Controllers;
 
@@ -10,10 +12,12 @@ namespace TDK.Api.Controllers;
 public class CourtController : ControllerBase
 {
     private readonly ICourtService _courtService;
+    private readonly IAuthService _authService;
 
-    public CourtController(ICourtService courtService)
+    public CourtController(ICourtService courtService, IAuthService authService)
     {
         _courtService = courtService;
+        _authService = authService;
     }
 
     [HttpGet("api/courts")]
@@ -40,11 +44,13 @@ public class CourtController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpDelete("api/admin/courts/{id}")]
+    [HttpPost("api/admin/courts/{id}/delete")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, AdminCredentialRequest request)
     {
+        var verification = await _authService.VerifyAdminCredentialsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);
+        if (!verification.Success) return BadRequest(verification);
         var result = await _courtService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 }

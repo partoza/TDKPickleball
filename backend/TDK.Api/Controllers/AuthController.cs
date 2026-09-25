@@ -1,12 +1,10 @@
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using TDK.Application.DTOs.Auth;
+using TDK.Application.DTOs.Common;
 using TDK.Application.Interfaces;
 using TDK.Api.Validation;
 
@@ -18,13 +16,11 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IConfiguration _configuration;
-    private readonly IMemoryCache _cache;
 
-    public AuthController(IAuthService authService, IConfiguration configuration, IMemoryCache cache)
+    public AuthController(IAuthService authService, IConfiguration configuration)
     {
         _authService = authService;
         _configuration = configuration;
-        _cache = cache;
     }
 
     [HttpPost("login")]
@@ -45,7 +41,22 @@ public class AuthController : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
-    public async Task<IActionResult> GetMe() => Ok(await _authService.GetCurrentUserAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+    public async Task<IActionResult> GetMe()
+    {
+        if (User.IsInRole("Customer") && User.FindFirstValue("auth_provider") == "google_email_verification")
+        {
+            var response = new AuthResponse(
+                "",
+                User.FindFirstValue(ClaimTypes.Email) ?? "",
+                User.FindFirstValue(ClaimTypes.GivenName) ?? "",
+                User.FindFirstValue(ClaimTypes.Surname) ?? "",
+                "Customer",
+                false,
+                User.FindFirstValue("profile_picture"));
+            return Ok(ApiResponse<AuthResponse>.Ok(response));
+        }
+        return Ok(await _authService.GetCurrentUserAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+    }
 
     [HttpPost("change-password")]
     [Authorize]
@@ -70,55 +81,35 @@ public class AuthController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpGet("google/start")]
+    [HttpPost("google/verify")]
     [AllowAnonymous]
     [EnableRateLimiting("Authentication")]
-    public IActionResult StartGoogleLogin()
+    public async Task<IActionResult> VerifyGoogleCredential(GoogleCredentialRequest request)
     {
-        if (string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientId"]) || string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientSecret"]))
+        var clientId = _configuration["Authentication:Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { success = false, message = "Google sign-in is not configured" });
-        return Challenge(new AuthenticationProperties { RedirectUri = Url.ActionLink(nameof(CompleteGoogleLogin)) }, GoogleDefaults.AuthenticationScheme);
-    }
 
-    [HttpGet("google/complete")]
-    [AllowAnonymous]
-    [EnableRateLimiting("Authentication")]
-    public async Task<IActionResult> CompleteGoogleLogin()
-    {
-        var external = await HttpContext.AuthenticateAsync("GoogleExternal");
-        if (!external.Succeeded || external.Principal is null) return RedirectToFrontend("google_error=authentication_failed");
+        try
+        {
+            var payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.Credential,
+                new GoogleJsonWebSignature.ValidationSettings { Audience = [clientId] });
 
-        var providerKey = external.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        var email = external.Principal.FindFirstValue(ClaimTypes.Email);
-        var verified = external.Principal.FindFirstValue("email_verified");
-        if (string.IsNullOrWhiteSpace(providerKey) || string.IsNullOrWhiteSpace(email) || !bool.TryParse(verified, out var emailVerified) || !emailVerified)
-            return RedirectToFrontend("google_error=email_not_verified");
+            if (!payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Subject) || string.IsNullOrWhiteSpace(payload.Email))
+                return Unauthorized(new { success = false, message = "Google could not verify this email address" });
 
-        var firstName = external.Principal.FindFirstValue(ClaimTypes.GivenName) ?? "";
-        var lastName = external.Principal.FindFirstValue(ClaimTypes.Surname) ?? "";
-        var result = await _authService.GoogleLoginAsync(providerKey, email, firstName, lastName);
-        await HttpContext.SignOutAsync("GoogleExternal");
-        if (!result.Success || result.Data is null) return RedirectToFrontend("google_error=account_unavailable");
-
-        var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        _cache.Set($"google-login:{code}", result.Data, TimeSpan.FromMinutes(2));
-        return RedirectToFrontend($"code={Uri.EscapeDataString(code)}");
-    }
-
-    [HttpPost("google/exchange")]
-    [AllowAnonymous]
-    [EnableRateLimiting("Authentication")]
-    public IActionResult ExchangeGoogleCode(GoogleExchangeRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Code) || !_cache.TryGetValue<AuthResponse>($"google-login:{request.Code}", out var response) || response is null)
-            return Unauthorized(new { success = false, message = "The Google sign-in code is invalid or expired" });
-        _cache.Remove($"google-login:{request.Code}");
-        return Ok(new { success = true, data = response });
-    }
-
-    private IActionResult RedirectToFrontend(string query)
-    {
-        var frontend = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
-        return Redirect($"{frontend}/auth/google/callback?{query}");
+            var result = await _authService.GoogleLoginAsync(
+                payload.Subject,
+                payload.Email,
+                payload.GivenName ?? "",
+                payload.FamilyName ?? "",
+                payload.Picture);
+            return result.Success ? Ok(result) : Unauthorized(result);
+        }
+        catch (InvalidJwtException)
+        {
+            return Unauthorized(new { success = false, message = "The Google verification token is invalid or expired" });
+        }
     }
 }

@@ -8,10 +8,10 @@ public record StorageStatusDto(
     decimal WarningThresholdMegabytes,
     decimal UsedPercent,
     bool IsHealthy,
-    int CompletedBookingCount,
+    int CleanupEligibleRecordCount,
     DateTime CheckedAtUtc);
 
-public record BookingCleanupPreviewDto(DateOnly FromDate, DateOnly ThroughDate, int EligibleBookingCount, int ReceiptCount, DateOnly? OldestBookingDate);
+public record BookingCleanupPreviewDto(DateOnly FromDate, DateOnly ThroughDate, int EligibleScheduleCount, int EligibleBookingCount, int ReceiptCount, DateOnly? OldestRecordDate);
 
 public record BookingCleanupRequest(DateOnly FromDate, DateOnly ThroughDate, string Confirmation);
 
@@ -21,6 +21,7 @@ public record BookingCleanupHistoryDto(
     DateOnly DeletedThroughDate,
     DateOnly? OldestBookingDate,
     int DeletedBookingCount,
+    int DeletedScheduleCount,
     int DeletedReceiptCount,
     string DeletedByName,
     string DeletedByEmail,
@@ -29,6 +30,7 @@ public record BookingCleanupHistoryDto(
 public sealed class BookingCleanupResultDto
 {
     public int DeletedBookingCount { get; init; }
+    public int DeletedScheduleCount { get; init; }
     public int DeletedReceiptCount { get; init; }
     public DateOnly FromDate { get; init; }
     public DateOnly ThroughDate { get; init; }

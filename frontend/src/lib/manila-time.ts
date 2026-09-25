@@ -8,6 +8,7 @@ const manilaParts = (instant: Date = new Date()) => {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(instant);
   return Object.fromEntries(parts.map(part => [part.type, part.value]));
@@ -18,6 +19,7 @@ export const getManilaNow = (instant: Date = new Date()) => {
   return {
     date: `${parts.year}-${parts.month}-${parts.day}`,
     minutes: Number(parts.hour) * 60 + Number(parts.minute),
+    seconds: Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second),
   };
 };
 

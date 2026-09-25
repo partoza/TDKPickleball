@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePromos } from '@/hooks/usePromos';
 import { Promo, DiscountType, RateType } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -6,16 +6,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PlusIcon as Plus, EllipsisHorizontalIcon as MoreHorizontal, ReceiptPercentIcon as Percent, CalendarDaysIcon as Calendar, UsersIcon as Users } from '@heroicons/react/24/solid';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PlusIcon as Plus, ReceiptPercentIcon as Percent, CalendarDaysIcon as Calendar, UsersIcon as Users, PencilIcon as Pencil, TrashIcon as Trash } from '@heroicons/react/24/solid';
 import { format } from 'date-fns';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
+import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { getPromoValidity } from '@/lib/promo-availability';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 
 export default function PromosPage() {
   const { promos, loading, fetchPromos, createPromo, updatePromo, deletePromo } = usePromos();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Promo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Promo | null>(null);
+  const [page, setPage] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [form, setForm] = useState({
     code: '',
@@ -69,6 +76,7 @@ export default function PromosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     const data = {
       ...form,
       value: Number(form.value),
@@ -78,12 +86,15 @@ export default function PromosPage() {
       appliesTo: form.appliesTo === 'All' ? undefined : form.appliesTo,
     };
 
-    const success = editing 
-      ? await updatePromo(editing.id, data)
-      : await createPromo(data);
+    setIsSaving(true);
+    try {
+      const success = editing
+        ? await updatePromo(editing.id, data)
+        : await createPromo(data);
 
-    if (success) {
-      setOpen(false);
+      if (success) setOpen(false);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -99,7 +110,7 @@ export default function PromosPage() {
         </Button>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={nextOpen => { if (!isSaving) setOpen(nextOpen); }}>
         <DialogContent className="sm:max-w-[425px] rounded-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Promo' : 'Create Promo'}</DialogTitle>
@@ -120,7 +131,7 @@ export default function PromosPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Discount Type</Label>
-                <div className="mac-segmented flex w-full rounded-lg p-0.5"><Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${form.type === DiscountType.Percentage ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setForm({...form, type: DiscountType.Percentage})}>%</Button><Button type="button" variant="ghost" className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${form.type === DiscountType.FixedAmount ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setForm({...form, type: DiscountType.FixedAmount})}>₱</Button></div></div><div className="space-y-2"><Label htmlFor="value">Value *</Label>
+                <div className="mac-segmented flex w-full rounded-lg p-0.5"><Button type="button" variant={form.type === DiscountType.Percentage ? 'default' : 'ghost'} aria-pressed={form.type === DiscountType.Percentage} className="flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none" onClick={() => setForm({...form, type: DiscountType.Percentage})}>%</Button><Button type="button" variant={form.type === DiscountType.FixedAmount ? 'default' : 'ghost'} aria-pressed={form.type === DiscountType.FixedAmount} className="flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none" onClick={() => setForm({...form, type: DiscountType.FixedAmount})}>₱</Button></div></div><div className="space-y-2"><Label htmlFor="value">Value *</Label>
                 <Input id="value" type="number" step="0.01" min="0" placeholder="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value === '' ? '' : Number(e.target.value) })} required />
               </div>
             </div>
@@ -136,7 +147,7 @@ export default function PromosPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue placeholder="Select rates" /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue placeholder="Select usage limit" /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
 
             {editing && (
               <div className="flex items-center gap-2">
@@ -145,10 +156,13 @@ export default function PromosPage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={!form.code.trim() || Number(form.value) <= 0}>{editing ? 'Save changes' : 'Create Promo'}</Button>
-            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={!form.code.trim() || Number(form.value) <= 0 || isSaving}>
+                {isSaving && <LoadingIndicator className="mr-2" label={editing ? 'Saving promo' : 'Creating promo'} />}
+                {isSaving ? (editing ? 'Saving changes…' : 'Creating promo…') : (editing ? 'Save changes' : 'Create Promo')}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -173,12 +187,22 @@ export default function PromosPage() {
                   <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Applies To</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Valid Dates</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Usage</TableHead>
+                <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Validity</TableHead>
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Status</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {promos.map((promo) => (
+              {promos.slice(page * 10, (page + 1) * 10).map((promo) => {
+                const validity = getPromoValidity(promo);
+                const validityClass = validity === 'Available'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : validity === 'Expired'
+                    ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                    : validity === 'Scheduled'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                      : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
+                return (
                 <TableRow key={promo.id}>
                   <TableCell>
                     <div>
@@ -213,43 +237,26 @@ export default function PromosPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${promo.isActive ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${validityClass}`}>
+                      {validity}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${promo.isActive ? 'bg-primary/10 text-primary dark:bg-primary/20' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
                       {promo.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                        <DropdownMenuItem onClick={() => handleOpen(promo)} className="cursor-pointer">Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { if(window.confirm('Delete this promo?')) deletePromo(promo.id); }} className="cursor-pointer text-red-600 focus:text-red-600">Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => handleOpen(promo)}><Pencil className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider>{!promo.isActive && <TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setDeleteTarget(promo)}><Trash className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Delete</TooltipContent></Tooltip></TooltipProvider>}</div>
                   </TableCell>
                 </TableRow>
-              ))}
+              );})}
             </TableBody>
           </Table>
         )}
       </div>
+      <TablePagination page={page} total={promos.length} onPageChange={setPage} />
+      <AdminCredentialDeleteDialog open={!!deleteTarget} title={`Delete ${deleteTarget?.code || 'promo'}?`} description="This permanently deletes the disabled promo and cannot be undone." onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={async credentials => { if (deleteTarget && await deletePromo(deleteTarget.id, credentials)) setDeleteTarget(null); }} />
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

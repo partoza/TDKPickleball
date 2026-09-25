@@ -1,13 +1,94 @@
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftIcon } from '@heroicons/react/24/solid';
-import { Link } from 'react-router-dom';
-import { authService } from '@/services/auth';
+import { Link, useNavigate } from 'react-router-dom';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { useAuth } from '@/hooks/useAuth';
+import { getApiErrorMessage } from '@/services/api';
 import { ROUTES } from '@/lib/constants';
 
-function GoogleMark() {
-  return <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.91h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.4Z"/><path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.37l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.92A6.02 6.02 0 0 1 6.08 12c0-.67.11-1.32.31-1.92V7.46H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.54l3.35-2.62Z"/><path fill="#EA4335" d="M12 5.95c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.62C7.18 7.71 9.39 5.95 12 5.95Z"/></svg>;
+const GOOGLE_SCRIPT_ID = 'google-identity-services';
+
+function loadGoogleIdentityServices() {
+  if ((window as any).google?.accounts?.id) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Google sign-in could not be loaded')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Google sign-in could not be loaded'));
+    document.head.appendChild(script);
+  });
 }
 
 export default function GoogleLoginPage() {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { verifyGoogleCredential } = useAuth();
+  const [error, setError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const clientId = String((import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '').trim();
+    if (!clientId) {
+      setError('Google sign-in is not configured for this website.');
+      return () => { active = false; };
+    }
+
+    loadGoogleIdentityServices()
+      .then(() => {
+        if (!active || !buttonRef.current) return;
+        const google = (window as any).google;
+        google.accounts.id.initialize({
+          client_id: clientId,
+          ux_mode: 'popup',
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          callback: async ({ credential }: { credential?: string }) => {
+            if (!active || !credential) {
+              if (active) setError('Google did not return a verification token. Please try again.');
+              return;
+            }
+            setError('');
+            setIsVerifying(true);
+            try {
+              await verifyGoogleCredential(credential);
+              if (active) navigate(ROUTES.BOOKING, { replace: true });
+            } catch (requestError) {
+              if (active) setError(getApiErrorMessage(requestError, 'Google could not verify this email address.'));
+            } finally {
+              if (active) setIsVerifying(false);
+            }
+          },
+        });
+        google.accounts.id.renderButton(buttonRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'pill',
+          logo_alignment: 'left',
+          width: Math.min(buttonRef.current.clientWidth || 400, 400),
+        });
+      })
+      .catch((scriptError) => {
+        if (active) setError(scriptError instanceof Error ? scriptError.message : 'Google sign-in could not be loaded.');
+      });
+
+    return () => {
+      active = false;
+      (window as any).google?.accounts?.id?.cancel();
+    };
+  }, [navigate, verifyGoogleCredential]);
+
   return (
     <main className="flex-1 bg-gradient-to-br from-white via-white to-primary/10 flex w-full">
       {/* Left Panel */}
@@ -44,9 +125,11 @@ export default function GoogleLoginPage() {
             <p className="mt-4 text-[15px] text-slate-500 leading-relaxed">We use your verified Google email for the booking. Your display name remains editable later.</p>
           </div>
           
-          <button type="button" onClick={() => window.location.assign(authService.getGoogleLoginUrl())} className="h-[52px] w-full flex items-center justify-center gap-3 rounded-2xl text-[15px] font-bold border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.98] cursor-pointer">
-            <GoogleMark /> Sign in with Google
-          </button>
+          <div className="relative flex min-h-[52px] w-full items-center justify-center overflow-hidden rounded-full bg-white">
+            <div ref={buttonRef} className={isVerifying ? 'pointer-events-none opacity-50' : ''} />
+            {isVerifying && <div className="absolute inset-0 flex items-center justify-center bg-white/90"><LoadingIndicator label="Verifying your Google email" /></div>}
+          </div>
+          {error && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-700">{error}</p>}
 
           <div className="mt-10 text-center lg:text-left">
             <p className="text-[13px] leading-relaxed text-slate-600">Google verifies your identity securely. We never receive or store your Google password.</p>

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -49,7 +50,7 @@ public sealed class CloudinaryProfileImageService : IProfileImageService
 
         using var response = await Client.PostAsync(UploadUrl("image/upload"), form, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Cloudinary rejected the profile image upload");
+            throw new InvalidOperationException(await GetUploadErrorAsync(response, cancellationToken));
 
         await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         var payload = await JsonSerializer.DeserializeAsync<UploadResponse>(responseStream, cancellationToken: cancellationToken);
@@ -63,19 +64,41 @@ public sealed class CloudinaryProfileImageService : IProfileImageService
     {
         if (string.IsNullOrWhiteSpace(publicId)) return;
         EnsureConfigured();
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
-        var parameters = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        Exception? lastError = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            ["public_id"] = publicId,
-            ["timestamp"] = timestamp
-        };
-        using var form = new FormUrlEncodedContent(parameters.Concat(new[]
-        {
-            new KeyValuePair<string, string>("api_key", _apiKey),
-            new KeyValuePair<string, string>("signature", Sign(parameters))
-        }));
-        using var response = await Client.PostAsync(UploadUrl("image/destroy"), form, cancellationToken);
-        response.EnsureSuccessStatusCode();
+            try
+            {
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+                var parameters = new SortedDictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["public_id"] = publicId,
+                    ["timestamp"] = timestamp
+                };
+                using var form = new FormUrlEncodedContent(parameters.Concat(new[]
+                {
+                    new KeyValuePair<string, string>("api_key", _apiKey),
+                    new KeyValuePair<string, string>("signature", Sign(parameters))
+                }));
+                using var response = await Client.PostAsync(UploadUrl("image/destroy"), form, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var result = await JsonSerializer.DeserializeAsync<DestroyResponse>(responseStream, cancellationToken: cancellationToken);
+                if (result?.Result is "ok" or "not found") return;
+                throw new InvalidOperationException("Cloudinary did not delete the previous image");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                if (attempt < 3) await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException("Cloudinary could not delete the image after three attempts", lastError);
     }
 
     private string UploadUrl(string action) =>
@@ -90,11 +113,50 @@ public sealed class CloudinaryProfileImageService : IProfileImageService
 
     private void EnsureConfigured()
     {
-        if (string.IsNullOrWhiteSpace(_cloudName) || string.IsNullOrWhiteSpace(_apiKey) || string.IsNullOrWhiteSpace(_apiSecret))
+        if (IsMissingOrPlaceholder(_cloudName) || IsMissingOrPlaceholder(_apiKey) || IsMissingOrPlaceholder(_apiSecret))
             throw new InvalidOperationException("Cloudinary is not configured. Set Cloudinary__CloudName, Cloudinary__ApiKey, and Cloudinary__ApiSecret");
+    }
+
+    private static bool IsMissingOrPlaceholder(string value) =>
+        string.IsNullOrWhiteSpace(value) || value.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase) || value.StartsWith("your-", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<string> GetUploadErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        string? cloudinaryMessage = null;
+        try
+        {
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var payload = await JsonSerializer.DeserializeAsync<CloudinaryErrorResponse>(responseStream, cancellationToken: cancellationToken);
+            cloudinaryMessage = payload?.Error?.Message;
+        }
+        catch (JsonException)
+        {
+            // Cloudinary normally returns JSON, but callers should still get a safe,
+            // actionable message if an upstream proxy replaces the response body.
+        }
+
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden ||
+            cloudinaryMessage?.Contains("signature", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return "Cloudinary rejected the credentials. Re-copy the cloud name, API key, and API secret from the same Cloudinary product environment";
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return "Cloudinary could not find the configured cloud. Check the Cloudinary cloud name";
+
+        if ((int)response.StatusCode == 420 || response.StatusCode == HttpStatusCode.TooManyRequests)
+            return "Cloudinary temporarily rate-limited image uploads. Wait a moment and try again";
+
+        return "Cloudinary rejected the profile image. Confirm that JPEG, PNG, and WebP uploads are enabled, then try again";
     }
 
     private sealed record UploadResponse(
         [property: JsonPropertyName("secure_url")] string SecureUrl,
         [property: JsonPropertyName("public_id")] string PublicId);
+
+    private sealed record DestroyResponse([property: JsonPropertyName("result")] string Result);
+
+    private sealed record CloudinaryErrorResponse([property: JsonPropertyName("error")] CloudinaryError? Error);
+
+    private sealed record CloudinaryError([property: JsonPropertyName("message")] string? Message);
 }

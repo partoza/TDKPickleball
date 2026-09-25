@@ -6,9 +6,8 @@ export const authService = {
     const { data } = await api.post('/api/auth/login', credentials);
     return data.data;
   },
-  getGoogleLoginUrl: () => `${api.defaults.baseURL}/api/auth/google/start`,
-  exchangeGoogleCode: async (code: string): Promise<AuthResponse> => {
-    const { data } = await api.post('/api/auth/google/exchange', { code });
+  verifyGoogleCredential: async (credential: string): Promise<AuthResponse> => {
+    const { data } = await api.post('/api/auth/google/verify', { credential });
     return data.data;
   },
   getMe: async (): Promise<AuthResponse> => {
@@ -31,8 +30,8 @@ export const authService = {
     const { data } = await api.patch(`/api/admin/users/${encodeURIComponent(userId)}/status`, { isActive });
     return data;
   },
-  deleteUser: async (userId: string): Promise<ApiResponse<boolean>> => {
-    const { data } = await api.delete(`/api/admin/users/${encodeURIComponent(userId)}`);
+  deleteUser: async ({ userId, credentials }: { userId: string; credentials: { email: string; password: string } }): Promise<ApiResponse<boolean>> => {
+    const { data } = await api.post(`/api/admin/users/${encodeURIComponent(userId)}/delete`, credentials);
     return data;
   },
   uploadUserProfileImage: async (userId: string, image: File): Promise<ApiResponse<SystemUser>> => {

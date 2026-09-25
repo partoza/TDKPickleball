@@ -9,6 +9,7 @@ namespace TDK.Application.Services;
 
 public class RateService : IRateService
 {
+    private const int MaximumRates = 20;
     private readonly IRepository<Rate> _rateRepo;
 
     public RateService(IRepository<Rate> rateRepo)
@@ -25,7 +26,9 @@ public class RateService : IRateService
     public async Task<ApiResponse<RateDto>> CreateAsync(CreateRateRequest request)
     {
         if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
-        if (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
+        var allRates = (await _rateRepo.GetAllAsync()).ToList();
+        if (allRates.Count >= MaximumRates) return ApiResponse<RateDto>.Fail("The maximum of 20 rates has been reached");
+        if (request.RateType != RateType.Internal && (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m)) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
         if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
         var conflict = await HasConflictAsync(request.StartTime, request.EndTime, request.RateType);
         if (conflict) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range");
@@ -33,7 +36,7 @@ public class RateService : IRateService
         {
             StartTime = request.StartTime,
             EndTime = request.EndTime,
-            PricePerHour = request.PricePerHour,
+            PricePerHour = request.RateType == RateType.Internal ? 0 : request.PricePerHour,
             RateType = request.RateType,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
@@ -49,13 +52,13 @@ public class RateService : IRateService
         var rate = await _rateRepo.GetByIdAsync(id);
         if (rate == null) return ApiResponse<RateDto>.Fail("Rate not found");
         if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
-        if (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
+        if (request.RateType != RateType.Internal && (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m)) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
         if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
         if (request.IsActive && await HasConflictAsync(request.StartTime, request.EndTime, request.RateType, id)) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range for the selected type");
         
         rate.StartTime = request.StartTime;
         rate.EndTime = request.EndTime;
-        rate.PricePerHour = request.PricePerHour;
+        rate.PricePerHour = request.RateType == RateType.Internal ? 0 : request.PricePerHour;
         rate.RateType = request.RateType;
         rate.IsActive = request.IsActive;
         rate.UpdatedAt = DateTime.UtcNow;
@@ -69,15 +72,15 @@ public class RateService : IRateService
     {
         var rate = await _rateRepo.GetByIdAsync(id);
         if (rate == null) return ApiResponse<bool>.Fail("Rate not found");
-        rate.IsActive = false;
-        rate.UpdatedAt = DateTime.UtcNow;
-        _rateRepo.Update(rate);
+        if (rate.IsActive) return ApiResponse<bool>.Fail("Disable the rate before deleting it");
+        _rateRepo.Delete(rate);
         await _rateRepo.SaveChangesAsync();
-        return ApiResponse<bool>.Ok(true, "Rate marked inactive");
+        return ApiResponse<bool>.Ok(true, "Inactive rate deleted");
     }
 
     public async Task<decimal> CalculateRateAsync(TimeOnly startTime, TimeOnly endTime, RateType rateType = RateType.Booking)
     {
+        if (rateType == RateType.Internal) return 0;
         var rates = (await _rateRepo.GetAllAsync()).Where(r => r.IsActive && r.RateType == rateType).OrderBy(r => r.StartTime).ToList();
         decimal total = 0;
         var startMinutes = startTime.Hour * 60 + startTime.Minute;

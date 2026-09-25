@@ -25,8 +25,8 @@ export const courtsService = {
     const { data } = await api.put(`/api/admin/courts/${id}`, normalizeCourtTimes(court));
     return data;
   },
-  deleteCourt: async (id: number): Promise<ApiResponse<void>> => {
-    const { data } = await api.delete(`/api/admin/courts/${id}`);
+  deleteCourt: async ({ id, credentials }: { id: number; credentials: { email: string; password: string } }): Promise<ApiResponse<void>> => {
+    const { data } = await api.post(`/api/admin/courts/${id}/delete`, credentials);
     return data;
   },
 };

@@ -1,13 +1,14 @@
 ﻿import { useState } from 'react';
 import { format } from 'date-fns';
-import { PencilSquareIcon as Edit2, ArrowPathIcon as LoaderCircle, PlusIcon as Plus, PowerIcon, NoSymbolIcon } from '@heroicons/react/24/solid';
+import { PencilSquareIcon as Edit2, PlusIcon as Plus, PowerIcon, NoSymbolIcon, TrashIcon } from '@heroicons/react/24/solid';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { toast } from 'sonner';
-import { useCreateRate, useRates, useUpdateRate } from '@/hooks/useRates';
+import { useCreateRate, useDeleteRate, useRates, useUpdateRate } from '@/hooks/useRates';
 import { Rate, RateType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { AdminTimeSelect, hourlyOptions } from '@/components/admin/AdminFormControls';
 import { isValidTimeRange, minimumEndTime } from '@/lib/time-range';
 import { getApiErrorMessage } from '@/services/api';
+import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
 
 type RateForm = { startTime: string; endTime: string; pricePerHour: number | ''; rateType: RateType };
 const defaultForm: RateForm = { startTime: '07:00', endTime: '17:00', pricePerHour: '', rateType: RateType.Booking };
@@ -27,10 +29,12 @@ export default function RatesPage() {
   const rates = data?.data || [];
   const create = useCreateRate();
   const update = useUpdateRate();
+  const remove = useDeleteRate();
   const [editing, setEditing] = useState<Rate | null | undefined>(undefined);
   const [form, setForm] = useState<RateForm>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<Rate | null>(null);
 
   const open = (rate?: Rate) => {
     setErrors({});
@@ -45,7 +49,7 @@ export default function RatesPage() {
 
   const save = () => {
     const nextErrors: Record<string, string> = {};
-    if (Number(form.pricePerHour) <= 0) nextErrors.pricePerHour = 'Rate must be greater than zero.';
+    if (form.rateType !== RateType.Internal && Number(form.pricePerHour) <= 0) nextErrors.pricePerHour = 'Rate must be greater than zero.';
     if (!isValidTimeRange(form.startTime, form.endTime)) nextErrors.endTime = 'End time must be at least 1 hour after start time.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
@@ -57,7 +61,7 @@ export default function RatesPage() {
       },
       onError: (error: unknown) => toast.error(getApiErrorMessage(error, 'Unable to save rate')),
     };
-    const payload = { ...form, pricePerHour: Number(form.pricePerHour) };
+    const payload = { ...form, pricePerHour: form.rateType === RateType.Internal ? 0 : Number(form.pricePerHour) };
     if (editing) update.mutate({ id: editing.id, rate: { ...payload, isActive: editing.isActive } }, options);
     else create.mutate(payload, options);
   };
@@ -81,7 +85,7 @@ export default function RatesPage() {
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex items-end justify-between">
       <div><h1 className="text-3xl font-bold tracking-tight">Rates</h1><p className="mt-1 text-slate-500">Customize pricing for bookings, training, and free play.</p></div>
-      <Button onClick={() => open()}><Plus className="h-4 w-4" />Add Rate</Button>
+      <Button onClick={() => open()} disabled={rates.length >= 20}><Plus className="h-4 w-4" />Add Rate</Button>
     </div>
 
 
@@ -94,9 +98,9 @@ export default function RatesPage() {
             <TableCell className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</TableCell>
             <TableCell><RateTypeBadge type={rate.rateType || RateType.Booking} /></TableCell>
             <TableCell>{time(rate.startTime)}</TableCell><TableCell>{time(rate.endTime)}</TableCell>
-            <TableCell className="font-semibold">₱{rate.pricePerHour.toLocaleString()}</TableCell>
+            <TableCell className="font-semibold">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</TableCell>
             <TableCell><Badge className={rate.isActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''} variant={rate.isActive ? 'default' : 'secondary'}>{rate.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
-            <TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4 text-red-600" /> : <PowerIcon className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{rate.isActive ? 'Inactive' : 'Active'}</TooltipContent></Tooltip></TooltipProvider></div></TableCell>
+            <TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4 text-red-600" /> : <PowerIcon className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{rate.isActive ? 'Disable' : 'Enable'}</TooltipContent></Tooltip></TooltipProvider>{!rate.isActive && <Button size="icon" variant="ghost" aria-label="Delete inactive rate" className="text-red-600" onClick={() => setDeleteTarget(rate)}><TrashIcon className="h-4 w-4" /></Button>}</div></TableCell>
           </TableRow>)}</TableBody></Table></div>
           
           <div className="grid md:hidden gap-4">
@@ -104,7 +108,7 @@ export default function RatesPage() {
               <div key={rate.id} className="rounded-xl border dark:border-white/10 p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</span><RateTypeBadge type={rate.rateType || RateType.Booking} /></div>
-                  <span className="font-semibold text-lg">₱{rate.pricePerHour.toLocaleString()}</span>
+                  <span className="font-semibold text-lg">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</span>
                 </div>
                 <div className="text-sm text-muted-foreground flex justify-between">
                   <span>{time(rate.startTime)} - {time(rate.endTime)}</span>
@@ -113,6 +117,7 @@ export default function RatesPage() {
                 <div className="flex gap-2 pt-2 border-t dark:border-white/10">
                   <Button variant="outline" className="flex-1 gap-2" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /> Edit</Button>
                   <Button variant="outline" className={cn('flex-1 gap-2', rate.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700')} onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4" /> : <PowerIcon className="h-4 w-4" />} {rate.isActive ? 'Inactive' : 'Active'}</Button>
+                  {!rate.isActive && <Button variant="outline" className="text-red-600" onClick={() => setDeleteTarget(rate)}><TrashIcon className="h-4 w-4" />Delete</Button>}
                 </div>
               </div>
             ))}
@@ -134,14 +139,15 @@ export default function RatesPage() {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader><DialogTitle>{editing ? 'Edit rate' : 'Add rate'}</DialogTitle><DialogDescription>Choose who this price applies to, its time range, and hourly amount.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
+          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value, pricePerHour: value === RateType.Internal ? 0 : form.pricePerHour })}><SelectTrigger><SelectValue placeholder="Select rate type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
           <div><Label>Start time</Label><AdminTimeSelect value={form.startTime} options={hourlyOptions(0, 23)} onChange={value => { setForm({ ...form, startTime: value, endTime: isValidTimeRange(value, form.endTime) ? form.endTime : minimumEndTime(value) }); setErrors(e => ({...e, endTime: ''})); }} /></div>
           <div><Label>End time</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} options={endTimeOptions} onChange={value => { setForm({ ...form, endTime: value }); setErrors(e => ({...e, endTime: ''})); }} />{errors.endTime && <p className="field-error" role="alert">{errors.endTime}</p>}</div>
-          <div className="sm:col-span-2"><Label>Hourly rate (₱)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="1" step="0.01" value={form.pricePerHour} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder="0" />{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
+          <div className="sm:col-span-2"><Label>Hourly rate (₱)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="0" step="0.01" value={form.rateType === RateType.Internal ? 0 : form.pricePerHour} disabled={form.rateType === RateType.Internal} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder={form.rateType === RateType.Internal ? 'Free' : 'Enter hourly rate'} />{form.rateType === RateType.Internal && <p className="mt-1 text-xs text-muted-foreground">Internal schedules are always free.</p>}{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
         </div>
-        <Button disabled={pending} onClick={save}>Save Rate{pending && <LoaderCircle className="h-4 w-4 animate-spin" />}</Button>
+        <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(undefined)}>Cancel</Button><Button disabled={pending} onClick={save}>Save Rate{pending && <LoadingIndicator label="Saving rate" />}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+    <AdminCredentialDeleteDialog open={!!deleteTarget} title="Delete inactive rate?" description="This permanently deletes the selected rate and cannot be undone." pending={remove.isPending} onOpenChange={value => !value && setDeleteTarget(null)} onConfirm={credentials => { if (!deleteTarget) return; remove.mutate({ id: deleteTarget.id, credentials }, { onSuccess: response => { if (!response.success) return toast.error(response.message); toast.success('Inactive rate deleted'); setDeleteTarget(null); }, onError: error => toast.error(getApiErrorMessage(error, 'Rate could not be deleted')) }); }} />
   </div>;
 }
 

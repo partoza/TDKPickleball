@@ -19,7 +19,7 @@ public class TdkDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<BookingCleanupAudit> BookingCleanupAudits { get; set; }
     public DbSet<Rate> Rates { get; set; }
     public DbSet<Notification> Notifications { get; set; }
-    public DbSet<StaffProfile> StaffProfiles { get; set; }
+    public DbSet<InternalCoachProfile> InternalCoachProfiles { get; set; }
     public DbSet<Promo> Promos { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)

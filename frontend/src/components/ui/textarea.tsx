@@ -10,7 +10,7 @@ const Textarea = React.forwardRef<
     <textarea
       data-slot="textarea"
       className={cn(
-        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent dark:bg-[#3a3a3c] dark:border-white/10 px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-base shadow-sm transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-muted-foreground hover:border-primary/45 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 dark:border-white/10 dark:bg-[#3a3a3c] dark:hover:border-primary/55 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
         className
       )}
       ref={ref}

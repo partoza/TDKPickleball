@@ -6,7 +6,8 @@ export const QUERY_KEYS = {
   BOOKINGS: 'bookings',
   RATES: 'rates',
   AVAILABILITY: 'availability',
-  USER: 'user'
+  USER: 'user',
+  NOTIFICATIONS: 'notifications',
 };
 
 export const STATUS_COLORS: Record<ScheduleStatus, string> = {
@@ -38,13 +39,15 @@ export const ROUTES = {
     DASHBOARD: '/tdkadmin/dashboard',
     SCHEDULE: '/tdkadmin/schedule',
     BOOKINGS: '/tdkadmin/bookings',
+    REVENUE: '/tdkadmin/revenue',
     RATES: '/tdkadmin/rates',
     PROMOS: '/tdkadmin/promos',
     COURTS: '/tdkadmin/courts',
     ADMINS: '/tdkadmin/admins',
-    STAFF: '/tdkadmin/staff',
+    INTERNAL_COACHES: '/tdkadmin/internal-coaches',
     STORAGE: '/tdkadmin/storage',
     WELCOME: '/tdkadmin/welcome',
     PROFILE: '/tdkadmin/profile',
+    WIDGET: '/tdkadmin/widget',
   }
 };

@@ -14,12 +14,14 @@ public sealed class StorageController : ControllerBase
     private readonly IStorageManagementService _storage;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<StorageController> _logger;
+    private readonly IEmailService _email;
 
-    public StorageController(IStorageManagementService storage, IWebHostEnvironment environment, ILogger<StorageController> logger)
+    public StorageController(IStorageManagementService storage, IWebHostEnvironment environment, ILogger<StorageController> logger, IEmailService email)
     {
         _storage = storage;
         _environment = environment;
         _logger = logger;
+        _email = email;
     }
 
     [HttpGet("status")]
@@ -62,6 +64,23 @@ public sealed class StorageController : ControllerBase
             {
                 _logger.LogWarning(exception, "Could not remove a receipt file during booking cleanup");
             }
+        }
+
+        try
+        {
+            await _email.SendStorageCleanupSummaryAsync(
+                result.Data.Audit.DeletedByName,
+                result.Data.Audit.DeletedByEmail,
+                result.Data.FromDate,
+                result.Data.ThroughDate,
+                result.Data.DeletedScheduleCount,
+                result.Data.DeletedBookingCount,
+                result.Data.DeletedReceiptCount,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Storage cleanup completed, but the store notification email could not be sent");
         }
 
         return Ok(result);

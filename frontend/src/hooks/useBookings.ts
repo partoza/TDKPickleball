@@ -35,6 +35,17 @@ export const useRescheduleBooking = () => {
   }});
 };
 
+export const useAddPaddleRental = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bookingsService.addPaddleRental,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.BOOKINGS] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULES] });
+    },
+  });
+};
+
 export const useCreateBooking = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -45,6 +56,14 @@ export const useCreateBooking = () => {
     },
   });
 };
+
+export const useSubmitPublicBookingRequest = () => useMutation({
+  mutationFn: bookingsService.submitPublicBookingRequest,
+});
+
+export const useSubmitPublicPayMongoRequest = () => useMutation({
+  mutationFn: bookingsService.submitPublicPayMongoRequest,
+});
 
 export const useConfirmBooking = () => {
   const queryClient = useQueryClient();

@@ -36,10 +36,12 @@ public class AdminController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpDelete("users/{id}")]
-    public async Task<IActionResult> DeleteUser(string id, CancellationToken cancellationToken)
+    [HttpPost("users/{id}/delete")]
+    public async Task<IActionResult> DeleteUser(string id, AdminCredentialRequest request, CancellationToken cancellationToken)
     {
         var actingUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var verification = await _authService.VerifyAdminCredentialsAsync(actingUserId, request.Email, request.Password);
+        if (!verification.Success) return BadRequest(verification);
         var result = await _authService.DeleteUserAsync(id, actingUserId, cancellationToken);
         return result.Success ? Ok(result) : BadRequest(result);
     }

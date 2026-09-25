@@ -19,17 +19,17 @@ export enum RateType {
   Internal = 'Internal'
 }
 
-export enum StaffType {
-  Internal = 0,
-  Trainer = 1
+export enum InternalCoachType {
+  Internal = 'Internal',
+  Coach = 'Coach'
 }
 
-export interface StaffProfile {
+export interface InternalCoachProfile {
   id: number;
   name: string;
   email?: string;
   phone?: string;
-  type: StaffType;
+  type: InternalCoachType;
   isActive: boolean;
   profilePictureUrl?: string;
 }
@@ -67,7 +67,7 @@ export interface Schedule {
   paymentStatus?: BookingStatus;
   amountPaid?: number;
   totalAmount?: number;
-  staffProfileId?: number;
+  internalCoachProfileId?: number;
 }
 
 export interface Booking {
@@ -83,6 +83,8 @@ export interface Booking {
   endTime: string;
   subtotal: number;
   discountAmount: number;
+  paddleRentalQuantity: number;
+  paddleRentalFee: number;
   totalAmount: number;
   amountPaid: number;
   remainingBalance: number;
@@ -92,7 +94,7 @@ export interface Booking {
   createdAt: string;
   rescheduledAt?: string;
   receiptAvailable?: boolean;
-  staffProfileId?: number;
+  internalCoachProfileId?: number;
   promoId?: number;
 }
 
@@ -156,6 +158,14 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+export interface AdminNotification {
+  id: number;
+  bookingId?: number;
+  title: string;
+  message: string;
+  createdAtUtc: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   email: string;
@@ -183,16 +193,17 @@ export interface StorageStatus {
   warningThresholdMegabytes: number;
   usedPercent: number;
   isHealthy: boolean;
-  completedBookingCount: number;
+  cleanupEligibleRecordCount: number;
   checkedAtUtc: string;
 }
 
 export interface BookingCleanupPreview {
   fromDate: string;
   throughDate: string;
+  eligibleScheduleCount: number;
   eligibleBookingCount: number;
   receiptCount: number;
-  oldestBookingDate?: string;
+  oldestRecordDate?: string;
 }
 
 export interface BookingCleanupHistory {
@@ -201,8 +212,37 @@ export interface BookingCleanupHistory {
   deletedThroughDate: string;
   oldestBookingDate?: string;
   deletedBookingCount: number;
+  deletedScheduleCount: number;
   deletedReceiptCount: number;
   deletedByName: string;
   deletedByEmail: string;
   deletedAtUtc: string;
+}
+
+export interface RevenueDaily {
+  date: string;
+  bookingSales: number;
+  trainingSales: number;
+  paddleRentalSales: number;
+  grossSales: number;
+  collectedRevenue: number;
+  outstandingBalance: number;
+  transactionCount: number;
+}
+
+export interface RevenueSummary {
+  fromDate: string;
+  throughDate: string;
+  collectedRevenue: number;
+  grossSales: number;
+  outstandingBalance: number;
+  bookingSales: number;
+  trainingSales: number;
+  paddleRentalSales: number;
+  paddleRentalCount: number;
+  transactionCount: number;
+  paidCount: number;
+  reservedCount: number;
+  completedCount: number;
+  daily: RevenueDaily[];
 }

@@ -42,6 +42,17 @@ export const useUpdateSchedule = () => {
   });
 };
 
+export const useDeleteSchedule = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, email, password }: { id: string; email: string; password: string }) =>
+      schedulesService.deleteSchedule(id, { email, password }),
+    onSuccess: response => {
+      if (response.success) queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULES] });
+    },
+  });
+};
+
 export const useBulkUpdate = () => {
   const queryClient = useQueryClient();
   return useMutation({

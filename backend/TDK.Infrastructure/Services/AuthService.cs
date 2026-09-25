@@ -20,7 +20,7 @@ public class AuthService : IAuthService
     private readonly IEmailService _email;
     private readonly IProfileImageService _profileImages;
     private readonly string _jwtKey;
-    private const int MaximumTeamAccounts = 6;
+    private const int MaximumTeamAccounts = 10;
     private static readonly SemaphoreSlim TeamAccountCreationLock = new(1, 1);
     private static readonly SemaphoreSlim TeamAccountMutationLock = new(1, 1);
 
@@ -66,49 +66,25 @@ public class AuthService : IAuthService
         return ApiResponse<AuthResponse>.Ok(new AuthResponse("", user.Email!, user.FirstName, user.LastName, roles.FirstOrDefault() ?? "", user.MustChangePassword, user.ProfileImageUrl));
     }
 
-    public async Task<ApiResponse<AuthResponse>> GoogleLoginAsync(string providerKey, string email, string firstName, string lastName)
+    public async Task<ApiResponse<AuthResponse>> GoogleLoginAsync(string providerKey, string email, string firstName, string lastName, string? profileImageUrl)
     {
         if (string.IsNullOrWhiteSpace(providerKey) || string.IsNullOrWhiteSpace(email))
             return ApiResponse<AuthResponse>.Fail("Google did not return a valid identity");
 
         email = email.Trim().ToLowerInvariant();
-        var user = await _userManager.FindByLoginAsync("Google", providerKey);
-        if (user is null)
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        if (existingUser is not null)
         {
-            user = await _userManager.FindByEmailAsync(email);
-            if (user is not null)
-            {
-                var existingRoles = await _userManager.GetRolesAsync(user);
-                if (existingRoles.Any(role => role is "Admin" or "Staff"))
-                    return ApiResponse<AuthResponse>.Fail("This email belongs to an administrative account");
-            }
-            else
-            {
-                user = new ApplicationUser
-                {
-                    UserName = email,
-                    Email = email,
-                    EmailConfirmed = true,
-                    FirstName = string.IsNullOrWhiteSpace(firstName) ? "Google" : firstName.Trim(),
-                    LastName = lastName?.Trim() ?? "",
-                    IsActive = true,
-                    MustChangePassword = false
-                };
-                var created = await _userManager.CreateAsync(user);
-                if (!created.Succeeded) return ApiResponse<AuthResponse>.Fail("The customer account could not be created");
-                await _userManager.AddToRoleAsync(user, "Customer");
-            }
-
-            var loginAdded = await _userManager.AddLoginAsync(user, new UserLoginInfo("Google", providerKey, "Google"));
-            if (!loginAdded.Succeeded) return ApiResponse<AuthResponse>.Fail("The Google account could not be linked");
+            var existingRoles = await _userManager.GetRolesAsync(existingUser);
+            if (existingRoles.Any(role => role is "Admin" or "Staff"))
+                return ApiResponse<AuthResponse>.Fail("This email belongs to an administrative account");
         }
 
-        if (!user.IsActive) return ApiResponse<AuthResponse>.Fail("This account is disabled");
-        var roles = await _userManager.GetRolesAsync(user);
-        if (!roles.Contains("Customer")) await _userManager.AddToRoleAsync(user, "Customer");
-        roles = await _userManager.GetRolesAsync(user);
-        var token = GenerateJwt(user, roles);
-        return ApiResponse<AuthResponse>.Ok(new AuthResponse(token, user.Email!, user.FirstName, user.LastName, "Customer", false, user.ProfileImageUrl));
+        var safeFirstName = string.IsNullOrWhiteSpace(firstName) ? "Guest" : firstName.Trim()[..Math.Min(firstName.Trim().Length, 80)];
+        var safeLastName = string.IsNullOrWhiteSpace(lastName) ? "" : lastName.Trim()[..Math.Min(lastName.Trim().Length, 80)];
+        var safeProfileImageUrl = NormalizeGoogleProfileImageUrl(profileImageUrl);
+        var token = GenerateGoogleVerificationJwt(providerKey, email, safeFirstName, safeLastName, safeProfileImageUrl);
+        return ApiResponse<AuthResponse>.Ok(new AuthResponse(token, email, safeFirstName, safeLastName, "Customer", false, safeProfileImageUrl), "Email verified with Google");
     }
 
     public async Task<ApiResponse<IEnumerable<UserDto>>> GetUsersAsync()
@@ -130,7 +106,7 @@ public class AuthService : IAuthService
     {
         var role = request.Role?.Trim() ?? "";
         if (role is not ("Admin" or "Staff")) return ApiResponse<UserDto>.Fail("Role must be Admin or Staff");
-        if (string.IsNullOrWhiteSpace(_config["Smtp:Host"])) return ApiResponse<UserDto>.Fail("Configure SMTP before adding a user so the temporary password can be delivered");
+        if (!_email.IsConfigured) return ApiResponse<UserDto>.Fail("Configure SMTP before adding a user so the temporary password can be delivered");
         var email = request.Email?.Trim().ToLowerInvariant() ?? "";
         await TeamAccountCreationLock.WaitAsync();
         try
@@ -141,7 +117,7 @@ public class AuthService : IAuthService
             var staff = await _userManager.GetUsersInRoleAsync("Staff");
             var teamAccountCount = administrators.Select(user => user.Id).Concat(staff.Select(user => user.Id)).Distinct().Count();
             if (teamAccountCount >= MaximumTeamAccounts)
-                return ApiResponse<UserDto>.Fail("The team account limit has been reached. You can have one primary administrator and up to five additional users");
+                return ApiResponse<UserDto>.Fail("The maximum of 10 administrator and staff accounts has been reached");
 
             var temporaryPassword = $"Tdk!9{Convert.ToHexString(RandomNumberGenerator.GetBytes(6))}";
             var firstName = request.FirstName?.Trim() ?? "";
@@ -230,6 +206,24 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<ApiResponse<bool>> VerifyAdminCredentialsAsync(string userId, string email, string password)
+    {
+        const string failureMessage = "The email or password does not match the signed-in administrator";
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null || !user.IsActive || string.IsNullOrWhiteSpace(user.Email))
+            return ApiResponse<bool>.Fail(failureMessage);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        if (!roles.Contains("Admin")) return ApiResponse<bool>.Fail(failureMessage);
+        if (!string.Equals(user.Email.Trim(), email?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return ApiResponse<bool>.Fail(failureMessage);
+
+        var passwordResult = await _signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
+        return passwordResult.Succeeded
+            ? ApiResponse<bool>.Ok(true)
+            : ApiResponse<bool>.Fail(failureMessage);
+    }
+
     public async Task<ApiResponse<UserDto>> UpdateProfileImageAsync(string userId, Stream content, string fileName, string contentType, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(userId);
@@ -304,13 +298,47 @@ public class AuthService : IAuthService
         };
         foreach (var r in roles) claims.Add(new Claim(ClaimTypes.Role, r));
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var isTeamAccount = roles.Any(role => role is "Admin" or "Staff");
         var defaultSessionHours = isTeamAccount ? 24 : 2;
         var configuredSessionHours = _config.GetValue<int?>(isTeamAccount ? "Jwt:AdminSessionHours" : "Jwt:CustomerSessionHours");
         var sessionHours = Math.Clamp(configuredSessionHours ?? defaultSessionHours, 1, 24);
-        
+        return WriteJwt(claims, sessionHours);
+    }
+
+    private string GenerateGoogleVerificationJwt(string providerKey, string email, string firstName, string lastName, string? profileImageUrl)
+    {
+        var subjectHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(providerKey)));
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, $"google-email:{subjectHash}"),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Name, $"{firstName} {lastName}".Trim()),
+            new(ClaimTypes.GivenName, firstName),
+            new(ClaimTypes.Surname, lastName),
+            new(ClaimTypes.Role, "Customer"),
+            new("auth_provider", "google_email_verification"),
+            new("must_change_password", "false")
+        };
+        if (!string.IsNullOrWhiteSpace(profileImageUrl)) claims.Add(new("profile_picture", profileImageUrl));
+        var sessionHours = Math.Clamp(_config.GetValue<int?>("Jwt:CustomerSessionHours") ?? 2, 1, 24);
+        return WriteJwt(claims, sessionHours);
+    }
+
+    private static string? NormalizeGoogleProfileImageUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 2048) return null;
+        return Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) &&
+               uri.Scheme == Uri.UriSchemeHttps &&
+               (uri.Host.Equals("googleusercontent.com", StringComparison.OrdinalIgnoreCase) ||
+                uri.Host.EndsWith(".googleusercontent.com", StringComparison.OrdinalIgnoreCase))
+            ? uri.AbsoluteUri
+            : null;
+    }
+
+    private string WriteJwt(IEnumerable<Claim> claims, int sessionHours)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],

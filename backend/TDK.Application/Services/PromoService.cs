@@ -63,8 +63,8 @@ public class PromoService : IPromoService
             Description = request.Description.Trim(),
             Type = request.Type,
             Value = request.Value,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            StartDate = NormalizeStartDate(request.StartDate),
+            EndDate = NormalizeEndDate(request.EndDate),
             AppliesTo = request.AppliesTo,
             MaxUses = request.MaxUses,
             IsActive = true,
@@ -94,8 +94,8 @@ public class PromoService : IPromoService
         p.Description = request.Description.Trim();
         p.Type = request.Type;
         p.Value = request.Value;
-        p.StartDate = request.StartDate;
-        p.EndDate = request.EndDate;
+        p.StartDate = NormalizeStartDate(request.StartDate);
+        p.EndDate = NormalizeEndDate(request.EndDate);
         p.MaxUses = request.MaxUses;
         p.AppliesTo = request.AppliesTo;
         p.IsActive = request.IsActive;
@@ -112,6 +112,7 @@ public class PromoService : IPromoService
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
         var p = await _repo.GetByIdAsync(id);
+        if (p?.IsActive == true) return ApiResponse<bool>.Fail("Disable the promo before deleting it");
         if (p != null)
         {
             _repo.Delete(p);
@@ -119,4 +120,7 @@ public class PromoService : IPromoService
         }
         return ApiResponse<bool>.Ok(true);
     }
+
+    private static DateTime? NormalizeStartDate(DateTime? value) => value?.Date;
+    private static DateTime? NormalizeEndDate(DateTime? value) => value?.Date.AddDays(1).AddTicks(-1);
 }

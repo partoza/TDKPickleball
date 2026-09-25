@@ -1,14 +1,15 @@
-﻿import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
-import { EyeIcon as Eye, PlusIcon as Plus, QrCodeIcon as QrCode, ViewfinderCircleIcon as ScanLine, CalendarDaysIcon as CalendarClock, ArrowPathIcon as LoaderCircle, CheckIcon as Check, XMarkIcon as X, MagnifyingGlassIcon as Search, FunnelIcon as Filter, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, TrashIcon as Trash } from '@heroicons/react/24/solid';
+import { EyeIcon as Eye, PlusIcon as Plus, MinusIcon as Minus, QrCodeIcon as QrCode, ViewfinderCircleIcon as ScanLine, CalendarDaysIcon as CalendarClock, CheckIcon as Check, XMarkIcon as X, MagnifyingGlassIcon as Search, FunnelIcon as Filter, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, TrashIcon as Trash } from '@heroicons/react/24/solid';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { toast } from 'sonner';
-import { useAvailability, useBookings, useCancelBooking, useCompleteBooking, useConfirmBooking, useCreateBooking, useDeleteBooking, useRescheduleBooking, useVerifyBooking } from '@/hooks/useBookings';
+import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useCompleteBooking, useConfirmBooking, useCreateBooking, useDeleteBooking, useRescheduleBooking, useVerifyBooking } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
-import { Booking, BookingStatus, RateType } from '@/types';
+import { Booking, BookingStatus, Promo, RateType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -29,11 +30,13 @@ import { allocateBatchPayment, BookingBlockErrors, BookingBlockValue, bookingBlo
 import { getApiErrorMessage } from '@/services/api';
 import { TDK_ICON_URL } from '@/lib/branding';
 import { getManilaDate, getManilaDateAsLocalDate, isPastManilaStart } from '@/lib/manila-time';
-import { useStaff } from '@/hooks/useStaff';
-import { StaffType } from '@/types';
+import { useInternalCoaches } from '@/hooks/useInternalCoaches';
+import { InternalCoachType } from '@/types';
 import { usePromos } from '@/hooks/usePromos';
+import { ConfirmDeleteDialog } from '@/components/admin/ConfirmDeleteDialog';
+import { isPromoAvailable } from '@/lib/promo-availability';
 
-const emptyForm = { courtId: '', bookingDate: getManilaDate(), startTime: '', endTime: '', customerName: '', email: '', phone: '', notes: '', amountPaid: '' as number | string, paymentStatus: BookingStatus.Paid, rateType: RateType.Booking, staffProfileId: null as number | null, promoId: null as number | null };
+const emptyForm = { courtId: '', bookingDate: getManilaDate(), startTime: '', endTime: '', customerName: '', email: '', phone: '', notes: '', amountPaid: '' as number | string, paymentStatus: BookingStatus.Paid, rateType: RateType.Booking, internalCoachProfileId: null as number | null, promoId: null as number | null, paddleRentalQuantity: 0 };
 
 export default function BookingsPage() {
   const { data: response, isLoading } = useBookings();
@@ -43,13 +46,14 @@ export default function BookingsPage() {
   const courts = courtsResponse?.data || [];
   const rates = ratesResponse?.data || [];
   const [selected, setSelected] = useState<Booking | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
   const [qrBooking, setQrBooking] = useState<Booking | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   
-  const { staff, fetchStaff } = useStaff();
+  const { internalCoaches, fetchInternalCoaches } = useInternalCoaches();
   const { promos, fetchPromos } = usePromos();
-  useEffect(() => { fetchStaff(); fetchPromos(); }, [fetchStaff, fetchPromos]);
+  useEffect(() => { fetchInternalCoaches(); fetchPromos(); }, [fetchInternalCoaches, fetchPromos]);
 
   const downloadQr = async () => {
     if (!qrBooking || !qrRef.current || downloading) return;
@@ -73,6 +77,8 @@ export default function BookingsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [reschedule, setReschedule] = useState<Booking | null>(null);
+  const [paddleRentalTarget, setPaddleRentalTarget] = useState<Booking | null>(null);
+  const [paddleRentalQuantity, setPaddleRentalQuantity] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [addBlocks, setAddBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
@@ -90,7 +96,7 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [scheduleDate, setScheduleDate] = useState('');
-  const create = useCreateBooking(); const move = useRescheduleBooking(); const verify = useVerifyBooking();
+  const create = useCreateBooking(); const move = useRescheduleBooking(); const verify = useVerifyBooking(); const addPaddleRental = useAddPaddleRental();
   const { data: availabilityResponse, isFetching: availabilityLoading } = useAvailability(form.bookingDate, form.courtId);
   const availability = availabilityResponse?.data;
   const markPaid = useConfirmBooking(); const cancel = useCancelBooking(); const complete = useCompleteBooking(); const remove = useDeleteBooking();
@@ -114,12 +120,13 @@ export default function BookingsPage() {
   let batchDiscount = 0;
   if (form.promoId && promos) {
     const promo = promos.find((p: any) => p.id === form.promoId);
-    if (promo) {
+    if (promo && isPromoAvailable(promo, form.rateType)) {
       batchDiscount = promo.type === 'Percentage' ? (rawGrandTotal * (promo.value / 100)) : promo.value;
       if (batchDiscount > rawGrandTotal) batchDiscount = rawGrandTotal;
     }
   }
-  const addGrandTotal = rawGrandTotal - batchDiscount;
+  const paddleRentalFee = form.paddleRentalQuantity * 100;
+  const addGrandTotal = rawGrandTotal - batchDiscount + paddleRentalFee;
   const hasFilters = !!search || courtFilter !== 'all' || statusFilter !== 'all' || paymentFilter !== 'all' || !!scheduleDate;
   const validate = (includeContact = true) => {
     const errors: Record<string, string> = {};
@@ -151,13 +158,14 @@ export default function BookingsPage() {
     setCreatingBatch(true);
     try {
       const batchAmount = form.paymentStatus === BookingStatus.Paid ? addGrandTotal : Number(form.amountPaid || 0);
-      const allocatedPayments = allocateBatchPayment(addBlocks, rates, form.rateType, batchAmount);
+      const allocatedPayments = allocateBatchPayment(addBlocks, rates, form.rateType, batchAmount, paddleRentalFee);
       const results = [];
       for (const [index, block] of addBlocks.entries()) {
         results.push(await create.mutateAsync({
           courtId: Number(block.courtId), bookingDate: block.date, startTime: block.startTime, endTime: block.endTime,
           customerName: form.customerName, email: form.email, phone: form.phone, notes: form.notes,
-          amountPaid: allocatedPayments[index], rateType: form.rateType, staffProfileId: form.staffProfileId, promoId: form.promoId
+          amountPaid: allocatedPayments[index], rateType: form.rateType, internalCoachProfileId: form.internalCoachProfileId, promoId: form.promoId,
+          paddleRentalQuantity: index === 0 ? form.paddleRentalQuantity : 0,
         }));
       }
       const failed = results.find(result => !result.success);
@@ -203,9 +211,21 @@ export default function BookingsPage() {
     } catch (error: any) { setScanError(error?.message || 'Unable to read this QR image.'); }
   };
   const clearFilters = () => { setSearch(''); setCourtFilter('all'); setStatusFilter('all'); setPaymentFilter('all'); setScheduleDate(''); setPage(0); };
-  const deleteCancelled = (booking: Booking) => {
-    if (!window.confirm(`Permanently delete ${booking.bookingReference}? This cannot be undone.`)) return;
-    remove.mutate(booking.id, { onSuccess: r => r.success ? toast.success('Cancelled booking deleted') : toast.error(r.message), onError: () => toast.error('Booking could not be deleted') });
+  const deleteCancelled = () => {
+    if (!deleteTarget) return;
+    remove.mutate(deleteTarget.id, { onSuccess: r => { if (r.success) { toast.success('Cancelled booking deleted'); setDeleteTarget(null); } else toast.error(r.message); }, onError: () => toast.error('Booking could not be deleted') });
+  };
+  const savePaddleRental = () => {
+    if (!paddleRentalTarget) return;
+    addPaddleRental.mutate({ id: paddleRentalTarget.id, quantity: paddleRentalQuantity }, {
+      onSuccess: response => {
+        if (!response.success) { toast.error(response.message || 'Could not add the paddle rental'); return; }
+        toast.success(`${paddleRentalQuantity} paid paddle rental${paddleRentalQuantity === 1 ? '' : 's'} added`);
+        setPaddleRentalTarget(null);
+        setPaddleRentalQuantity(1);
+      },
+      onError: error => toast.error(getApiErrorMessage(error, 'Could not add the paddle rental')),
+    });
   };
 
 
@@ -215,7 +235,7 @@ export default function BookingsPage() {
     <div className="grid gap-4 sm:grid-cols-3"><Metric label="Matching bookings" value={filteredBookings.length.toString()} /><Metric label="Paid" value={filteredBookings.filter(b => b.status === 'Paid').length.toString()} /><Metric label="Remaining balance" value={`₱${totalRemaining.toLocaleString()}`} /></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>Booking records</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-3">{[1,2,3,4].map(x => <Skeleton key={x} className="h-14 w-full rounded-xl" />)}</div> : <div className="space-y-4">
       <div className="overflow-x-auto rounded-xl border hidden md:block"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Booked by</TableHead><TableHead>Schedule</TableHead><TableHead>Payment</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
-      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell className="font-mono text-xs font-semibold">{b.bookingReference}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` · ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}–{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={b.status === 'Paid' ? 'bg-emerald-600 text-white' : b.status === 'Reserved' ? 'bg-amber-500 text-white' : b.status === 'Cancelled' ? 'bg-red-500 text-white' : ''}>{b.status}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== 'Cancelled' && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{b.status === 'Reserved' && <IconButton label="Mark paid" onClick={() => act(b, 'paid')}><Check /></IconButton>}{b.status === 'Reserved' && <IconButton label="Cancel" onClick={() => act(b, 'cancel')}><X /></IconButton>}{b.status === 'Cancelled' && <IconButton label="Delete" onClick={() => deleteCancelled(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
+      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell className="font-mono text-xs font-semibold">{b.bookingReference}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` · ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}–{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={b.status === 'Paid' ? 'bg-emerald-600 text-white' : b.status === 'Reserved' ? 'bg-amber-500 text-white' : b.status === 'Cancelled' ? 'bg-red-500 text-white' : ''}>{b.status}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== 'Cancelled' && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{(b.status === 'Paid' || b.status === 'Reserved') && b.paddleRentalQuantity < 50 && <IconButton label="Add paddle rental" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{b.status === 'Reserved' && <IconButton label="Mark paid" onClick={() => act(b, 'paid')}><Check /></IconButton>}{b.status === 'Reserved' && <IconButton label="Cancel" onClick={() => act(b, 'cancel')}><X /></IconButton>}{b.status === 'Cancelled' && <IconButton label="Delete" onClick={() => setDeleteTarget(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
       {!filteredBookings.length && <TableRow><TableCell colSpan={6} className="py-12 text-center text-slate-500">No bookings match these filters.</TableCell></TableRow>}
     </TableBody></Table></div>
     <div className="grid md:hidden gap-4">
@@ -241,10 +261,11 @@ export default function BookingsPage() {
           <div className="flex flex-wrap gap-2 pt-2 border-t">
             <Button variant="outline" size="sm" className="flex-1 min-w-0" onClick={() => setSelected(b)}><Eye className="mr-1 h-3.5 w-3.5" /> View</Button>
             {b.status !== 'Cancelled' && <Button variant="outline" size="sm" className="flex-1 min-w-0" onClick={() => setQrBooking(b)}><QrCode className="mr-1 h-3.5 w-3.5" /> QR</Button>}
+            {(b.status === 'Paid' || b.status === 'Reserved') && b.paddleRentalQuantity < 50 && <Button variant="outline" size="sm" className="flex-1 min-w-[30%]" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus className="mr-1 h-3.5 w-3.5" /> Paddle</Button>}
             {canReschedule(b) && <Button variant="outline" size="sm" className="flex-1 min-w-[30%]" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock className="mr-1 h-3.5 w-3.5" /> Move</Button>}
             {b.status === 'Reserved' && <Button variant="outline" size="sm" className="flex-1 min-w-[30%]" onClick={() => act(b, 'paid')}><Check className="mr-1 h-3.5 w-3.5" /> Paid</Button>}
             {b.status === 'Reserved' && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => act(b, 'cancel')}><X className="mr-1 h-3.5 w-3.5" /> Cancel</Button>}
-            {b.status === 'Cancelled' && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => deleteCancelled(b)}><Trash className="mr-1 h-3.5 w-3.5" /> Delete</Button>}
+            {b.status === 'Cancelled' && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => setDeleteTarget(b)}><Trash className="mr-1 h-3.5 w-3.5" /> Delete</Button>}
           </div>
         </div>
       ))}
@@ -273,25 +294,25 @@ export default function BookingsPage() {
           <div className="space-y-5">
             <BookingBlocksEditor blocks={addBlocks} onChange={blocks => { setAddBlocks(blocks); setBlockErrors([]); setFormErrors(current => ({...current, amountPaid: ''})); }} courts={courts} rates={rates} rateType={form.rateType} errors={blockErrors} discount={batchDiscount} />
             <section className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm sm:grid-cols-2 sm:p-5 dark:border-white/10 dark:bg-[#323234]">
-              <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { setForm({...form, rateType: value as RateType}); setBlockErrors([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
-              {(form.rateType === RateType.Training || form.rateType === RateType.Internal) && (
+              <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { setForm({...form, rateType: value as RateType, promoId: null}); setBlockErrors([]); }}><SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div>
+              {form.rateType === RateType.Training && (
                 <div>
-                  <Label>{form.rateType === RateType.Training ? 'Trainer' : 'Internal'}</Label>
-                  <Select value={form.staffProfileId?.toString() || 'none'} onValueChange={value => setForm({...form, staffProfileId: value !== 'none' ? Number(value) : null})}>
-                    <SelectTrigger><SelectValue placeholder={`Select ${form.rateType === RateType.Training ? 'Trainer' : 'internal'}`} /></SelectTrigger>
+                  <Label>Coach</Label>
+                  <Select value={form.internalCoachProfileId?.toString() || 'none'} onValueChange={value => setForm({...form, internalCoachProfileId: value !== 'none' ? Number(value) : null})}>
+                    <SelectTrigger><SelectValue placeholder={`Select ${form.rateType === RateType.Training ? 'coach' : 'internal'}`} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {staff.filter(s => s.type === (form.rateType === RateType.Training ? StaffType.Trainer : StaffType.Internal)).map(s => (
-                        <SelectItem key={s.id} value={s.id.toString()}>
+                      {internalCoaches.filter(profile => profile.type === InternalCoachType.Coach && profile.isActive).map(profile => (
+                        <SelectItem key={profile.id} value={profile.id.toString()}>
                           <div className="flex items-center gap-2">
-                            {s.profilePictureUrl ? (
-                              <img src={s.profilePictureUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                            {profile.profilePictureUrl ? (
+                              <img src={profile.profilePictureUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
                             ) : (
                               <div className="h-6 w-6 rounded-full bg-[#2a2e25] flex items-center justify-center text-[#88cc22] font-bold text-[10px] tracking-wider">
-                                {getInitials(s.name)}
+                                {getInitials(profile.name)}
                               </div>
                             )}
-                            <span>{s.name} <span className="text-muted-foreground ml-1">({s.type === StaffType.Trainer ? 'Trainer' : 'Internal'})</span></span>
+                            <span>{profile.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -305,24 +326,39 @@ export default function BookingsPage() {
                   <SelectTrigger><SelectValue placeholder="Select promo code" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {promos.filter((p: any) => p.isActive).map((p: any) => (
+                    {promos.filter((p) => isPromoAvailable(p, form.rateType)).map((p) => (
                       <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Booked by *</Label><Input aria-invalid={!!formErrors.customerName} className={cn(formErrors.customerName && 'field-invalid')} value={form.customerName} onChange={event => { setForm({...form, customerName: event.target.value}); setFormErrors(current => ({...current, customerName: ''})); }} placeholder="e.g. John Doe" /><FieldError message={formErrors.customerName} /></div>
+              <div><Label>{form.rateType === RateType.Training ? 'Trainee *' : 'Booked by *'}</Label><Input aria-invalid={!!formErrors.customerName} className={cn(formErrors.customerName && 'field-invalid')} value={form.customerName} onChange={event => { setForm({...form, customerName: event.target.value}); setFormErrors(current => ({...current, customerName: ''})); }} placeholder="e.g. John Doe" /><FieldError message={formErrors.customerName} /></div>
               <div><Label>Email (optional)</Label><Input aria-invalid={!!formErrors.email} className={cn(formErrors.email && 'field-invalid')} type="email" value={form.email} onChange={event => { setForm({...form, email: event.target.value}); setFormErrors(current => ({...current, email: ''})); }} placeholder="e.g. john@example.com" /><FieldError message={formErrors.email} /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={event => setForm({...form, phone: event.target.value})} placeholder="e.g. 09123456789" /></div>
-              <div><Label>Payment *</Label><Select value={form.paymentStatus} onValueChange={(paymentStatus: BookingStatus) => { setForm({...form, paymentStatus, amountPaid: paymentStatus === BookingStatus.Paid ? '' : form.amountPaid}); setFormErrors(current => ({...current, amountPaid: ''})); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
+              <div><Label>Payment *</Label><Select value={form.paymentStatus} onValueChange={(paymentStatus: BookingStatus) => { setForm({...form, paymentStatus, amountPaid: paymentStatus === BookingStatus.Paid ? '' : form.amountPaid}); setFormErrors(current => ({...current, amountPaid: ''})); }}><SelectTrigger><SelectValue placeholder="Select payment status" /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
               {form.paymentStatus === BookingStatus.Reserved && <div><Label>Reservation Amount</Label><Input aria-invalid={!!formErrors.amountPaid} className={cn(formErrors.amountPaid && 'field-invalid')} type="number" min="0" max={addGrandTotal} step="0.01" value={form.amountPaid} onChange={event => { setForm({...form, amountPaid: event.target.value === '' ? '' : Number(event.target.value)}); setFormErrors(current => ({...current, amountPaid: ''})); }} placeholder="0" /><FieldError message={formErrors.amountPaid} /></div>}
+              <div className="sm:col-span-2">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Paddle Rental</label>
+                <div className="mt-1.5 flex items-center justify-between rounded-xl border bg-white p-3 dark:bg-[#3a3a3c]">
+                  <div>
+                    <p className="text-sm font-semibold">Selkirk Paddle – ₱100 each</p>
+                    <p className="text-xs text-muted-foreground">Charged once for the complete session.</p>
+                  </div>
+                  <div className="flex items-center rounded-lg border p-1">
+                    <button type="button" className="grid h-8 w-8 place-items-center rounded-md transition-colors hover:bg-accent disabled:opacity-40" disabled={form.paddleRentalQuantity === 0} onClick={() => setForm({...form, paddleRentalQuantity: Math.max(0, form.paddleRentalQuantity - 1)})}><Minus className="h-4 w-4" /></button>
+                    <span className="w-9 text-center text-sm font-bold">{form.paddleRentalQuantity}</span>
+                    <button type="button" className="grid h-8 w-8 place-items-center rounded-md transition-colors hover:bg-accent disabled:opacity-40" disabled={form.paddleRentalQuantity === 50} onClick={() => setForm({...form, paddleRentalQuantity: Math.min(50, form.paddleRentalQuantity + 1)})}><Plus className="h-4 w-4" /></button>
+                  </div>
+                </div>
+                {form.paddleRentalQuantity > 0 && <p className="mt-2 text-right text-sm font-semibold text-primary">Paddle rental: ₱{paddleRentalFee.toLocaleString()}</p>}
+              </div>
               <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={event => setForm({...form, notes: event.target.value})} placeholder="Optional notes applied to every booking" /></div>
             </section>
           </div>
         </div>
         <div className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
           <button 
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" 
+            className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground dark:border-white/15 dark:bg-[#3a3a3c] dark:text-slate-100 dark:hover:bg-[#48484a] dark:hover:text-white" 
             onClick={() => setShowAdd(false)}
             disabled={busy}
           >
@@ -331,10 +367,10 @@ export default function BookingsPage() {
           <button 
             onClick={save}
             disabled={busy}
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
+            className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] bg-primary hover:bg-primary/90 text-white shadow-sm"
           >
             Save Booking
-            {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
+            {busy && <LoadingIndicator label="Saving booking" />}
           </button>
         </div>
       </DialogContent>
@@ -350,17 +386,31 @@ export default function BookingsPage() {
         <div className="px-6 overflow-y-auto custom-scrollbar flex-1 py-4">
             <BookingFields form={form} setForm={setForm} courts={courts} rates={rates} errors={formErrors} setErrors={setFormErrors} availability={availability} availabilityLoading={availabilityLoading} currentBooking={reschedule} now={clock} />
         </div>
-        <div className="px-6 py-4 border-t border-slate-100 shrink-0 bg-white">
-          <Button onClick={saveReschedule} disabled={busy} className="w-full h-11 font-bold text-[14px]">
-            Reschedule Booking{busy && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
-          </Button>
+        <div className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+          <button 
+            className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground dark:border-white/15 dark:bg-[#3a3a3c] dark:text-slate-100 dark:hover:bg-[#48484a] dark:hover:text-white" 
+            onClick={() => setReschedule(null)}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={saveReschedule}
+            disabled={busy}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] bg-primary hover:bg-primary/90 text-white shadow-sm"
+          >
+            Reschedule Booking
+            {busy && <LoadingIndicator label="Rescheduling booking" />}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
     <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}><DialogContent><DialogHeader><DialogTitle>{selected?.bookingReference}</DialogTitle><DialogDescription>Complete booking details</DialogDescription></DialogHeader>{selected && <BookingDetails booking={selected} />}</DialogContent></Dialog>
-    <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-3 object-contain" /><p className="mb-6 font-bold text-center uppercase tracking-wider" style={{ color: '#861721', fontSize: '12px' }}>Scan this to verify your booking</p><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] w-[56px] h-[56px]" style={{ backgroundColor: '#ffffff' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="w-[38px] h-[38px] object-contain" /></div></div><p className="mt-6 text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
+    <Dialog open={!!paddleRentalTarget} onOpenChange={open => { if (!open) { setPaddleRentalTarget(null); setPaddleRentalQuantity(1); } }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Add paddle rental</DialogTitle><DialogDescription>Add paid Selkirk paddle rentals to {paddleRentalTarget?.bookingReference}. The fee is charged once for the remaining session.</DialogDescription></DialogHeader><div className="rounded-2xl border bg-muted/20 p-4"><div className="flex items-center justify-between"><div><p className="font-semibold">Selkirk Paddle</p><p className="text-sm text-muted-foreground">₱100 per paddle</p></div><div className="flex items-center rounded-xl border bg-background p-1"><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={paddleRentalQuantity === 1} onClick={() => setPaddleRentalQuantity(quantity => Math.max(1, quantity - 1))}><Minus className="h-4 w-4" /></Button><span className="w-10 text-center font-bold">{paddleRentalQuantity}</span><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!paddleRentalTarget || paddleRentalTarget.paddleRentalQuantity + paddleRentalQuantity >= 50} onClick={() => setPaddleRentalQuantity(quantity => Math.min(50 - (paddleRentalTarget?.paddleRentalQuantity || 0), quantity + 1))}><Plus className="h-4 w-4" /></Button></div></div><div className="mt-4 flex items-center justify-between border-t pt-4"><span className="text-sm font-medium">Paid rental fee</span><strong className="text-primary">₱{(paddleRentalQuantity * 100).toLocaleString()}</strong></div></div><div className="flex justify-end gap-3"><Button variant="outline" onClick={() => setPaddleRentalTarget(null)} disabled={addPaddleRental.isPending}>Cancel</Button><Button onClick={savePaddleRental} disabled={addPaddleRental.isPending}>{addPaddleRental.isPending && <LoadingIndicator className="mr-2" label="Adding paddle rental" />}Add paid rental</Button></div></DialogContent></Dialog>
+    <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-3 object-contain" /><p className="mb-6 font-bold text-center uppercase tracking-wider" style={{ color: '#861721', fontSize: '12px' }}>Scan this to verify your booking</p><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] w-[56px] h-[56px]" style={{ backgroundColor: '#ffffff' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="w-[38px] h-[38px] object-contain" /></div></div><p className="mt-6 text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoadingIndicator className="mr-2" label="Downloading ticket" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
     <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} />}</DialogContent></Dialog>
-    <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoaderCircle className="h-4 w-4 animate-spin" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
+    <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoadingIndicator label="Verifying QR code" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
+    <ConfirmDeleteDialog open={!!deleteTarget} title={`Delete ${deleteTarget?.bookingReference || 'booking'}?`} description="This permanently removes the cancelled booking and cannot be undone." pending={remove.isPending} onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={deleteCancelled} />
   </div>;
 }
 
@@ -409,17 +459,10 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
           Payment
         </div>
         <div className="p-4 grid gap-3">
-          {b.discountAmount > 0 ? (
-            <>
-              <Detail k="Subtotal" v={`₱${b.subtotal.toLocaleString()}`} />
-              <Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />
-              <div className="border-t dark:border-white/10 pt-3 mt-1">
-                <Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" />
-              </div>
-            </>
-          ) : (
-            <Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" />
-          )}
+          <Detail k="Court Booking" v={`₱${b.subtotal.toLocaleString()}`} />
+          {b.discountAmount > 0 && <Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />}
+          {b.paddleRentalQuantity > 0 && <Detail k={`Selkirk Paddle Rental × ${b.paddleRentalQuantity}`} v={`₱${b.paddleRentalFee.toLocaleString()}`} />}
+          <div className="border-t dark:border-white/10 pt-3 mt-1"><Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" /></div>
           
           <div className="border-t dark:border-white/10 pt-3 mt-1 space-y-3">
             <Detail 
@@ -469,7 +512,7 @@ function BookingFields({ form, setForm, courts, rates = [], promos = [], include
   let discount = 0;
   if (quote.covered && form.promoId && promos) {
     const promo = promos.find((p: any) => p.id === form.promoId);
-    if (promo) {
+    if (promo && isPromoAvailable(promo, form.rateType)) {
       discount = promo.type === 'Percentage' ? (quote.total * (promo.value / 100)) : promo.value;
       if (discount > quote.total) discount = quote.total;
     }
@@ -488,14 +531,18 @@ function BookingFields({ form, setForm, courts, rates = [], promos = [], include
           <SelectTrigger><SelectValue placeholder="Select promo code" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">None</SelectItem>
-            {promos.filter((p: any) => p.isActive).map((p: any) => (
+            {promos.filter((p: Promo) => isPromoAvailable(p, form.rateType)).map((p: Promo) => (
               <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-      <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => set('rateType', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div><div><Label>Booked by *</Label><Input aria-invalid={!!errors.customerName} className={cn(errors.customerName && 'field-invalid')} value={form.customerName} onChange={e => set('customerName', e.target.value)} placeholder="e.g. John Doe" /><FieldError message={errors.customerName} /></div><div><Label>Email (optional)</Label><Input aria-invalid={!!errors.email} className={cn(errors.email && 'field-invalid')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="e.g. john@example.com" /><FieldError message={errors.email} /></div><div><Label>Phone</Label><Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="e.g. 09123456789" /></div><div><Label>Amount paid</Label><Input aria-invalid={!!errors.amountPaid} className={cn(errors.amountPaid && 'field-invalid')} type="number" min="0" max={quote.covered ? finalTotal : undefined} step="0.01" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value === '' ? '' : Number(e.target.value))} placeholder="0" /><FieldError message={errors.amountPaid} /></div><div><Label>Notes</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes or requests" /></div></>}
+      <div><Label>Booking type *</Label><Select value={form.rateType} onValueChange={value => { set('rateType', value); set('promoId', null); }}><SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem></SelectContent></Select></div><div><Label>{form.rateType === RateType.Training ? 'Trainee *' : 'Booked by *'}</Label><Input aria-invalid={!!errors.customerName} className={cn(errors.customerName && 'field-invalid')} value={form.customerName} onChange={e => set('customerName', e.target.value)} placeholder="e.g. John Doe" /><FieldError message={errors.customerName} /></div><div><Label>Email (optional)</Label><Input aria-invalid={!!errors.email} className={cn(errors.email && 'field-invalid')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="e.g. john@example.com" /><FieldError message={errors.email} /></div><div><Label>Phone</Label><Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="e.g. 09123456789" /></div><div><Label>Amount paid</Label><Input aria-invalid={!!errors.amountPaid} className={cn(errors.amountPaid && 'field-invalid')} type="number" min="0" max={quote.covered ? finalTotal : undefined} step="0.01" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value === '' ? '' : Number(e.target.value))} placeholder="0" /><FieldError message={errors.amountPaid} /></div><div><Label>Notes</Label><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes or requests" /></div></>}
   </div>;
 }
+
+
+
+
 
 

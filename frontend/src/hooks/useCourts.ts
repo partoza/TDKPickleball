@@ -30,3 +30,8 @@ export const useUpdateCourt = () => {
     },
   });
 };
+
+export const useDeleteCourt = () => {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: courtsService.deleteCourt, onSuccess: () => queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.COURTS] }) });
+};

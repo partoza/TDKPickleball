@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { CheckCircleIcon as CheckCircle2, ArrowPathIcon as LoaderCircle, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
+import { CheckCircleIcon as CheckCircle2, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { useVerifyBooking } from '@/hooks/useBookings';
 import { Booking } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,7 @@ export default function VerifyPage() {
               disabled={verify.isPending}
             >
               Verify
-              {verify.isPending && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
+              {verify.isPending && <LoadingIndicator className="ml-2" label="Verifying booking" />}
             </Button>
           </div>
           {error && <p className="mt-2 text-sm font-medium text-red-500">{error}</p>}

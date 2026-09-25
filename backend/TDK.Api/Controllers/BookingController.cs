@@ -5,6 +5,7 @@ using TDK.Application.Interfaces;
 using Microsoft.AspNetCore.RateLimiting;
 using TDK.Domain.Enums;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace TDK.Api.Controllers;
 
@@ -26,20 +27,18 @@ public class BookingController : ControllerBase
 
     [HttpPost("api/bookings")]
     [EnableRateLimiting("Email")]
-    [Authorize(Roles = "Admin,Staff,Customer")]
+    [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> Create(CreateBookingRequest request)
     {
-        if (User.IsInRole("Customer")) request = request with { Email = User.FindFirstValue(ClaimTypes.Email) };
         return Ok(await _bookingService.CreateAsync(request));
     }
 
     [HttpPost("api/bookings/with-receipt")]
     [EnableRateLimiting("Email")]
-    [Authorize(Roles = "Admin,Staff,Customer")]
+    [Authorize(Roles = "Admin,Staff")]
     [RequestSizeLimit(5_500_000)]
-    public async Task<IActionResult> CreateWithReceipt([FromForm] CreateBookingWithReceiptForm request)
+    public async Task<IActionResult> CreateWithReceipt([FromForm] CreateBookingWithReceiptForm request, CancellationToken cancellationToken)
     {
-        if (User.IsInRole("Customer")) request.Email = User.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(request.CustomerName) || request.CustomerName.Length > 150) return BadRequest(new { success = false, message = "Booked by is required" });
         if (!string.IsNullOrWhiteSpace(request.Email) && (!System.Net.Mail.MailAddress.TryCreate(request.Email, out _) || request.Email.Length > 254)) return BadRequest(new { success = false, message = "Enter a valid email address" });
         if (request.Phone?.Length > 30) return BadRequest(new { success = false, message = "Phone number is too long" });
@@ -54,7 +53,7 @@ public class BookingController : ControllerBase
         var fullPath = Path.Combine(directory, fileName);
         await using (var target = System.IO.File.Create(fullPath)) await request.Receipt.CopyToAsync(target);
 
-        var result = await _bookingService.CreateAsync(new(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, request.CustomerName, request.Email, request.Phone, request.Notes, request.AmountPaid, request.RateType));
+        var result = await _bookingService.CreateAsync(new(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, request.CustomerName, request.Email, request.Phone, request.Notes, request.AmountPaid, request.RateType, PaddleRentalQuantity: request.PaddleRentalQuantity), sendConfirmation: false);
         if (!result.Success || result.Data is null)
         {
             System.IO.File.Delete(fullPath);
@@ -62,7 +61,107 @@ public class BookingController : ControllerBase
         }
         var attached = await _bookingService.AttachReceiptAsync(result.Data.Id, fileName, detected.Value.ContentType);
         if (!attached.Success) { System.IO.File.Delete(fullPath); return StatusCode(500, attached); }
+        var receiptBytes = await System.IO.File.ReadAllBytesAsync(fullPath, cancellationToken);
+        var emailed = await _bookingService.SendReceiptConfirmationAsync(
+            result.Data.Id,
+            receiptBytes,
+            $"payment-receipt{detected.Value.Extension}",
+            detected.Value.ContentType,
+            cancellationToken);
+        if (!emailed.Success) result.Message = emailed.Message;
         return Ok(result);
+    }
+
+    [HttpPost("api/booking-requests/with-receipt")]
+    [EnableRateLimiting("Email")]
+    [Authorize(Roles = "Customer")]
+    [RequestSizeLimit(5_500_000)]
+    public async Task<IActionResult> SubmitPublicRequest([FromForm] PublicBookingRequestWithReceiptForm request, CancellationToken cancellationToken)
+    {
+        var verifiedEmail = User.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(verifiedEmail) || !System.Net.Mail.MailAddress.TryCreate(verifiedEmail, out _))
+            return Unauthorized(new { success = false, message = "A verified customer email is required" });
+        if (string.IsNullOrWhiteSpace(request.CustomerName) || request.CustomerName.Trim().Length > 150)
+            return BadRequest(new { success = false, message = "Full name is required and must be 150 characters or fewer" });
+        if (request.Phone?.Length > 30)
+            return BadRequest(new { success = false, message = "Phone number is too long" });
+        if (request.Notes?.Length > 2_000)
+            return BadRequest(new { success = false, message = "Notes must be 2,000 characters or fewer" });
+        if (request.PaddleRentalQuantity is < 0 or > 50)
+            return BadRequest(new { success = false, message = "Paddle rental quantity must be between 0 and 50" });
+        if (request.Receipt is null || request.Receipt.Length == 0)
+            return BadRequest(new { success = false, message = "Payment receipt is required" });
+        if (request.Receipt.Length > 5 * 1024 * 1024)
+            return BadRequest(new { success = false, message = "Receipt must be 5 MB or smaller" });
+
+        List<PublicBookingRequestBlockDto>? schedules;
+        try
+        {
+            schedules = JsonSerializer.Deserialize<List<PublicBookingRequestBlockDto>>(request.SchedulesJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new { success = false, message = "Booking schedules are invalid" });
+        }
+        if (schedules is null || schedules.Count is < 1 or > 20)
+            return BadRequest(new { success = false, message = "Select between 1 and 20 booking schedules" });
+
+        var detected = await DetectReceiptTypeAsync(request.Receipt);
+        if (detected is null)
+            return BadRequest(new { success = false, message = "Receipt must be a valid JPG, PNG, or WebP image" });
+
+        await using var receiptStream = new MemoryStream();
+        await request.Receipt.CopyToAsync(receiptStream, cancellationToken);
+        var result = await _bookingService.SubmitPublicRequestAsync(
+            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules),
+            receiptStream.ToArray(),
+            $"payment-receipt{detected.Value.Extension}",
+            detected.Value.ContentType,
+            cancellationToken);
+
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpPost("api/booking-requests/paymongo")]
+    [Authorize(Roles = "Customer,Admin,Staff")]
+    [EnableRateLimiting("PublicRead")]
+    public async Task<IActionResult> SubmitPayMongoRequest([FromBody] PublicPayMongoBookingRequestForm request, CancellationToken cancellationToken)
+    {
+        var verifiedEmail = User.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(verifiedEmail) || !System.Net.Mail.MailAddress.TryCreate(verifiedEmail, out _))
+            return Unauthorized(new { success = false, message = "A verified customer email is required" });
+        if (string.IsNullOrWhiteSpace(request.CustomerName) || request.CustomerName.Trim().Length > 150)
+            return BadRequest(new { success = false, message = "Full name is required and must be 150 characters or fewer" });
+        if (request.Phone?.Length > 30)
+            return BadRequest(new { success = false, message = "Phone number is too long" });
+        if (request.Notes?.Length > 2_000)
+            return BadRequest(new { success = false, message = "Notes must be 2,000 characters or fewer" });
+        if (request.PaddleRentalQuantity is < 0 or > 50)
+            return BadRequest(new { success = false, message = "Paddle rental quantity must be between 0 and 50" });
+
+        List<PublicBookingRequestBlockDto>? schedules;
+        try
+        {
+            schedules = JsonSerializer.Deserialize<List<PublicBookingRequestBlockDto>>(request.SchedulesJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new { success = false, message = "Booking schedules are invalid" });
+        }
+        if (schedules is null || schedules.Count is < 1 or > 20)
+            return BadRequest(new { success = false, message = "Select between 1 and 20 booking schedules" });
+
+        var result = await _bookingService.SubmitPayMongoRequestAsync(
+            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules),
+            cancellationToken);
+
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpPost("api/bookings/verify")]
@@ -72,6 +171,14 @@ public class BookingController : ControllerBase
     [HttpGet("api/admin/bookings")]
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> GetAll() => Ok(await _bookingService.GetAllAsync());
+
+    [HttpGet("api/admin/revenue")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetRevenue([FromQuery] DateOnly fromDate, [FromQuery] DateOnly throughDate)
+    {
+        var result = await _bookingService.GetRevenueAsync(fromDate, throughDate);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
 
     [HttpGet("api/admin/bookings/{id}")]
     [Authorize(Roles = "Admin,Staff")]
@@ -86,6 +193,14 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> Reschedule(long id, RescheduleBookingRequest request)
     {
         var result = await _bookingService.RescheduleAsync(id, request);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpPost("api/admin/bookings/{id}/paddle-rentals")]
+    [Authorize(Roles = "Admin,Staff")]
+    public async Task<IActionResult> AddPaddleRental(long id, AddPaddleRentalRequest request)
+    {
+        var result = await _bookingService.AddPaddleRentalAsync(id, request.Quantity);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
@@ -152,5 +267,26 @@ public sealed class CreateBookingWithReceiptForm
     public string? Notes { get; set; }
     public decimal AmountPaid { get; set; }
     public RateType RateType { get; set; } = RateType.Booking;
+    [System.ComponentModel.DataAnnotations.Range(0, 50)]
+    public int PaddleRentalQuantity { get; set; }
     public IFormFile? Receipt { get; set; }
+}
+
+public sealed class PublicBookingRequestWithReceiptForm
+{
+    public string CustomerName { get; set; } = "";
+    public string? Phone { get; set; }
+    public string? Notes { get; set; }
+    public int PaddleRentalQuantity { get; set; }
+    public string SchedulesJson { get; set; } = "[]";
+    public IFormFile? Receipt { get; set; }
+}
+
+public sealed class PublicPayMongoBookingRequestForm
+{
+    public string CustomerName { get; set; } = "";
+    public string? Phone { get; set; }
+    public string? Notes { get; set; }
+    public int PaddleRentalQuantity { get; set; }
+    public string SchedulesJson { get; set; } = "[]";
 }

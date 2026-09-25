@@ -8,6 +8,7 @@ namespace TDK.Application.Services;
 
 public class CourtService : ICourtService
 {
+    private const int MaximumCourts = 10;
     private readonly IRepository<Court> _courtRepo;
 
     public CourtService(IRepository<Court> courtRepo)
@@ -36,6 +37,7 @@ public class CourtService : ICourtService
         if (name.Length is < 2 or > 100) return ApiResponse<CourtDto>.Fail("Court name must contain between 2 and 100 characters");
         if (displayName.Length > 100) return ApiResponse<CourtDto>.Fail("Display name cannot exceed 100 characters");
         var courts = (await _courtRepo.GetAllAsync()).ToList();
+        if (courts.Count >= MaximumCourts) return ApiResponse<CourtDto>.Fail("The maximum of 10 courts has been reached");
         if (courts.Any(court => string.Equals(court.Name, name, StringComparison.OrdinalIgnoreCase)))
             return ApiResponse<CourtDto>.Fail("A court with this name already exists");
 
@@ -85,10 +87,16 @@ public class CourtService : ICourtService
     {
         var court = await _courtRepo.GetByIdAsync(id);
         if (court == null) return ApiResponse<bool>.Fail("Court not found");
-        court.IsActive = false;
-        court.UpdatedAt = DateTime.UtcNow;
-        _courtRepo.Update(court);
-        await _courtRepo.SaveChangesAsync();
-        return ApiResponse<bool>.Ok(true, "Court marked inactive");
+        if (court.IsActive) return ApiResponse<bool>.Fail("Disable the court before deleting it");
+        try
+        {
+            _courtRepo.Delete(court);
+            await _courtRepo.SaveChangesAsync();
+            return ApiResponse<bool>.Ok(true, "Inactive court deleted");
+        }
+        catch
+        {
+            return ApiResponse<bool>.Fail("This court has booking or schedule history and cannot be permanently deleted");
+        }
     }
 }

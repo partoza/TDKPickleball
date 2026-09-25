@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Squares2X2Icon as LayoutDashboard,
@@ -13,6 +13,7 @@ import {
   UsersIcon as Users,
   CircleStackIcon as Database,
   ReceiptPercentIcon as Percent,
+  ChartBarIcon as ChartBar,
 } from '@heroicons/react/24/solid';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -46,12 +47,13 @@ export default function AdminSidebar() {
     { icon: LayoutDashboard, label: 'Overview', href: ROUTES.ADMIN.DASHBOARD },
     { icon: Calendar, label: 'Schedule', href: ROUTES.ADMIN.SCHEDULE },
     { icon: Ticket, label: 'Bookings', href: ROUTES.ADMIN.BOOKINGS },
+    ...(user?.role === 'Admin' ? [{ icon: ChartBar, label: 'Revenue', href: ROUTES.ADMIN.REVENUE }] : []),
   ];
   
   const systemItems = [
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
-    { icon: Users, label: 'Internal', href: ROUTES.ADMIN.STAFF },
+    { icon: Users, label: 'Internal & Coaches', href: ROUTES.ADMIN.INTERNAL_COACHES },
     { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
@@ -107,21 +109,21 @@ export default function AdminSidebar() {
           <div className="mac-segmented flex items-center gap-0.5 rounded-lg p-0.5">
             <button
               onClick={() => setTheme('system')}
-              className={cn("p-1.5 rounded-md transition-all", theme === 'system' ? "bg-white text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground")}
+              className={cn("p-1.5 rounded-md transition-all", theme === 'system' ? "bg-primary text-primary-foreground shadow-sm dark:bg-primary dark:text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
               title="Use system appearance"
             >
               <Monitor className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setTheme('light')}
-              className={cn("p-1.5 rounded-md transition-all", theme === 'light' ? "bg-white text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground")}
+              className={cn("p-1.5 rounded-md transition-all", theme === 'light' ? "bg-primary text-primary-foreground shadow-sm dark:bg-primary dark:text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
               title="Use light appearance"
             >
               <Sun className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setTheme('dark')}
-              className={cn("p-1.5 rounded-md transition-all", theme === 'dark' ? "bg-white text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground")}
+              className={cn("p-1.5 rounded-md transition-all", theme === 'dark' ? "bg-primary text-primary-foreground shadow-sm dark:bg-primary dark:text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
               title="Use dark appearance"
             >
               <Moon className="h-3.5 w-3.5" />

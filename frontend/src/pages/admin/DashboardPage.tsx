@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useStaff } from '@/hooks/useStaff';
+import { useInternalCoaches } from '@/hooks/useInternalCoaches';
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isWithinInterval, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
-import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket } from '@heroicons/react/24/solid';
+import { BellIcon as Bell, CalendarDaysIcon as CalendarDays, BanknotesIcon as CircleDollarSign, ClockIcon as Clock3, RectangleGroupIcon as Dumbbell, ChevronRightIcon as ChevronRight, TicketIcon as Ticket, ComputerDesktopIcon as ComputerDesktop } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
-function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booking[], staff: any[] }) {
+function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, bookings: Booking[], internalCoaches: any[] }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 10000);
@@ -53,20 +53,20 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
 
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-sm relative overflow-hidden transition-all group">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="font-bold text-lg">{court.name}</h3>
-          {activeBooking ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Currently in use</span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">Available</span>
-          )}
-        </div>
-        {activeBooking && (
-          <div className="text-right">
-            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-lg leading-none m-0">{court.name}</h3>
+        {timeStr < '08:00:00' ? (
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">Closed</span>
+        ) : activeBooking ? (
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</div>
+              <div className="text-[10px] text-muted-foreground">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</div>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">In use</span>
           </div>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Available</span>
         )}
       </div>
 
@@ -79,15 +79,15 @@ function LiveCourtCard({ court, bookings, staff }: { court: any, bookings: Booki
                 <span className="font-semibold">{activeBooking.customerName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Trainer:</span>
-                <span className="font-semibold">{staff.find(s => s.id === activeBooking.staffProfileId)?.name || 'N/A'}</span>
+                <span className="text-slate-500">Coach:</span>
+                <span className="font-semibold">{internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'N/A'}</span>
               </div>
             </>
           ) : activeBooking.bookingType === RateType.Internal ? (
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Internal:</span>
-                <span className="font-semibold">{staff.find(s => s.id === activeBooking.staffProfileId)?.name || 'N/A'}</span>
+                <span className="font-semibold">{internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'N/A'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Reference:</span>
@@ -120,7 +120,7 @@ type Range = 'day'|'week'|'month';
 export default function DashboardPage() {
   const { user } = useAuth();
   const [range, setRange] = useState<Range>('month'); const [anchor, setAnchor] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const { data: bookingResponse, isLoading } = useBookings(); const { data: courtResponse } = useCourts(); const { staff } = useStaff();
+  const { data: bookingResponse, isLoading } = useBookings(); const { data: courtResponse } = useCourts(); const { internalCoaches } = useInternalCoaches();
   const bookings = bookingResponse?.data || []; const courts = courtResponse?.data || [];
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const interval = range === 'day' ? { start: startOfDay(anchorDate), end: endOfDay(anchorDate) } : range === 'week' ? { start: startOfWeek(anchorDate), end: endOfWeek(anchorDate) } : { start: startOfMonth(anchorDate), end: endOfMonth(anchorDate) };
@@ -189,6 +189,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
         <p className="mt-1 text-muted-foreground">{user?.role === 'Staff' ? 'Today’s bookings and court schedule at a glance.' : 'Revenue and court operations from live booking data.'}</p>
+        <Button variant="outline" size="sm" className="mt-3 dark:border-white/20 dark:bg-[#3a3a3c] dark:text-white dark:hover:bg-[#48484a]" asChild><Link to={ROUTES.ADMIN.WIDGET}><ComputerDesktop className="h-4 w-4" />Schedule Widgets</Link></Button>
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-2 rounded-xl border bg-card p-1.5 shadow-sm">
         <div className="w-full sm:w-[250px]">
@@ -196,7 +197,7 @@ export default function DashboardPage() {
         </div>
         <div className="mac-segmented flex w-full sm:w-auto rounded-lg p-0.5">
           {(['day','week','month'] as Range[]).map(x => 
-            <Button key={x} type="button" variant="ghost" onClick={() => setRange(x)} className={`flex-1 sm:flex-none h-8 rounded-md px-3 text-xs capitalize shadow-none ${range === x ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : 'text-muted-foreground'}`}>
+            <Button key={x} type="button" variant="ghost" onClick={() => setRange(x)} className={`flex-1 sm:flex-none h-8 rounded-md px-3 text-xs capitalize shadow-none ${range === x ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90' : 'text-muted-foreground'}`}>
               {x}
             </Button>
           )}
@@ -217,7 +218,7 @@ export default function DashboardPage() {
     )}
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 mb-6">
       {courts.filter(c => c.isActive).map(court => (
-        <LiveCourtCard key={court.id} court={court} bookings={bookings} staff={staff} />
+        <LiveCourtCard key={court.id} court={court} bookings={bookings} internalCoaches={internalCoaches} />
       ))}
     </div>
     <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
@@ -330,6 +331,7 @@ function Upcoming({ booking: b }: { booking: Booking }) {
     </div>
   ); 
 }
+
 
 
 

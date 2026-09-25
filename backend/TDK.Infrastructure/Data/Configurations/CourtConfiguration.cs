@@ -13,8 +13,8 @@ public class CourtConfiguration : IEntityTypeConfiguration<Court>
         builder.Property(x => x.DisplayName).IsRequired().HasMaxLength(100);
 
         builder.HasData(
-            new Court { Id = 1, Name = "Court 1", DisplayName = "Court 1", IsActive = true, SortOrder = 1, OpenTime = new TimeOnly(7, 0), CloseTime = new TimeOnly(0, 0), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new Court { Id = 2, Name = "Court 2", DisplayName = "Court 2", IsActive = true, SortOrder = 2, OpenTime = new TimeOnly(7, 0), CloseTime = new TimeOnly(0, 0), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new Court { Id = 1, Name = "Court 1", DisplayName = "Court 1", IsActive = true, SortOrder = 1, OpenTime = new TimeOnly(7, 0), CloseTime = new TimeOnly(0, 0), CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9629), UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9633) },
+            new Court { Id = 2, Name = "Court 2", DisplayName = "Court 2", IsActive = true, SortOrder = 2, OpenTime = new TimeOnly(7, 0), CloseTime = new TimeOnly(0, 0), CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9636), UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9637) }
         );
     }
 }

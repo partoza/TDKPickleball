@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { useCreateBooking } from '@/hooks/useBookings';
+import { toPng } from 'html-to-image';
+import { toast } from 'sonner';
+import { useSubmitPublicBookingRequest, useSubmitPublicPayMongoRequest } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import QRCode from 'react-qr-code';
-import { TDK_ICON_URL } from '@/lib/branding';
-import { Booking, RateType } from '@/types';
-import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, ArrowPathIcon as LoaderCircle, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload } from '@heroicons/react/24/solid';
+import { RateType } from '@/types';
+import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, HomeIcon as Home, CalendarDaysIcon as CalendarDays, CameraIcon as Camera, EnvelopeIcon as Envelope, MinusIcon, PlusIcon } from '@heroicons/react/24/solid';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { calculateRateQuote } from '@/lib/rate-calculation';
 import { cn } from '@/lib/utils';
 import { formatTimeLabel } from '@/components/admin/AdminFormControls';
@@ -19,8 +20,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
 import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
 import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const BOOKING_DRAFT_KEY = 'tdk-public-booking-draft';
+const PADDLE_RENTAL_PRICE = 100;
+const PAYMENT_WINDOW_SECONDS = 15 * 60;
 
 function FieldError({ message }: { message?: string }) { 
   return message ? <p className="text-[13px] text-red-500 font-medium mt-1.5">{message}</p> : null; 
@@ -60,21 +64,34 @@ export default function BookingPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [paddleQuantity, setPaddleQuantity] = useState(0);
   const [errors, setErrors] = useState<any>({});
-  const [createdBookings, setCreatedBookings] = useState<Booking[]>([]);
+  const [requestReference, setRequestReference] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'manual' | 'paymongo'>('manual');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<File | null>(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState('');
   const [receiptError, setReceiptError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [paymentExpiresAt, setPaymentExpiresAt] = useState<number | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(10 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(PAYMENT_WINDOW_SECONDS);
   const [paymentQrUnavailable, setPaymentQrUnavailable] = useState(false);
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
+  const [isDownloadingConfirmation, setIsDownloadingConfirmation] = useState(false);
+  const confirmationRef = useRef<HTMLDivElement>(null);
 
   const { data: courtsRes } = useCourts();
   const courts = courtsRes?.data || [];
   const { data: ratesRes } = useRates();
   const rates = ratesRes?.data || [];
-  const createBooking = useCreateBooking();
+  const submitBookingRequest = useSubmitPublicBookingRequest();
+  const submitPayMongoRequest = useSubmitPublicPayMongoRequest();
+  const courtBookingTotal = blocks.reduce((total, block) => {
+    const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
+    return total + (quote.covered ? quote.total : 0);
+  }, 0);
+  const paddleRentalFee = paddleQuantity * PADDLE_RENTAL_PRICE;
+  const checkoutTotal = courtBookingTotal + paddleRentalFee;
 
   useEffect(() => {
     let savedBlocks: any[] = [];
@@ -101,6 +118,18 @@ export default function BookingPage() {
   }, [authLoading, isGoogleCustomer, user]);
 
   useEffect(() => {
+    if (!receipt) {
+      setReceiptPreviewUrl('');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(receipt);
+    setReceiptPreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [receipt]);
+
+  useEffect(() => {
     if (step !== 3 || !paymentExpiresAt) return;
 
     const updateCountdown = () => {
@@ -113,6 +142,7 @@ export default function BookingPage() {
         setEmail('');
         setPhone('');
         setNotes('');
+        setPaddleQuantity(0);
         setReceipt(null);
         setReceiptError('');
         setErrors({});
@@ -157,9 +187,9 @@ export default function BookingPage() {
       return;
     }
     if (step === 2 && validateStep2()) {
-      const expiresAt = Date.now() + (10 * 60 * 1000);
+      const expiresAt = Date.now() + (PAYMENT_WINDOW_SECONDS * 1000);
       setPaymentExpiresAt(expiresAt);
-      setSecondsLeft(10 * 60);
+      setSecondsLeft(PAYMENT_WINDOW_SECONDS);
       setStep(3);
     }
   };
@@ -192,80 +222,145 @@ export default function BookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!receipt) {
-      setReceiptError('Upload your payment receipt before confirming.');
+    if (paymentMethod === 'manual' && !receipt) {
+      setReceiptError('Upload your payment receipt before sending the request.');
       return;
     }
+    
     setIsSubmitting(true);
     
     try {
-      const results = await Promise.all(
-        blocks.map(block => createBooking.mutateAsync({
-          courtId: Number(block.courtId),
-          bookingDate: block.date,
-          startTime: block.startTime,
-          endTime: block.endTime,
+      if (paymentMethod === 'paymongo') {
+        const result = await submitPayMongoRequest.mutateAsync({
           customerName,
           email,
           phone,
           notes,
-          rateType: RateType.Booking,
-          amountPaid: 0,
-          receipt
-        }))
-      );
-      
-      const successful = results.filter(r => r.success).map(r => r.data!);
-      if (successful.length === 0) {
-        setSubmitError("Failed to submit any bookings. Please try again.");
-      } else {
-        if (successful.length < blocks.length) {
-          setSubmitError(`Successfully booked ${successful.length} out of ${blocks.length} blocks. Some failed.`);
+          paddleRentalQuantity: paddleQuantity,
+          schedules: blocks,
+        });
+        
+        if (result.success && result.data?.checkoutUrl) {
+          window.location.href = result.data.checkoutUrl;
+        } else {
+          setSubmitError(result.message || 'Failed to initialize payment.');
+          setIsSubmitting(false);
         }
-        setCreatedBookings(successful);
+        return;
+      }
+      
+      const result = await submitBookingRequest.mutateAsync({
+        customerName,
+        email,
+        phone,
+        notes,
+        paddleRentalQuantity: paddleQuantity,
+        schedules: blocks,
+        receipt: receipt!,
+      });
+      if (result.success && result.data) {
+        setRequestReference(result.data.requestReference);
         setPaymentExpiresAt(null);
         sessionStorage.removeItem(BOOKING_DRAFT_KEY);
         setStep(4);
+      } else {
+        setSubmitError(result.message || 'The booking request could not be sent. Please try again.');
       }
     } catch (error: any) {
-      setSubmitError(error.response?.data?.message || "Failed to submit bookings");
+      setSubmitError(error.response?.data?.message || 'The booking request could not be sent. No booking was created.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const downloadConfirmation = async () => {
+    if (!confirmationRef.current || isDownloadingConfirmation) return;
+    setIsDownloadingConfirmation(true);
+    try {
+      const image = await toPng(confirmationRef.current, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      link.download = `${requestReference || 'TDK-booking-request'}-confirmation.png`;
+      link.href = image;
+      link.click();
+    } catch {
+      toast.error('The confirmation image could not be downloaded. Please take a screenshot instead.');
+    } finally {
+      setIsDownloadingConfirmation(false);
+    }
+  };
+
   if (step === 4) {
     return (
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <Card className="text-center p-8 border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-900">
-          <div className="h-20 w-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckIcon className="h-10 w-10" aria-hidden="true" />
-          </div>
-          <CardTitle className="text-2xl mb-4 text-green-800 dark:text-green-400">Booking Confirmed!</CardTitle>
-          <CardDescription className="text-base text-green-700/80 dark:text-green-500/80 mb-8">
-            Your courts have been successfully booked. Save the QR codes below for verification.
-          </CardDescription>
-          
-          <div className="flex flex-wrap justify-center gap-6 mb-8">
-            {createdBookings.map((b, i) => (
-              <div key={i} className="rounded-2xl border bg-white p-5 max-w-[280px] w-full text-left">
-                <p className="text-sm font-semibold mb-1 text-slate-900">{b.courtName}</p>
-                <p className="text-xs text-slate-500 mb-4">{format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(b.startTime)} - {formatTimeLabel(b.endTime)}</p>
-                <div className="relative mx-auto mb-4 h-[150px] w-[150px]">
-                  <QRCode value={b.bookingReference} size={150} level="H" />
-                  <span className="absolute left-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg bg-white p-1.5 shadow-sm">
-                    <img src={TDK_ICON_URL} alt="" className="h-full w-full object-contain" />
-                  </span>
-                </div>
-                <p className="font-mono font-bold text-center text-slate-900">{b.bookingReference}</p>
-                <p className="mt-1 text-center text-sm font-semibold text-slate-700">Booked for {b.customerName}</p>
-              </div>
-            ))}
-          </div>
+      <div className="container mx-auto max-w-4xl px-4 py-8 sm:py-14">
+        <Card className="relative overflow-hidden border-border/70 bg-card shadow-[0_24px_70px_-36px_rgba(15,23,42,0.4)]">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary" />
+          <div ref={confirmationRef} className="px-5 py-8 text-center sm:px-10 sm:py-11">
+            <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:ring-emerald-950/30">
+              <CheckIcon className="h-8 w-8" aria-hidden="true" />
+            </div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">Request received</p>
+            <CardTitle className="text-2xl tracking-tight sm:text-3xl">Booking request sent</CardTitle>
+            <CardDescription className="mx-auto mt-3 max-w-2xl text-sm leading-6 sm:text-base">
+              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the store’s reply.
+            </CardDescription>
 
-          <Button onClick={() => { setBlocks([createBookingBlock()]); setCreatedBookings([]); setCustomerName(''); setEmail(''); setPhone(''); setNotes(''); setReceipt(null); setReceiptError(''); setStep(1); }} className="mx-auto hover:scale-105 transition-all duration-200">
-            Book Another Court
-          </Button>
+            <div className="mx-auto mt-8 max-w-2xl space-y-4 text-left">
+              <div className="rounded-2xl border bg-muted/25 p-5 sm:p-6">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Request reference</p>
+                <p className="mt-2 break-all font-mono text-lg font-bold tracking-tight text-foreground sm:text-xl">{requestReference}</p>
+                <p className="mt-2 text-sm leading-5 text-muted-foreground">Keep this reference when contacting the store. It is a request number, not a confirmed booking reference.</p>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border bg-background">
+                <div className="flex items-center gap-2 border-b bg-muted/25 px-5 py-3 text-sm font-semibold">
+                  <CalendarDays className="h-4 w-4 text-primary" />Requested schedule
+                </div>
+                <div className="divide-y">
+                  {blocks.map((block, index) => (
+                    <div key={`${block.courtId}-${block.date}-${block.startTime}-${index}`} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm font-semibold text-foreground">{courts.find(court => String(court.id) === block.courtId)?.name || 'Court'}</p>
+                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(block.startTime)}–{formatTimeLabel(block.endTime)}</p>
+                    </div>
+                  ))}
+                  {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium">Selkirk Paddle Rental</span><span className="font-semibold text-primary">× {paddleQuantity}</span></div>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-blue-900 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-100">
+                <div className="flex items-start gap-3">
+                  <Envelope className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-sm font-semibold">A copy was emailed to your verified account</p>
+                    <p className="mt-1 break-all text-xs leading-5 text-blue-700 dark:text-blue-300">{email}. Check your inbox or spam folder for the request details and receipt copy.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+                <div className="flex items-start gap-3">
+                  <Camera className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="text-sm font-semibold">Save this confirmation before leaving</p>
+                    <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-300">Take a screenshot or download a copy below. Keep it until the store replies and confirms your booking.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-col-reverse justify-center gap-3 border-t pt-6 sm:flex-row">
+              <Button type="button" variant="outline" onClick={downloadConfirmation} disabled={isDownloadingConfirmation} className="h-11 min-w-48 rounded-xl px-6 font-semibold">
+                {isDownloadingConfirmation ? <LoadingIndicator className="mr-2" label="Downloading confirmation" /> : <Download className="mr-2 h-4 w-4" />}
+                {isDownloadingConfirmation ? 'Preparing download…' : 'Download confirmation'}
+              </Button>
+              <Button onClick={() => navigate(ROUTES.HOME)} className="h-11 min-w-44 rounded-xl px-6 font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
+                <Home className="mr-2 h-4 w-4" />Back to Home
+              </Button>
+            </div>
+          </div>
         </Card>
       </div>
     );
@@ -274,8 +369,8 @@ export default function BookingPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Book a Court</h1>
-        <p className="text-muted-foreground">Follow the steps below to reserve your pickleball court.</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Request a Court Booking</h1>
+        <p className="text-muted-foreground">Choose your schedule and send your payment receipt for manual store verification.</p>
       </div>
 
       <div className="mb-10 relative flex justify-between items-center px-2 sm:px-8">
@@ -284,7 +379,7 @@ export default function BookingPage() {
         {[
           { number: 1, label: 'Schedule' },
           { number: 2, label: 'Your details' },
-          { number: 3, label: 'Pay & confirm' },
+          { number: 3, label: 'Pay & request' },
         ].map((s) => (
           <div key={s.number} className="relative z-10 flex flex-col sm:flex-row items-center gap-2 sm:gap-3 bg-transparent sm:bg-background px-2 sm:px-4">
             <div className={cn(
@@ -313,12 +408,12 @@ export default function BookingPage() {
             <CardTitle>
               {step === 1 && "Select Schedule"}
               {step === 2 && "Your Details"}
-              {step === 3 && "Pay with QR Ph"}
+              {step === 3 && "Payment"}
             </CardTitle>
             <CardDescription>
               {step === 1 && "Choose when and where you want to play. You can book multiple timeslots at once."}
               {step === 2 && "Provide your contact information for the reservation."}
-              {step === 3 && "Scan the merchant QR, upload your receipt, and confirm before the timer ends."}
+              {step === 3 && "Choose your payment method. You can upload a receipt for manual verification or use PayMongo for instant confirmation."}
             </CardDescription>
           </CardHeader>
           
@@ -339,7 +434,7 @@ export default function BookingPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address (optional)</Label>
+                    <Label htmlFor="email">Verified Email</Label>
                     <Input id="email" type="email" value={email} readOnly aria-readonly="true" className={cn('cursor-not-allowed bg-muted/60', errors.email && 'border-red-500 ring-red-500')} />
                     <p className="text-xs text-muted-foreground">Verified by Google and used for this booking.</p>
                     <FieldError message={errors.email} />
@@ -357,15 +452,35 @@ export default function BookingPage() {
                   <Input id="notes" placeholder="Optional notes or requests" value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
 
+                <section className="rounded-2xl border bg-card p-4 sm:p-5" aria-labelledby="paddle-rental-title">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h4 id="paddle-rental-title" className="font-semibold">Paddle Rental</h4>
+                      <p className="mt-2 text-sm font-medium">Selkirk Pickleball Paddle</p>
+                      <p className="mt-0.5 text-sm font-semibold text-primary">₱100 per paddle <span className="text-muted-foreground">• Entire session</span></p>
+                      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Rental is valid for your entire booking session.</p>
+                    </div>
+                    <div className="flex w-fit items-center rounded-xl border bg-background p-1 shadow-sm" aria-label="Paddle rental quantity">
+                      <Button type="button" variant="ghost" size="icon" className="h-10 w-10 cursor-pointer rounded-lg" onClick={() => setPaddleQuantity(quantity => Math.max(0, quantity - 1))} disabled={paddleQuantity === 0} aria-label="Remove one paddle">
+                        <MinusIcon className="h-4 w-4" />
+                      </Button>
+                      <output className="min-w-12 text-center text-base font-bold tabular-nums" aria-live="polite">{paddleQuantity}</output>
+                      <Button type="button" variant="ghost" size="icon" className="h-10 w-10 cursor-pointer rounded-lg" onClick={() => setPaddleQuantity(quantity => Math.min(50, quantity + 1))} disabled={paddleQuantity === 50} aria-label="Add one paddle">
+                        <PlusIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+
                 <div className="mt-6 bg-muted/30 p-4 rounded-lg border">
-                  <h4 className="font-semibold mb-3">Booking Summary</h4>
+                  <h4 className="font-semibold mb-3">Booking Request Summary</h4>
                   <div className="space-y-2 text-sm">
                     {blocks.map((b, i) => {
                       const quote = calculateRateQuote(rates, b.startTime, b.endTime, RateType.Booking);
                       return (
                         <div key={i} className="flex justify-between border-b last:border-0 pb-2 last:pb-0">
                           <div>
-                            <span className="font-medium">{courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
+                            <span className="font-medium">Court Booking · {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
                             <span className="text-muted-foreground ml-2">
                               {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
                             </span>
@@ -376,13 +491,16 @@ export default function BookingPage() {
                         </div>
                       )
                     })}
+                    {paddleQuantity > 0 && (
+                      <div className="flex items-center justify-between border-t pt-2">
+                        <span className="font-medium">Selkirk Paddle Rental × {paddleQuantity}</span>
+                        <span className="font-medium text-primary">₱{paddleRentalFee.toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="mt-2 flex justify-between pt-2">
                       <span className="font-semibold">Total Amount:</span>
                       <span className="font-bold text-primary text-base">
-                        ₱{blocks.reduce((acc, b) => {
-                          const quote = calculateRateQuote(rates, b.startTime, b.endTime, RateType.Booking);
-                          return acc + (quote.covered ? quote.total : 0);
-                        }, 0).toLocaleString()}
+                        ₱{checkoutTotal.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -400,41 +518,104 @@ export default function BookingPage() {
                   <span className="font-mono text-2xl font-bold tabular-nums">{String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:{String(secondsLeft % 60).padStart(2, '0')}</span>
                 </div>
 
-                <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-2xl border bg-muted/20 p-5 text-center">
-                    <div className="mx-auto mb-4 flex h-10 w-fit items-center gap-2 rounded-full bg-primary/10 px-4 text-sm font-semibold text-primary"><QrCode className="h-4 w-4" /> QR Ph</div>
-                    {!paymentQrUnavailable ? (
-                      <img src="/assets/images/payment-method.png" alt="Payment QR code" className="mx-auto aspect-square w-full max-w-[250px] rounded-2xl border bg-white object-contain p-3 shadow-sm" onError={() => setPaymentQrUnavailable(true)} />
-                    ) : (
-                      <div className="mx-auto flex aspect-square w-full max-w-[250px] flex-col items-center justify-center rounded-2xl border border-dashed bg-background p-6 text-muted-foreground">
-                        <QrCode className="mb-3 h-16 w-16" />
-                        <p className="text-sm font-semibold text-foreground">Merchant QR unavailable</p>
-                        <p className="mt-1 text-xs">Please contact The Dirty Kitchen before paying.</p>
-                      </div>
-                    )}
-                    <p className="mt-4 text-sm text-muted-foreground">Scan using any QR Ph-enabled banking or e-wallet app.</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border bg-card p-5">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount to pay</p>
-                      <p className="mt-1 text-xl font-bold text-primary">₱{blocks.reduce((total, block) => { const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking); return total + (quote.covered ? quote.total : 0); }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      <p className="mt-2 text-sm text-muted-foreground">For {blocks.length} booking {blocks.length === 1 ? 'schedule' : 'schedules'}</p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="receipt">Payment receipt *</Label>
-                      <label htmlFor="receipt" className={cn('mt-2 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-8 text-center transition-colors hover:border-primary hover:bg-primary/5', receiptError ? 'border-red-400 bg-red-50/50 dark:bg-red-950/20' : receipt ? 'border-primary bg-primary/5' : 'border-border')}>
-                        <Upload className="mb-3 h-7 w-7 text-primary" />
-                        <span className="text-sm font-semibold">{receipt ? receipt.name : 'Choose receipt image'}</span>
-                        <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</span>
-                        {receipt && <span className="mt-2 text-xs font-medium text-primary">{(receipt.size / 1024 / 1024).toFixed(2)} MB selected</span>}
-                      </label>
-                      <input id="receipt" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => handleReceiptChange(event.target.files?.[0])} />
-                      <FieldError message={receiptError} />
-                    </div>
-                  </div>
+                <div className="flex gap-2 p-1 bg-muted/50 rounded-xl border">
+                  <button 
+                    type="button" 
+                    onClick={() => setPaymentMethod('manual')} 
+                    className={cn('flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all', paymentMethod === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5')}
+                  >
+                    Manual Upload
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setPaymentMethod('paymongo')} 
+                    className={cn('flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all', paymentMethod === 'paymongo' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5')}
+                  >
+                    PayMongo QR Ph
+                  </button>
                 </div>
+
+                {paymentMethod === 'manual' ? (
+                  <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
+                    <div className="rounded-2xl border bg-muted/20 p-5 text-center">
+                      <div className="mx-auto mb-4 flex h-10 w-fit items-center gap-2 rounded-full bg-primary/10 px-4 text-sm font-semibold text-primary"><QrCode className="h-4 w-4" /> QR Ph</div>
+                      {!paymentQrUnavailable ? (
+                        <>
+                          <img src="/assets/images/payment-method.png" alt="Payment QR code" className="mx-auto aspect-square w-full max-w-[250px] rounded-2xl border bg-white object-contain p-3 shadow-sm" onError={() => setPaymentQrUnavailable(true)} />
+                          <Button asChild type="button" variant="outline" size="sm" className="mt-4 cursor-pointer">
+                            <a href="/assets/images/payment-method.png" download="TDK-Payment-QR.png">
+                              <Download className="mr-2 h-4 w-4" />Download QR
+                            </a>
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="mx-auto flex aspect-square w-full max-w-[250px] flex-col items-center justify-center rounded-2xl border border-dashed bg-background p-6 text-muted-foreground">
+                          <QrCode className="mb-3 h-16 w-16" />
+                          <p className="text-sm font-semibold text-foreground">Merchant QR unavailable</p>
+                          <p className="mt-1 text-xs">Please contact The Dirty Kitchen before paying.</p>
+                        </div>
+                      )}
+                      <p className="mt-4 text-sm text-muted-foreground">Scan using any QR Ph-enabled banking or e-wallet app.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border bg-card p-5">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount to pay</p>
+                        <p className="mt-1 text-xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">For {blocks.length} booking {blocks.length === 1 ? 'schedule' : 'schedules'}{paddleQuantity > 0 ? ` plus ${paddleQuantity} paddle ${paddleQuantity === 1 ? 'rental' : 'rentals'}` : ''}</p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="receipt">Payment receipt *</Label>
+                        {receipt && receiptPreviewUrl ? (
+                          <div className={cn('mt-2 rounded-2xl border-2 border-dashed p-3 text-center', receiptError ? 'border-red-400 bg-red-50/50 dark:bg-red-950/20' : 'border-primary bg-primary/5')}>
+                            <button type="button" className="group relative mx-auto block aspect-[4/3] max-h-64 w-full cursor-zoom-in overflow-hidden rounded-xl border bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" onClick={() => setReceiptPreviewOpen(true)} aria-label={`Preview ${receipt.name}`}>
+                                <img
+                                  src={receiptPreviewUrl}
+                                  alt={`Preview of ${receipt.name}`}
+                                  className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                                />
+                                <div className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-left text-white backdrop-blur-sm">
+                                  <p className="truncate text-xs font-semibold">{receipt.name}</p>
+                                  <p className="mt-0.5 text-[11px] text-white/80">{(receipt.size / 1024 / 1024).toFixed(2)} MB · Click to preview</p>
+                                </div>
+                            </button>
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+                              <p className="text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</p>
+                              <label htmlFor="receipt" className="cursor-pointer text-xs font-semibold text-primary hover:underline">Replace receipt</label>
+                            </div>
+                          </div>
+                        ) : (
+                          <label htmlFor="receipt" className={cn('mt-2 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-8 text-center transition-colors hover:border-primary hover:bg-primary/5', receiptError ? 'border-red-400 bg-red-50/50 dark:bg-red-950/20' : 'border-border')}>
+                            <>
+                              <Upload className="mb-3 h-7 w-7 text-primary" />
+                              <span className="text-sm font-semibold">Choose receipt image</span>
+                              <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</span>
+                            </>
+                          </label>
+                        )}
+                        <input id="receipt" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => handleReceiptChange(event.target.files?.[0])} />
+                        <FieldError message={receiptError} />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border bg-muted/20 p-8 text-center space-y-6">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                      <QrCode className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Pay with PayMongo QR Ph</h3>
+                      <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
+                        Once you click &quot;Proceed with PayMongo&quot;, a secure payment QR will be generated. Your booking will be automatically confirmed upon successful payment.
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-background p-4 border mx-auto max-w-xs">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -462,14 +643,23 @@ export default function BookingPage() {
                 </Button>
               ) : (
                 <Button type="submit" disabled={isSubmitting} className="hover:scale-105 transition-all duration-200">
-                  Submit Receipt & Confirm
-                  {isSubmitting && <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />}
+                  {paymentMethod === 'manual' ? 'Send Booking Request' : 'Proceed with PayMongo'}
+                  {isSubmitting && <LoadingIndicator className="ml-2" label={paymentMethod === 'manual' ? "Sending booking request" : "Processing"} />}
                 </Button>
               )}
             </div>
           </CardFooter>
         </form>
       </Card>
+      <Dialog open={receiptPreviewOpen} onOpenChange={setReceiptPreviewOpen}>
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Payment receipt preview</DialogTitle>
+            <DialogDescription>{receipt?.name || 'Uploaded payment receipt'}</DialogDescription>
+          </DialogHeader>
+          {receiptPreviewUrl && <div className="flex max-h-[72vh] items-center justify-center overflow-auto rounded-xl bg-black/5 p-2"><img src={receiptPreviewUrl} alt="Full preview of uploaded payment receipt" className="max-h-[68vh] max-w-full object-contain" /></div>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -29,6 +29,10 @@ export const schedulesService = {
     const { data } = await api.put(`/api/admin/schedules/${id}`, update);
     return data;
   },
+  deleteSchedule: async (id: string, credentials: { email: string; password: string }): Promise<ApiResponse<boolean>> => {
+    const { data } = await api.post(`/api/admin/schedules/${id}/delete`, credentials);
+    return data;
+  },
   bulkUpdate: async (payload: any): Promise<ApiResponse<void>> => {
     const request = {
       ...payload,

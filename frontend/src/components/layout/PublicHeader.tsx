@@ -1,13 +1,24 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ROUTES } from '@/lib/constants';
 import { useState } from 'react';
-import { Bars3BottomRightIcon, XMarkIcon } from '@heroicons/react/24/solid';
+import { ArrowRightOnRectangleIcon, Bars3BottomRightIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { TDK_LOGO_URL } from '@/lib/branding';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function PublicHeader() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Google user';
+  const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'G';
+
+  const signOut = () => {
+    logout();
+    setIsOpen(false);
+  };
 
   const navLinks = [
     { name: 'Home', href: ROUTES.HOME },
@@ -42,9 +53,34 @@ export default function PublicHeader() {
             <Button size="sm" className="font-bold shadow-md hover:scale-105 transition-transform duration-200" asChild>
               <Link to={ROUTES.BOOKING}>BOOK NOW</Link>
             </Button>
-            <Button variant="outline" size="sm" className="font-bold border-primary text-primary hover:bg-primary/5 hover:scale-105 transition-transform duration-200" asChild>
-              <Link to={ROUTES.LOGIN}>SIGN IN</Link>
-            </Button>
+            {!isLoading && (isAuthenticated && user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-10 max-w-[230px] gap-2 rounded-full border-border px-2 pr-3 hover:border-primary/30 hover:bg-primary/5">
+                    <Avatar className="h-7 w-7 border">
+                      <AvatarImage src={user.profileImageUrl} alt={displayName} referrerPolicy="no-referrer" />
+                      <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">{initials}</AvatarFallback>
+                    </Avatar>
+                    <span className="max-w-[145px] truncate text-sm font-semibold">{displayName}</span>
+                    <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="font-normal">
+                    <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                    <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40">
+                    <ArrowRightOnRectangleIcon className="mr-2 h-4 w-4" />Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button variant="outline" size="sm" className="font-bold border-primary text-primary hover:bg-primary/5 hover:scale-105 transition-transform duration-200" asChild>
+                <Link to={ROUTES.LOGIN}>SIGN IN</Link>
+              </Button>
+            ))}
           </div>
         </div>
         <div className="md:hidden">
@@ -71,9 +107,24 @@ export default function PublicHeader() {
             <Button className="w-full h-12 text-base font-bold shadow-md hover:scale-[1.02] transition-transform duration-200" asChild>
               <Link to={ROUTES.BOOKING} onClick={() => setIsOpen(false)}>BOOK NOW</Link>
             </Button>
-            <Button variant="outline" className="w-full h-12 text-base font-bold border-primary text-primary hover:bg-primary/5 hover:scale-[1.02] transition-transform duration-200" asChild>
-              <Link to={ROUTES.LOGIN} onClick={() => setIsOpen(false)}>SIGN IN</Link>
-            </Button>
+            {!isLoading && (isAuthenticated && user ? (
+              <div className="rounded-2xl border bg-muted/30 p-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar className="h-11 w-11 border">
+                    <AvatarImage src={user.profileImageUrl} alt={displayName} referrerPolicy="no-referrer" />
+                    <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{displayName}</p><p className="truncate text-xs text-muted-foreground">{user.email}</p></div>
+                </div>
+                <Button variant="outline" className="mt-3 h-10 w-full justify-center text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40" onClick={signOut}>
+                  <ArrowRightOnRectangleIcon className="mr-2 h-4 w-4" />Logout
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full h-12 text-base font-bold border-primary text-primary hover:bg-primary/5 hover:scale-[1.02] transition-transform duration-200" asChild>
+                <Link to={ROUTES.LOGIN} onClick={() => setIsOpen(false)}>SIGN IN</Link>
+              </Button>
+            ))}
           </div>
         </div>
       )}

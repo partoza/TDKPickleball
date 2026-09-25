@@ -197,8 +197,18 @@ namespace TDK.Infrastructure.Migrations
                     b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time(6)");
 
+                    b.Property<int?>("InternalCoachProfileId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Notes")
                         .HasColumnType("longtext");
+
+                    b.Property<decimal>("PaddleRentalFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PaddleRentalQuantity")
+                        .HasColumnType("int");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
@@ -220,9 +230,6 @@ namespace TDK.Infrastructure.Migrations
 
                     b.Property<DateTime?>("RescheduledAt")
                         .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("StaffProfileId")
-                        .HasColumnType("int");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time(6)");
@@ -248,9 +255,9 @@ namespace TDK.Infrastructure.Migrations
 
                     b.HasIndex("CourtId");
 
-                    b.HasIndex("PromoId");
+                    b.HasIndex("InternalCoachProfileId");
 
-                    b.HasIndex("StaffProfileId");
+                    b.HasIndex("PromoId");
 
                     b.ToTable("Bookings");
                 });
@@ -285,6 +292,9 @@ namespace TDK.Infrastructure.Migrations
                         .HasColumnType("varchar(450)");
 
                     b.Property<int>("DeletedReceiptCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DeletedScheduleCount")
                         .HasColumnType("int");
 
                     b.Property<DateOnly>("DeletedThroughDate")
@@ -348,26 +358,67 @@ namespace TDK.Infrastructure.Migrations
                         {
                             Id = 1,
                             CloseTime = new TimeOnly(0, 0, 0),
-                            CreatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 619, DateTimeKind.Utc).AddTicks(2253),
+                            CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9629),
                             DisplayName = "Court 1",
                             IsActive = true,
                             Name = "Court 1",
                             OpenTime = new TimeOnly(7, 0, 0),
                             SortOrder = 1,
-                            UpdatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 619, DateTimeKind.Utc).AddTicks(2257)
+                            UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9633)
                         },
                         new
                         {
                             Id = 2,
                             CloseTime = new TimeOnly(0, 0, 0),
-                            CreatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 619, DateTimeKind.Utc).AddTicks(2262),
+                            CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9636),
                             DisplayName = "Court 2",
                             IsActive = true,
                             Name = "Court 2",
                             OpenTime = new TimeOnly(7, 0, 0),
                             SortOrder = 2,
-                            UpdatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 619, DateTimeKind.Utc).AddTicks(2263)
+                            UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 257, DateTimeKind.Utc).AddTicks(9637)
                         });
+                });
+
+            modelBuilder.Entity("TDK.Domain.Entities.InternalCoachProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("InternalCoachProfiles", (string)null);
                 });
 
             modelBuilder.Entity("TDK.Domain.Entities.Notification", b =>
@@ -503,35 +554,35 @@ namespace TDK.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8684),
+                            CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8218),
                             EndTime = new TimeOnly(17, 0, 0),
                             IsActive = true,
                             PricePerHour = 320m,
                             RateType = 0,
                             StartTime = new TimeOnly(7, 0, 0),
-                            UpdatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8689)
+                            UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8221)
                         },
                         new
                         {
                             Id = 2,
-                            CreatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8692),
+                            CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8224),
                             EndTime = new TimeOnly(0, 0, 0),
                             IsActive = true,
                             PricePerHour = 400m,
                             RateType = 0,
                             StartTime = new TimeOnly(17, 0, 0),
-                            UpdatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8693)
+                            UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8225)
                         },
                         new
                         {
                             Id = 3,
-                            CreatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8696),
+                            CreatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8228),
                             EndTime = new TimeOnly(0, 0, 0),
                             IsActive = true,
                             PricePerHour = 300m,
                             RateType = 1,
                             StartTime = new TimeOnly(7, 0, 0),
-                            UpdatedAt = new DateTime(2026, 9, 23, 13, 50, 20, 620, DateTimeKind.Utc).AddTicks(8697)
+                            UpdatedAt = new DateTime(2026, 9, 24, 11, 23, 49, 259, DateTimeKind.Utc).AddTicks(8228)
                         });
                 });
 
@@ -585,47 +636,6 @@ namespace TDK.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Schedules");
-                });
-
-            modelBuilder.Entity("TDK.Domain.Entities.StaffProfile", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(254)
-                        .HasColumnType("varchar(254)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
-
-                    b.Property<string>("ProfilePictureUrl")
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("StaffProfiles");
                 });
 
             modelBuilder.Entity("TDK.Domain.Entities.TimeSlot", b =>
@@ -958,21 +968,21 @@ namespace TDK.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TDK.Domain.Entities.InternalCoachProfile", "InternalCoachProfile")
+                        .WithMany()
+                        .HasForeignKey("InternalCoachProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TDK.Domain.Entities.Promo", "Promo")
                         .WithMany("Bookings")
                         .HasForeignKey("PromoId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("TDK.Domain.Entities.StaffProfile", "StaffProfile")
-                        .WithMany()
-                        .HasForeignKey("StaffProfileId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Court");
 
-                    b.Navigation("Promo");
+                    b.Navigation("InternalCoachProfile");
 
-                    b.Navigation("StaffProfile");
+                    b.Navigation("Promo");
                 });
 
             modelBuilder.Entity("TDK.Domain.Entities.Notification", b =>

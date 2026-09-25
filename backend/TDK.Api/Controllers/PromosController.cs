@@ -2,19 +2,23 @@ using Microsoft.AspNetCore.Mvc;
 using TDK.Application.DTOs.Promo;
 using TDK.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using TDK.Application.DTOs.Auth;
+using System.Security.Claims;
 
 namespace TDK.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Admin")]
 public class PromosController : ControllerBase
 {
     private readonly IPromoService _promoService;
+    private readonly IAuthService _authService;
 
-    public PromosController(IPromoService promoService)
+    public PromosController(IPromoService promoService, IAuthService authService)
     {
         _promoService = promoService;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -52,9 +56,12 @@ public class PromosController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
+    [HttpPost("{id:int}/delete")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(int id, AdminCredentialRequest request)
     {
+        var verification = await _authService.VerifyAdminCredentialsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);
+        if (!verification.Success) return BadRequest(verification);
         var result = await _promoService.DeleteAsync(id);
         return result.Success ? Ok(result) : BadRequest(result);
     }

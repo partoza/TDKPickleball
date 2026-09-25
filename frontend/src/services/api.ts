@@ -6,9 +6,6 @@ const defaultApiUrl = typeof window !== 'undefined'
 
 export const api = axios.create({
   baseURL: (import.meta as any).env.VITE_API_URL || defaultApiUrl,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 export function getApiErrorMessage(error: any, fallback = 'The request could not be completed') {
@@ -25,7 +22,7 @@ export function getApiErrorMessage(error: any, fallback = 'The request could not
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || sessionStorage.getItem('booking-verification-token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -37,7 +34,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      // Redirect to login handled by AuthContext
+      sessionStorage.removeItem('booking-verification-token');
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('tdk-auth-expired'));
     }
     return Promise.reject(error);
   }

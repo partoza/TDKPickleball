@@ -88,10 +88,11 @@ export const bookingBlocksTotal = (blocks: BookingBlockValue[], rates: any[], ra
 
 // The API stores payment on each booking. Apply one batch reservation amount to
 // blocks in display order without allowing any individual booking to overpay.
-export function allocateBatchPayment(blocks: BookingBlockValue[], rates: any[], rateType: RateType, amountPaid: number) {
+export function allocateBatchPayment(blocks: BookingBlockValue[], rates: any[], rateType: RateType, amountPaid: number, firstBlockAddOn = 0) {
   let remainingCents = Math.max(0, Math.round(amountPaid * 100));
-  return bookingBlockTotals(blocks, rates, rateType).map(total => {
-    const paidCents = Math.min(remainingCents, Math.round(total * 100));
+  return bookingBlockTotals(blocks, rates, rateType).map((total, index) => {
+    const blockTotal = total + (index === 0 ? firstBlockAddOn : 0);
+    const paidCents = Math.min(remainingCents, Math.round(blockTotal * 100));
     remainingCents -= paidCents;
     return paidCents / 100;
   });

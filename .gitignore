@@ -19,6 +19,8 @@ backend/.runtime/
 backend/.runtime-logs/
 backend/TDK.Api/App_Data/
 backend/gen_part*.py
+backend/TDK.Api/Properties/PublishProfiles/
+publish/
 
 # IDE and operating-system files
 .vs/

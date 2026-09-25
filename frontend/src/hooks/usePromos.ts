@@ -57,9 +57,9 @@ export const usePromos = () => {
     }
   };
 
-  const deletePromo = async (id: number) => {
+  const deletePromo = async (id: number, credentials: { email: string; password: string }) => {
     try {
-      const { data } = await api.delete<{ success: boolean; message?: string }>(`/api/promos/${id}`);
+      const { data } = await api.post<{ success: boolean; message?: string }>(`/api/promos/${id}/delete`, credentials);
       if (data.success) {
         setPromos(prev => prev.filter(p => p.id !== id));
         toast.success('Promo deleted successfully');

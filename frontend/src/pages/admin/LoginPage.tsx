@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   ArrowLeftIcon,
-  ArrowPathIcon,
   EyeIcon,
   EyeSlashIcon,
 } from '@heroicons/react/24/solid';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { loginSchema } from '@/lib/validation';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -44,7 +45,7 @@ export default function LoginPage() {
     try {
       setError(null);
       const user = await login(data);
-      navigate(user.mustChangePassword ? ROUTES.ADMIN.WELCOME : ROUTES.ADMIN.DASHBOARD);
+      navigate(user.mustChangePassword ? ROUTES.ADMIN.WELCOME : searchParams.get('widget') === '1' ? ROUTES.ADMIN.WIDGET : ROUTES.ADMIN.DASHBOARD);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
     }
@@ -105,7 +106,7 @@ export default function LoginPage() {
 
             <Button type="submit" className="h-[52px] w-full rounded-2xl text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_8px_20px_rgba(114,21,29,0.25)] transition-all active:scale-[0.98] mt-2" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Signing in' : 'Continue with Admin'}
-              {form.formState.isSubmitting && <ArrowPathIcon className="ml-2 h-4 w-4 animate-spin" />}
+              {form.formState.isSubmitting && <LoadingIndicator className="ml-2" label="Signing in" />}
             </Button>
           </form>
 

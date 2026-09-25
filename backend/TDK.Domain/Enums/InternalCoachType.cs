@@ -1,7 +1,7 @@
 namespace TDK.Domain.Enums;
 
-public enum StaffType
+public enum InternalCoachType
 {
     Internal = 0,
-    Trainer = 1
+    Coach = 1
 }

@@ -21,8 +21,8 @@ export const ratesService = {
     const { data } = await api.put(`/api/admin/rates/${id}`, normalizeRateTimes(rate));
     return data;
   },
-  deleteRate: async (id: number): Promise<ApiResponse<void>> => {
-    const { data } = await api.delete(`/api/admin/rates/${id}`);
+  deleteRate: async ({ id, credentials }: { id: number; credentials: { email: string; password: string } }): Promise<ApiResponse<void>> => {
+    const { data } = await api.post(`/api/admin/rates/${id}/delete`, credentials);
     return data;
   },
 };
