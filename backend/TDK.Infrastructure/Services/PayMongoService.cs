@@ -37,7 +37,7 @@ public class PayMongoService : IPayMongoService
         }
     }
 
-    public async Task<string> CreateLinkAsync(decimal amount, string description, string referenceNumber, CancellationToken cancellationToken = default)
+    public async Task<string> CreateCheckoutSessionAsync(string referenceNumber, System.Collections.Generic.List<PayMongoLineItem> lineItems, PayMongoBilling billing, CancellationToken cancellationToken = default)
     {
         var baseUrl = _configuration.GetValue<string>("Frontend:BaseUrl")?.TrimEnd('/') ?? "http://localhost:5173";
         var successUrl = $"{baseUrl}/success?pmRef={referenceNumber}";
@@ -48,7 +48,18 @@ public class PayMongoService : IPayMongoService
             return $"{successUrl}&simulated=true";
         }
 
-        var amountInCents = (int)Math.Round(amount * 100, MidpointRounding.AwayFromZero);
+        var payloadLineItems = new System.Collections.Generic.List<object>();
+        foreach (var item in lineItems)
+        {
+            payloadLineItems.Add(new
+            {
+                currency = "PHP",
+                amount = (int)Math.Round(item.Amount * 100, MidpointRounding.AwayFromZero),
+                name = item.Name,
+                description = item.Description,
+                quantity = item.Quantity
+            });
+        }
 
         var payload = new
         {
@@ -59,19 +70,16 @@ public class PayMongoService : IPayMongoService
                     send_email_receipt = true,
                     show_description = true,
                     show_line_items = true,
-                    line_items = new[]
-                    {
-                        new
-                        {
-                            currency = "PHP",
-                            amount = amountInCents,
-                            name = description,
-                            quantity = 1
-                        }
-                    },
+                    line_items = payloadLineItems,
                     payment_method_types = new[] { "qrph", "gcash", "paymaya", "card", "dob" },
                     reference_number = referenceNumber,
-                    success_url = successUrl
+                    success_url = successUrl,
+                    billing = new 
+                    {
+                        name = billing.Name,
+                        email = billing.Email,
+                        phone = billing.Phone
+                    }
                 }
             }
         };

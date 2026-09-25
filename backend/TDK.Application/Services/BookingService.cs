@@ -142,6 +142,7 @@ public class BookingService : IBookingService
         }
 
         decimal checkoutTotal = 0;
+        var lineItems = new List<PayMongoLineItem>();
         foreach (var schedule in request.Schedules)
         {
             var conflict = await ValidateSlotAsync(schedule.CourtId, schedule.BookingDate, schedule.StartTime, schedule.EndTime);
@@ -151,9 +152,21 @@ public class BookingService : IBookingService
             var amount = await _rates.CalculateRateAsync(schedule.StartTime, schedule.EndTime, RateType.Booking);
             if (amount <= 0) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("No active rate covers one or more selected schedules");
             checkoutTotal += amount;
+            
+            lineItems.Add(new PayMongoLineItem(
+                $"Court Booking - {court.Name}", 
+                amount, 
+                1, 
+                $"{schedule.BookingDate:MMM dd, yyyy} ({schedule.StartTime:HH:mm} - {schedule.EndTime:HH:mm})"
+            ));
         }
 
-        checkoutTotal += request.PaddleRentalQuantity * PaddleRentalPrice;
+        if (request.PaddleRentalQuantity > 0)
+        {
+            var paddleRentalFee = request.PaddleRentalQuantity * PaddleRentalPrice;
+            checkoutTotal += paddleRentalFee;
+            lineItems.Add(new PayMongoLineItem("Paddle Rental", PaddleRentalPrice, request.PaddleRentalQuantity, "Pickleball Paddle Rental"));
+        }
 
         var submittedAt = _clock.UtcNow.UtcDateTime;
         var requestReference = $"PM-{submittedAt:yyyyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
@@ -161,7 +174,8 @@ public class BookingService : IBookingService
         string checkoutUrl;
         try
         {
-            checkoutUrl = await _payMongo.CreateLinkAsync(checkoutTotal, "Court Booking - The Dirty Kitchen", requestReference, cancellationToken);
+            var billing = new PayMongoBilling(request.CustomerName, request.Email, request.Phone);
+            checkoutUrl = await _payMongo.CreateCheckoutSessionAsync(requestReference, lineItems, billing, cancellationToken);
         }
         catch (Exception ex)
         {
