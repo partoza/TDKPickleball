@@ -212,7 +212,7 @@ export default function PromosPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                      {promo.type === DiscountType.Percentage ? `${promo.value}%` : `â‚±${promo.value.toFixed(2)}`}
+                      {promo.type === DiscountType.Percentage ? `${promo.value}%` : `₱${promo.value.toFixed(2)}`}
                     </div>
                   </TableCell>
                     <TableCell className="text-slate-600 dark:text-slate-400 font-medium">

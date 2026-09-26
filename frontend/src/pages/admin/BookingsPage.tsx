@@ -134,7 +134,7 @@ export default function BookingsPage() {
     if (!form.courtId) errors.courtId = 'Select a court.';
     if (!form.bookingDate) errors.bookingDate = 'Date is required.';
     if (!form.startTime) errors.startTime = 'Select a start time.';
-    else if (isPastManilaStart(form.bookingDate, form.startTime, new Date(clock))) errors.startTime = 'Start time has already passed in Manila.';
+    else if (isPastManilaStart(form.bookingDate, form.startTime, new Date(clock))) errors.startTime = 'Start time has already passed.';
     if (!form.endTime) errors.endTime = 'Select an end time.';
     else if (!isValidTimeRange(form.startTime, form.endTime)) errors.endTime = 'End time must be at least 1 hour after start time.';
     if (includeContact && !form.customerName.trim()) errors.customerName = 'Booked by is required.';

@@ -116,7 +116,7 @@ export default function AdminWidgetPage() {
           <div className="relative z-10 mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{upcoming.map(booking => <article key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-white/60 bg-white/50 p-6 shadow-sm backdrop-blur-md"><div className="min-w-0"><p className="text-[17px] font-bold tracking-[-0.02em]">{format(new Date(`${booking.bookingDate}T00:00:00`), 'MMM d')} · {displayTime(booking.startTime)}–{displayTime(booking.endTime)}</p><p className="mt-1.5 text-[14px] font-medium text-[#6e6e73]">Scheduled session</p></div><span className="shrink-0 rounded-full border border-[#851923]/20 bg-white/60 px-3.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-[#851923] shadow-sm">{booking.courtName}</span></article>)}{!upcoming.length && <p className="rounded-[24px] border border-white/60 bg-white/50 p-6 text-[14px] font-medium tracking-[-0.01em] text-[#6e6e73] shadow-sm backdrop-blur-md sm:col-span-2 lg:col-span-4">No upcoming schedules.</p>}</div>
         </section>
       </>}
-      <footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown · Schedule refreshes every minute · Manila time</footer>
+      <footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown · Schedule refreshes every minute</footer>
     </div>
   </main>;
 }

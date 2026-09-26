@@ -43,7 +43,7 @@ export function validateBookingBlocks(
     if (!block.date) error.date = 'Date is required.';
     else if (block.date < manilaToday) error.date = 'Booking date cannot be in the past.';
     if (!block.startTime) error.startTime = 'Select a start time.';
-    else if (isPastManilaStart(block.date, block.startTime)) error.startTime = 'Start time has already passed in Manila.';
+    else if (isPastManilaStart(block.date, block.startTime)) error.startTime = 'Start time has already passed.';
     if (!block.endTime) error.endTime = 'Select an end time.';
     else if (block.startTime && !isValidTimeRange(block.startTime, block.endTime)) error.endTime = 'End time must be at least 1 hour after start time.';
 

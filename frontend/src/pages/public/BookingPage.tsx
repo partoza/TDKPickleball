@@ -348,7 +348,7 @@ export default function BookingPage() {
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">Request received</p>
             <CardTitle className="text-2xl tracking-tight sm:text-3xl">Booking request sent</CardTitle>
             <CardDescription className="mx-auto mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the storeâ€™s reply.
+              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the store’s reply.
             </CardDescription>
 
             <div className="mx-auto mt-8 max-w-2xl space-y-4 text-left">
@@ -366,10 +366,10 @@ export default function BookingPage() {
                   {blocks.map((block, index) => (
                     <div key={`${block.courtId}-${block.date}-${block.startTime}-${index}`} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm font-semibold text-foreground">{courts.find(court => String(court.id) === block.courtId)?.name || 'Court'}</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} Â· {formatTimeLabel(block.startTime)}â€“{formatTimeLabel(block.endTime)}</p>
+                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(block.startTime)}–{formatTimeLabel(block.endTime)}</p>
                     </div>
                   ))}
-                  {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental</span><span className="font-semibold text-primary">Ã— {paddleQuantity}</span></div>}
+                  {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental</span><span className="font-semibold text-primary">× {paddleQuantity}</span></div>}
                 </div>
               </div>
 
@@ -397,7 +397,7 @@ export default function BookingPage() {
             <div className="mt-8 flex flex-col-reverse justify-center gap-3 border-t pt-6 sm:flex-row">
               <Button type="button" variant="outline" onClick={downloadConfirmation} disabled={isDownloadingConfirmation} className="h-11 min-w-48 rounded-xl px-6 font-semibold">
                 {isDownloadingConfirmation ? <LoadingIndicator className="mr-2" label="Downloading confirmation" /> : <Download className="mr-2 h-4 w-4" />}
-                {isDownloadingConfirmation ? 'Preparing downloadâ€¦' : 'Download confirmation'}
+                {isDownloadingConfirmation ? 'Preparing download…' : 'Download confirmation'}
               </Button>
               <Button onClick={() => navigate(ROUTES.HOME)} className="h-11 min-w-44 rounded-xl px-6 font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
                 <Home className="mr-2 h-4 w-4" />Back to Home
@@ -500,7 +500,7 @@ export default function BookingPage() {
                     <div>
                       <h4 id="paddle-rental-title" className="font-semibold flex items-center gap-1.5"><PaddleIcon className="w-5 h-5" /> Paddle Rental</h4>
                       <p className="mt-2 text-sm font-medium">Selkirk Pickleball Paddle</p>
-                      <p className="mt-0.5 text-sm font-semibold text-primary">â‚±100 per paddle <span className="text-muted-foreground">â€¢ Entire session</span></p>
+                      <p className="mt-0.5 text-sm font-semibold text-primary">₱100 per paddle <span className="text-muted-foreground">• Entire session</span></p>
                       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Rental is valid for your entire booking session.</p>
                     </div>
                     <div className="flex w-fit items-center rounded-xl border bg-background p-1 shadow-sm" aria-label="Paddle rental quantity">
@@ -543,7 +543,7 @@ export default function BookingPage() {
                   {appliedPromo && (
                     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
                       <span className="font-semibold">{appliedPromo.code} applied:</span>{' '}
-                      {appliedPromo.type === DiscountType.Percentage ? `${appliedPromo.value}%` : `â‚±${appliedPromo.value.toLocaleString()}`} off each selected schedule.
+                      {appliedPromo.type === DiscountType.Percentage ? `${appliedPromo.value}%` : `₱${appliedPromo.value.toLocaleString()}`} off each selected schedule.
                     </div>
                   )}
                 </section>
@@ -556,13 +556,13 @@ export default function BookingPage() {
                       return (
                         <div key={i} className="flex justify-between border-b last:border-0 pb-2 last:pb-0">
                           <div>
-                            <span className="font-medium">Court Booking Â· {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
+                            <span className="font-medium">Court Booking · {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
                             <span className="text-muted-foreground ml-2">
-                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} Â· {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
+                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
                             </span>
                           </div>
                           <span className="font-medium text-primary">
-                            {quote.covered ? `â‚±${quote.total.toLocaleString()}` : 'â€”'}
+                            {quote.covered ? `₱${quote.total.toLocaleString()}` : '—'}
                           </span>
                         </div>
                       )
@@ -570,19 +570,19 @@ export default function BookingPage() {
                     {paddleQuantity > 0 && (
                       <div className="flex items-center justify-between border-t pt-2">
                         <span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental × {paddleQuantity}</span>
-                        <span className="font-medium text-primary">â‚±{paddleRentalFee.toLocaleString()}</span>
+                        <span className="font-medium text-primary">₱{paddleRentalFee.toLocaleString()}</span>
                       </div>
                     )}
                     {appliedPromo && promoDiscount > 0 && (
                       <div className="flex items-center justify-between border-t pt-2 text-emerald-700 dark:text-emerald-400">
-                        <span className="font-medium">Promo Â· {appliedPromo.code}</span>
-                        <span className="font-semibold">-â‚±{promoDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="font-medium">Promo · {appliedPromo.code}</span>
+                        <span className="font-semibold">-₱{promoDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     <div className="mt-2 flex justify-between pt-2">
                       <span className="font-semibold">Total Amount:</span>
                       <span className="font-bold text-primary text-base">
-                        â‚±{checkoutTotal.toLocaleString()}
+                        ₱{checkoutTotal.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -643,7 +643,7 @@ export default function BookingPage() {
                     <div className="space-y-4">
                       <div className="rounded-2xl border bg-card p-5">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount to pay</p>
-                        <p className="mt-1 text-xl font-bold text-primary">â‚±{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="mt-1 text-xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         <p className="mt-2 text-sm text-muted-foreground">For {blocks.length} booking {blocks.length === 1 ? 'schedule' : 'schedules'}{paddleQuantity > 0 ? ` plus ${paddleQuantity} paddle ${paddleQuantity === 1 ? 'rental' : 'rentals'}` : ''}</p>
                       </div>
 
@@ -659,11 +659,11 @@ export default function BookingPage() {
                                 />
                                 <div className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-left text-white backdrop-blur-sm">
                                   <p className="truncate text-xs font-semibold">{receipt.name}</p>
-                                  <p className="mt-0.5 text-[11px] text-white/80">{(receipt.size / 1024 / 1024).toFixed(2)} MB Â· Click to preview</p>
+                                  <p className="mt-0.5 text-[11px] text-white/80">{(receipt.size / 1024 / 1024).toFixed(2)} MB · Click to preview</p>
                                 </div>
                             </button>
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                              <p className="text-xs text-muted-foreground">JPG, PNG, or WebP Â· maximum 5 MB</p>
+                              <p className="text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</p>
                               <label htmlFor="receipt" className="cursor-pointer text-xs font-semibold text-primary hover:underline">Replace receipt</label>
                             </div>
                           </div>
@@ -672,7 +672,7 @@ export default function BookingPage() {
                             <>
                               <Upload className="mb-3 h-7 w-7 text-primary" />
                               <span className="text-sm font-semibold">Choose receipt image</span>
-                              <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP Â· maximum 5 MB</span>
+                              <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</span>
                             </>
                           </label>
                         )}
@@ -694,7 +694,7 @@ export default function BookingPage() {
                     </div>
                     <div className="rounded-xl bg-background p-4 border mx-auto max-w-xs">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
-                      <p className="mt-1 text-2xl font-bold text-primary">â‚±{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 )}
