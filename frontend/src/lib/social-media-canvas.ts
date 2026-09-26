@@ -14,9 +14,9 @@ export interface ScheduleSlotArtwork {
 }
 
 export const SOCIAL_TEMPLATES = {
-  schedule: { src: '/assets/images/schedule-template.png', width: 1254, height: 1254 },
-  portrait: { src: '/assets/images/portrait-bg.png', width: 945, height: 1268 },
-  landscape: { src: '/assets/images/landscape-socmed.png', width: 1461, height: 924 },
+  schedule: { src: '/assets/images/schedule-socmed.png', width: 1254, height: 1254 },
+  portrait: { src: '/assets/images/portrait-socmed.png', width: 945, height: 1268 },
+  landscape: { src: '/assets/images/landscape-socmedia.png', width: 1461, height: 924 },
 } as const;
 
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
@@ -42,9 +42,9 @@ export async function renderScheduleArtwork(
   const template = SOCIAL_TEMPLATES.schedule;
   const background = await loadCanvasImage(template.src);
   await Promise.all([
-    document.fonts?.load('400 18px Poppins'),
-    document.fonts?.load('500 28px Poppins'),
-    document.fonts?.load('600 38px Poppins'),
+    document.fonts?.load('400 26px Poppins'),
+    document.fonts?.load('500 42px Poppins'),
+    document.fonts?.load('600 43px Poppins'),
   ]);
   canvas.width = template.width;
   canvas.height = template.height;
@@ -75,7 +75,7 @@ export async function renderScheduleArtwork(
   ctx.lineTo(template.width / 2 + 82, 380);
   ctx.stroke();
 
-  const grid = { x: 108, y: 404, width: 1038, rowHeight: 184 };
+  const grid = { x: 64, y: 396, width: 1126, rowHeight: 205 };
   const cellWidth = grid.width / 2;
   ctx.strokeStyle = 'rgba(255, 255, 255, .24)';
   ctx.lineWidth = 1.5;
@@ -107,16 +107,16 @@ export async function renderScheduleArtwork(
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
     ctx.fillStyle = 'rgba(255, 255, 255, .62)';
-    ctx.font = '400 16px Poppins, Arial, sans-serif';
-    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 55, 3.5);
+    ctx.font = '400 17px Poppins, Arial, sans-serif';
+    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 64, 3.5);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '500 36px Poppins, Arial, sans-serif';
-    ctx.fillText(slot.label, centerX, centerY - 4, cellWidth - 44);
+    ctx.font = '500 42px Poppins, Arial, sans-serif';
+    ctx.fillText(slot.label, centerX, centerY - 5, cellWidth - 36);
 
     ctx.fillStyle = 'rgba(255, 255, 255, .78)';
-    ctx.font = '400 22px Poppins, Arial, sans-serif';
-    ctx.fillText(formatAvailableCourtLabel(slot.courtNames), centerX, centerY + 48, cellWidth - 44);
+    ctx.font = '400 26px Poppins, Arial, sans-serif';
+    ctx.fillText(formatAvailableCourtLabel(slot.courtNames), centerX, centerY + 57, cellWidth - 36);
   });
   ctx.restore();
 }

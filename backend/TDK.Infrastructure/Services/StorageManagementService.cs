@@ -101,7 +101,10 @@ public sealed class StorageManagementService : IStorageManagementService
         await CleanupLock.WaitAsync(cancellationToken);
         try
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            // TiDB supports READ COMMITTED and REPEATABLE READ, but rejects SERIALIZABLE.
+            // The exact IDs are materialized and affected-row counts are verified below,
+            // so READ COMMITTED still prevents a partial cleanup from being committed.
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
             var manilaNow = _clock.ToManilaTime(_clock.UtcNow);
             var today = DateOnly.FromDateTime(manilaNow.DateTime);
             var currentTime = TimeOnly.FromDateTime(manilaNow.DateTime);
@@ -171,6 +174,14 @@ public sealed class StorageManagementService : IStorageManagementService
                 Audit = auditDto
             }, $"Permanently deleted {deletedScheduleCount} elapsed schedule record{(deletedScheduleCount == 1 ? "" : "s")} and {deletedCount} related booking record{(deletedCount == 1 ? "" : "s")}");
         }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogError(exception,
+                "Storage cleanup failed for {FromDate} through {ThroughDate}; the transaction was not committed",
+                request.FromDate, request.ThroughDate);
+            return ApiResponse<BookingCleanupResultDto>.Fail(
+                "Cleanup could not be completed. No records were deleted. Please try again.");
+        }
         finally
         {
             CleanupLock.Release();
@@ -190,6 +201,19 @@ public sealed class StorageManagementService : IStorageManagementService
 
     private async Task<(decimal UsedMegabytes, bool Available)> GetUsedStorageAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            // TiDB exposes physical table and index usage in MiB through this table.
+            var used = await _context.Database.SqlQueryRaw<decimal>(
+                "SELECT CAST(COALESCE(SUM(TABLE_SIZE), 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.TABLE_STORAGE_STATS WHERE TABLE_SCHEMA = DATABASE()")
+                .SingleAsync(cancellationToken);
+            return (decimal.Round(used, 2), true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogDebug(exception, "TiDB storage statistics are unavailable; trying MySQL information_schema measurements");
+        }
+
         try
         {
             var used = await _context.Database.SqlQueryRaw<decimal>(
