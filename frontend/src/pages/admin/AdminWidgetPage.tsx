@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowPathIcon, ClockIcon, RectangleGroupIcon } from '@heroicons/react/24/solid';
+import { ArrowPathIcon, ClockIcon, RectangleGroupIcon, ArrowLeftIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookings } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
@@ -93,7 +93,7 @@ export default function AdminWidgetPage() {
       <header className="mb-7 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div className="flex items-center gap-3.5"><div className="grid h-[58px] w-[58px] place-items-center overflow-hidden rounded-[18px] border border-white/20 bg-white/20 shadow-[0_8px_32px_rgba(0,0,0,.2)] backdrop-blur-xl"><img src="/assets/images/tdk-icon.png" alt="TDK" className="h-[46px] w-[46px] object-contain drop-shadow-md" /></div><div><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>TDK Live</p><h1 className="mt-0.5 text-[28px] font-bold leading-none tracking-[-0.045em] text-white sm:text-[36px]" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Court Schedule</h1></div></div>
         <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end justify-center text-right">
+          <div className="flex flex-col items-end justify-center text-right hidden sm:flex mr-2">
             <div className="text-[16px] font-bold tracking-[-0.015em] text-white tabular-nums leading-none mb-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
               {new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit' })}
             </div>
@@ -101,6 +101,7 @@ export default function AdminWidgetPage() {
               {new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'short', day: 'numeric' })}
             </div>
           </div>
+          <Link to={ROUTES.ADMIN.DASHBOARD} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Back to Dashboard"><ArrowLeftIcon className="h-5 w-5 drop-shadow-md" /></Link>
           <button type="button" onClick={() => refetch()} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Refresh court schedule">{isFetching ? <LoadingIndicator label="Refreshing court schedule" /> : <ArrowPathIcon className="h-5 w-5 drop-shadow-md" />}</button>
         </div>
       </header>
