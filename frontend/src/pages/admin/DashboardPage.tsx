@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 
 function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, bookings: Booking[], internalCoaches: any[] }) {
   const [now, setNow] = useState(new Date());
@@ -128,8 +129,8 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
                  )}
                  {activeBooking.paddleRentalQuantity > 0 && (
                    <div className="flex justify-between items-center text-[12px]">
-                     <span className="text-slate-500 font-medium">Paddles Rented:</span>
-                     <span className="font-semibold text-slate-700 dark:text-slate-300 bg-primary/10 text-primary px-1.5 py-0.5 rounded-md">{activeBooking.paddleRentalQuantity} paddle{activeBooking.paddleRentalQuantity > 1 ? 's' : ''}</span>
+                     <span className="text-slate-500 font-medium flex items-center gap-1.5"><PaddleIcon className="w-3.5 h-3.5" /> Paddles Rented:</span>
+                     <span className="font-semibold text-slate-700 dark:text-slate-300 bg-primary/10 text-primary px-1.5 py-0.5 rounded-md">{activeBooking.paddleRentalQuantity}</span>
                    </div>
                  )}
                </div>

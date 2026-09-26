@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ArrowPathIcon, ClockIcon, RectangleGroupIcon, ArrowLeftIcon } from '@heroicons/react/24/solid';
@@ -14,6 +14,7 @@ import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
@@ -111,7 +112,7 @@ function CourtWidget({ court, bookings, internalCoaches, now }: { court: Court; 
                  </div>
               )}
               {active.paddleRentalQuantity > 0 && (
-                 <div className="text-[12px] font-bold text-[#851923] bg-[#851923]/10 px-3 py-1.5 rounded-xl border border-[#851923]/20 shadow-sm w-full sm:w-auto">
+                 <div className="text-[12px] font-bold text-[#851923] bg-[#851923]/10 px-3 py-1.5 rounded-xl border border-[#851923]/20 shadow-sm w-full sm:w-auto flex items-center gap-1.5 justify-center sm:justify-start"><PaddleIcon className="w-4 h-4" forceLight />{active.paddleRentalQuantity}x Paddles</div>
                    {active.paddleRentalQuantity} paddle{active.paddleRentalQuantity > 1 ? 's' : ''} rented
                  </div>
               )}
@@ -191,10 +192,10 @@ export default function AdminWidgetPage() {
           <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#88cc22] opacity-[0.15] blur-[50px]" />
           <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-[#851923] opacity-[0.12] blur-[50px]" />
           <div className="relative z-10 flex items-center gap-2"><ClockIcon className="h-[18px] w-[18px] text-[#851923]" /><h2 className="text-[17px] font-semibold tracking-[-0.025em]">Upcoming Court Schedule</h2></div>
-          <div className="relative z-10 mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{upcoming.map(booking => <UpcomingBookingWidget key={booking.id} booking={booking} internalCoaches={internalCoaches} />)}{!upcoming.length && <p className="rounded-[24px] border border-white/60 bg-white/50 p-6 text-[14px] font-medium tracking-[-0.01em] text-[#6e6e73] shadow-sm backdrop-blur-md sm:col-span-2 lg:col-span-4">No upcoming schedules.</p>}</div></section></>}<footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown � Schedule refreshes every minute � Manila time</footer></div></main>;}
+          <div className="relative z-10 mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{upcoming.map(booking => <UpcomingBookingWidget key={booking.id} booking={booking} internalCoaches={internalCoaches} />)}{!upcoming.length && <p className="rounded-[24px] border border-white/60 bg-white/50 p-6 text-[14px] font-medium tracking-[-0.01em] text-[#6e6e73] shadow-sm backdrop-blur-md sm:col-span-2 lg:col-span-4">No upcoming schedules.</p>}</div></section></>}<footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown Â· Schedule refreshes every minute Â· Manila time</footer></div></main>;}
         </section>
       </>}
-      <footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown · Schedule refreshes every minute · Manila time</footer>
+      <footer className="mt-6 flex items-center justify-center gap-2 pb-2 text-[11px] font-medium tracking-[-0.01em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}><RectangleGroupIcon className="h-3.5 w-3.5" />Live countdown Ã‚Â· Schedule refreshes every minute Ã‚Â· Manila time</footer>
     </div>
   </main>;
 }
@@ -234,7 +235,7 @@ function UpcomingBookingWidget({ booking, internalCoaches }: { booking: Booking;
     <article className="flex flex-col justify-between gap-3 rounded-[24px] border border-white/60 bg-white/50 p-5 shadow-sm backdrop-blur-md group hover:bg-white/60 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[14px] font-bold tracking-[-0.02em]">{format(new Date(${booking.bookingDate}T00:00:00), 'MMM d')} � {displayTime(booking.startTime)}�{displayTime(booking.endTime)}</p>
+          <p className="text-[14px] font-bold tracking-[-0.02em]">{format(new Date(${booking.bookingDate}T00:00:00), 'MMM d')} Â· {displayTime(booking.startTime)}â€“{displayTime(booking.endTime)}</p>
           <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border shadow-sm mt-1.5", STATUS_COLORS[activeStatus])}>
              {STATUS_LABELS[activeStatus]}
           </span>
@@ -259,7 +260,7 @@ function UpcomingBookingWidget({ booking, internalCoaches }: { booking: Booking;
            </div>
         )}
         {booking.paddleRentalQuantity > 0 && (
-           <div className="flex justify-between items-center text-[11px] bg-[#851923]/5 px-2 py-1 rounded-md border border-[#851923]/10">
+           <div className="flex justify-between items-center text-[11px] bg-[#851923]/5 px-2 py-1 rounded-md border border-[#851923]/10"><span className="text-slate-500 font-medium flex items-center gap-1"><PaddleIcon className="w-3.5 h-3.5" forceLight /> Paddle:</span><span className="font-semibold text-[#851923]">{booking.paddleRentalQuantity}x</span></div>
              <span className="text-slate-500 font-medium">Paddle:</span>
              <span className="font-semibold text-[#851923]">{booking.paddleRentalQuantity}x</span>
            </div>
@@ -268,3 +269,4 @@ function UpcomingBookingWidget({ booking, internalCoaches }: { booking: Booking;
     </article>
   );
 }
+

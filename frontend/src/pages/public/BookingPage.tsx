@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import { useSubmitPublicBookingRequest, useSubmitPublicPayMongoRequest } from '@/hooks/useBookings';
+import { useSubmitPublicBookingRequest, useSubmitPublicPayMongoRequest, useValidatePublicPromo } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RateType } from '@/types';
-import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, HomeIcon as Home, CalendarDaysIcon as CalendarDays, CameraIcon as Camera, EnvelopeIcon as Envelope, MinusIcon, PlusIcon } from '@heroicons/react/24/solid';
+import { DiscountType, PublicPromo, RateType } from '@/types';
+import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, HomeIcon as Home, CalendarDaysIcon as CalendarDays, CameraIcon as Camera, EnvelopeIcon as Envelope, MinusIcon, PlusIcon, TagIcon as Tag } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { calculateRateQuote } from '@/lib/rate-calculation';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import { ROUTES } from '@/lib/constants';
 import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
 import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 
 const BOOKING_DRAFT_KEY = 'tdk-public-booking-draft';
 const PADDLE_RENTAL_PRICE = 100;
@@ -65,6 +66,9 @@ export default function BookingPage() {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [paddleQuantity, setPaddleQuantity] = useState(0);
+  const [promoName, setPromoName] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<PublicPromo | null>(null);
+  const [promoError, setPromoError] = useState('');
   const [errors, setErrors] = useState<any>({});
   const [requestReference, setRequestReference] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'manual' | 'paymongo'>('manual');
@@ -86,12 +90,21 @@ export default function BookingPage() {
   const rates = ratesRes?.data || [];
   const submitBookingRequest = useSubmitPublicBookingRequest();
   const submitPayMongoRequest = useSubmitPublicPayMongoRequest();
+  const validatePromo = useValidatePublicPromo();
   const courtBookingTotal = blocks.reduce((total, block) => {
     const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
     return total + (quote.covered ? quote.total : 0);
   }, 0);
+  const promoDiscount = appliedPromo ? blocks.reduce((total, block) => {
+    const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
+    if (!quote.covered) return total;
+    const discount = appliedPromo.type === DiscountType.Percentage
+      ? quote.total * (appliedPromo.value / 100)
+      : appliedPromo.value;
+    return total + Math.min(quote.total, Math.max(0, discount));
+  }, 0) : 0;
   const paddleRentalFee = paddleQuantity * PADDLE_RENTAL_PRICE;
-  const checkoutTotal = courtBookingTotal + paddleRentalFee;
+  const checkoutTotal = Math.max(0, courtBookingTotal - promoDiscount) + paddleRentalFee;
 
   useEffect(() => {
     let savedBlocks: any[] = [];
@@ -143,6 +156,9 @@ export default function BookingPage() {
         setPhone('');
         setNotes('');
         setPaddleQuantity(0);
+        setPromoName('');
+        setAppliedPromo(null);
+        setPromoError('');
         setReceipt(null);
         setReceiptError('');
         setErrors({});
@@ -220,6 +236,28 @@ export default function BookingPage() {
     setReceipt(file);
   };
 
+  const handleApplyPromo = async () => {
+    const exactName = promoName.trim();
+    setPromoError('');
+    setAppliedPromo(null);
+    if (!exactName) {
+      setPromoError('Enter the exact promo name.');
+      return;
+    }
+
+    try {
+      const result = await validatePromo.mutateAsync(exactName);
+      if (!result.success || !result.data) {
+        setPromoError(result.message || 'Promo name is invalid or unavailable.');
+        return;
+      }
+      setAppliedPromo(result.data);
+      setPromoName(result.data.code);
+    } catch (error: any) {
+      setPromoError(error.response?.data?.message || 'Promo name is invalid or unavailable. Enter the exact promo name.');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (paymentMethod === 'manual' && !receipt) {
@@ -237,6 +275,7 @@ export default function BookingPage() {
           phone,
           notes,
           paddleRentalQuantity: paddleQuantity,
+          promoCode: appliedPromo?.code,
           schedules: blocks,
         });
         
@@ -258,6 +297,7 @@ export default function BookingPage() {
         phone,
         notes,
         paddleRentalQuantity: paddleQuantity,
+        promoCode: appliedPromo?.code,
         schedules: blocks,
         receipt: receipt!,
       });
@@ -308,7 +348,7 @@ export default function BookingPage() {
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">Request received</p>
             <CardTitle className="text-2xl tracking-tight sm:text-3xl">Booking request sent</CardTitle>
             <CardDescription className="mx-auto mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the store’s reply.
+              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the storeâ€™s reply.
             </CardDescription>
 
             <div className="mx-auto mt-8 max-w-2xl space-y-4 text-left">
@@ -326,10 +366,10 @@ export default function BookingPage() {
                   {blocks.map((block, index) => (
                     <div key={`${block.courtId}-${block.date}-${block.startTime}-${index}`} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm font-semibold text-foreground">{courts.find(court => String(court.id) === block.courtId)?.name || 'Court'}</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(block.startTime)}–{formatTimeLabel(block.endTime)}</p>
+                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} Â· {formatTimeLabel(block.startTime)}â€“{formatTimeLabel(block.endTime)}</p>
                     </div>
                   ))}
-                  {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium">Selkirk Paddle Rental</span><span className="font-semibold text-primary">× {paddleQuantity}</span></div>}
+                  {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental</span><span className="font-semibold text-primary">Ã— {paddleQuantity}</span></div>}
                 </div>
               </div>
 
@@ -357,7 +397,7 @@ export default function BookingPage() {
             <div className="mt-8 flex flex-col-reverse justify-center gap-3 border-t pt-6 sm:flex-row">
               <Button type="button" variant="outline" onClick={downloadConfirmation} disabled={isDownloadingConfirmation} className="h-11 min-w-48 rounded-xl px-6 font-semibold">
                 {isDownloadingConfirmation ? <LoadingIndicator className="mr-2" label="Downloading confirmation" /> : <Download className="mr-2 h-4 w-4" />}
-                {isDownloadingConfirmation ? 'Preparing download…' : 'Download confirmation'}
+                {isDownloadingConfirmation ? 'Preparing downloadâ€¦' : 'Download confirmation'}
               </Button>
               <Button onClick={() => navigate(ROUTES.HOME)} className="h-11 min-w-44 rounded-xl px-6 font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
                 <Home className="mr-2 h-4 w-4" />Back to Home
@@ -458,9 +498,9 @@ export default function BookingPage() {
                 <section className="rounded-2xl border bg-card p-4 sm:p-5" aria-labelledby="paddle-rental-title">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h4 id="paddle-rental-title" className="font-semibold">Paddle Rental</h4>
+                      <h4 id="paddle-rental-title" className="font-semibold flex items-center gap-1.5"><PaddleIcon className="w-5 h-5" /> Paddle Rental</h4>
                       <p className="mt-2 text-sm font-medium">Selkirk Pickleball Paddle</p>
-                      <p className="mt-0.5 text-sm font-semibold text-primary">₱100 per paddle <span className="text-muted-foreground">• Entire session</span></p>
+                      <p className="mt-0.5 text-sm font-semibold text-primary">â‚±100 per paddle <span className="text-muted-foreground">â€¢ Entire session</span></p>
                       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Rental is valid for your entire booking session.</p>
                     </div>
                     <div className="flex w-fit items-center rounded-xl border bg-background p-1 shadow-sm" aria-label="Paddle rental quantity">
@@ -475,6 +515,39 @@ export default function BookingPage() {
                   </div>
                 </section>
 
+                <section className="rounded-2xl border bg-card p-4 sm:p-5" aria-labelledby="promo-title">
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-5 w-5 text-primary" aria-hidden="true" />
+                    <h4 id="promo-title" className="font-semibold">Promo</h4>
+                    <span className="text-xs text-muted-foreground">Optional</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Enter the exact promo name provided by The Dirty Kitchen. Promo names are case-sensitive.</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      aria-label="Exact promo name"
+                      value={promoName}
+                      maxLength={100}
+                      placeholder="Enter exact promo name"
+                      onChange={event => {
+                        setPromoName(event.target.value);
+                        setAppliedPromo(null);
+                        setPromoError('');
+                      }}
+                      className={cn('sm:flex-1', promoError && 'border-red-500 ring-red-500')}
+                    />
+                    <Button type="button" variant="outline" onClick={handleApplyPromo} disabled={validatePromo.isPending || !promoName.trim()}>
+                      {validatePromo.isPending ? <LoadingIndicator label="Checking promo" /> : 'Apply Promo'}
+                    </Button>
+                  </div>
+                  <FieldError message={promoError} />
+                  {appliedPromo && (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      <span className="font-semibold">{appliedPromo.code} applied:</span>{' '}
+                      {appliedPromo.type === DiscountType.Percentage ? `${appliedPromo.value}%` : `â‚±${appliedPromo.value.toLocaleString()}`} off each selected schedule.
+                    </div>
+                  )}
+                </section>
+
                 <div className="mt-6 bg-muted/30 p-4 rounded-lg border">
                   <h4 className="font-semibold mb-3">Booking Request Summary</h4>
                   <div className="space-y-2 text-sm">
@@ -483,27 +556,33 @@ export default function BookingPage() {
                       return (
                         <div key={i} className="flex justify-between border-b last:border-0 pb-2 last:pb-0">
                           <div>
-                            <span className="font-medium">Court Booking · {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
+                            <span className="font-medium">Court Booking Â· {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
                             <span className="text-muted-foreground ml-2">
-                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
+                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} Â· {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
                             </span>
                           </div>
                           <span className="font-medium text-primary">
-                            {quote.covered ? `₱${quote.total.toLocaleString()}` : '—'}
+                            {quote.covered ? `â‚±${quote.total.toLocaleString()}` : 'â€”'}
                           </span>
                         </div>
                       )
                     })}
                     {paddleQuantity > 0 && (
                       <div className="flex items-center justify-between border-t pt-2">
-                        <span className="font-medium">Selkirk Paddle Rental × {paddleQuantity}</span>
-                        <span className="font-medium text-primary">₱{paddleRentalFee.toLocaleString()}</span>
+                        <span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental × {paddleQuantity}</span>
+                        <span className="font-medium text-primary">â‚±{paddleRentalFee.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {appliedPromo && promoDiscount > 0 && (
+                      <div className="flex items-center justify-between border-t pt-2 text-emerald-700 dark:text-emerald-400">
+                        <span className="font-medium">Promo Â· {appliedPromo.code}</span>
+                        <span className="font-semibold">-â‚±{promoDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     <div className="mt-2 flex justify-between pt-2">
                       <span className="font-semibold">Total Amount:</span>
                       <span className="font-bold text-primary text-base">
-                        ₱{checkoutTotal.toLocaleString()}
+                        â‚±{checkoutTotal.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -564,7 +643,7 @@ export default function BookingPage() {
                     <div className="space-y-4">
                       <div className="rounded-2xl border bg-card p-5">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount to pay</p>
-                        <p className="mt-1 text-xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="mt-1 text-xl font-bold text-primary">â‚±{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         <p className="mt-2 text-sm text-muted-foreground">For {blocks.length} booking {blocks.length === 1 ? 'schedule' : 'schedules'}{paddleQuantity > 0 ? ` plus ${paddleQuantity} paddle ${paddleQuantity === 1 ? 'rental' : 'rentals'}` : ''}</p>
                       </div>
 
@@ -580,11 +659,11 @@ export default function BookingPage() {
                                 />
                                 <div className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-left text-white backdrop-blur-sm">
                                   <p className="truncate text-xs font-semibold">{receipt.name}</p>
-                                  <p className="mt-0.5 text-[11px] text-white/80">{(receipt.size / 1024 / 1024).toFixed(2)} MB · Click to preview</p>
+                                  <p className="mt-0.5 text-[11px] text-white/80">{(receipt.size / 1024 / 1024).toFixed(2)} MB Â· Click to preview</p>
                                 </div>
                             </button>
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                              <p className="text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</p>
+                              <p className="text-xs text-muted-foreground">JPG, PNG, or WebP Â· maximum 5 MB</p>
                               <label htmlFor="receipt" className="cursor-pointer text-xs font-semibold text-primary hover:underline">Replace receipt</label>
                             </div>
                           </div>
@@ -593,7 +672,7 @@ export default function BookingPage() {
                             <>
                               <Upload className="mb-3 h-7 w-7 text-primary" />
                               <span className="text-sm font-semibold">Choose receipt image</span>
-                              <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP · maximum 5 MB</span>
+                              <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or WebP Â· maximum 5 MB</span>
                             </>
                           </label>
                         )}
@@ -615,7 +694,7 @@ export default function BookingPage() {
                     </div>
                     <div className="rounded-xl bg-background p-4 border mx-auto max-w-xs">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
-                      <p className="mt-1 text-2xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">â‚±{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 )}
@@ -666,3 +745,4 @@ export default function BookingPage() {
     </div>
   );
 }
+
