@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ArchiveBoxXMarkIcon,
   CheckCircleIcon,
@@ -8,7 +9,9 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
+  TrashIcon,
 } from '@heroicons/react/24/solid';
+import type { BookingCleanupHistory } from '@/types';
 import { storageService } from '@/services/storage';
 import { getApiErrorMessage } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { TablePagination } from '@/components/admin/TablePagination';
 import { DataCleanupButton } from '@/components/admin/DataCleanup';
+import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
+import { Button } from '@/components/ui/button';
 
 const statusKey = ['database-storage-status'];
 const historyKey = ['booking-cleanup-history'];
@@ -26,9 +31,21 @@ const retryStorageQuery = (failureCount: number, error: unknown) =>
 
 export default function StoragePage() {
   const [historyPage, setHistoryPage] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<BookingCleanupHistory | null>(null);
+  const queryClient = useQueryClient();
   
   const statusQuery = useQuery({ queryKey: statusKey, queryFn: storageService.getStatus, retry: retryStorageQuery });
   const historyQuery = useQuery({ queryKey: historyKey, queryFn: storageService.getHistory, retry: retryStorageQuery });
+  const deleteHistory = useMutation({
+    mutationFn: ({ id, credentials }: { id: number; credentials: { email: string; password: string } }) => storageService.deleteHistory(id, credentials),
+    onSuccess: response => {
+      if (!response.success) { toast.error(response.message || 'Deletion history could not be removed'); return; }
+      toast.success('Deletion history removed');
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: historyKey });
+    },
+    onError: error => toast.error(getApiErrorMessage(error, 'Deletion history could not be removed')),
+  });
 
   const status = statusQuery.data?.data;
   const history = historyQuery.data?.data || [];
@@ -82,19 +99,21 @@ export default function StoragePage() {
       <CardContent>
         {historyQuery.isLoading ? <div className="space-y-3">{[1, 2, 3].map(item => <Skeleton key={item} className="h-12 rounded-xl" />)}</div> : historyQuery.isError ? <p className="text-sm text-destructive dark:text-white" role="alert">{storageError(historyQuery.error, 'Deletion history is unavailable.')}</p> : history.length ? <div className="overflow-x-auto rounded-xl border dark:border-white/10">
           <Table>
-            <TableHeader><TableRow><TableHead>Deleted on</TableHead><TableHead>Date range</TableHead><TableHead>Records</TableHead><TableHead>Receipts</TableHead><TableHead>Deleted by</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Deleted on</TableHead><TableHead>Date range</TableHead><TableHead>Records</TableHead><TableHead>Receipts</TableHead><TableHead>Deleted by</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>{paginatedHistory.map(item => <TableRow key={item.id}>
               <TableCell className="whitespace-nowrap font-medium">{formatDateTime(item.deletedAtUtc)}</TableCell>
               <TableCell className="whitespace-nowrap">{item.selectedFromDate ? `${formatDate(item.selectedFromDate)} – ${formatDate(item.deletedThroughDate)}` : `Through ${formatDate(item.deletedThroughDate)}`}</TableCell>
               <TableCell><p className="font-medium">{item.deletedScheduleCount.toLocaleString()} schedules</p><p className="text-xs text-muted-foreground">{item.deletedBookingCount.toLocaleString()} bookings</p></TableCell>
               <TableCell>{item.deletedReceiptCount.toLocaleString()}</TableCell>
               <TableCell><p className="font-medium">{item.deletedByName}</p><p className="text-xs text-muted-foreground">{item.deletedByEmail}</p></TableCell>
+              <TableCell className="text-right"><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete history from ${formatDateTime(item.deletedAtUtc)}`} onClick={() => setDeleteTarget(item)}><TrashIcon className="h-4 w-4" /></Button></TableCell>
             </TableRow>)}</TableBody>
           </Table>
           <TablePagination page={historyPage} total={history.length} onPageChange={setHistoryPage} />
         </div> : <div className="grid place-items-center rounded-xl border border-dashed py-12 text-center"><ArchiveBoxXMarkIcon className="h-9 w-9 text-muted-foreground/50" /><p className="mt-3 font-medium">No deletion history yet</p><p className="text-sm text-muted-foreground">Schedule cleanups will appear here.</p></div>}
       </CardContent>
     </Card>
+    <AdminCredentialDeleteDialog open={!!deleteTarget} title="Delete cleanup history?" description="This permanently removes only this audit-history entry. It does not delete or restore schedules, bookings, receipts, or Revenue data." pending={deleteHistory.isPending} onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={credentials => { if (deleteTarget) deleteHistory.mutate({ id: deleteTarget.id, credentials }); }} />
   </div>;
 }
 

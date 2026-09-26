@@ -83,6 +83,17 @@ public sealed class StorageManagementService : IStorageManagementService
         return ApiResponse<IReadOnlyList<BookingCleanupHistoryDto>>.Ok(history);
     }
 
+    public async Task<ApiResponse<bool>> DeleteCleanupHistoryAsync(long id, CancellationToken cancellationToken = default)
+    {
+        if (id <= 0) return ApiResponse<bool>.Fail("Deletion history record was not found");
+        var deleted = await _context.BookingCleanupAudits
+            .Where(audit => audit.Id == id)
+            .ExecuteDeleteAsync(cancellationToken);
+        return deleted == 1
+            ? ApiResponse<bool>.Ok(true, "Deletion history removed")
+            : ApiResponse<bool>.Fail("Deletion history record was not found");
+    }
+
     public async Task<ApiResponse<BookingCleanupResultDto>> DeleteCompletedBookingsAsync(
         BookingCleanupRequest request,
         string userId,

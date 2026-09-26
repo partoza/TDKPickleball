@@ -15,8 +15,8 @@ export interface ScheduleSlotArtwork {
 
 export const SOCIAL_TEMPLATES = {
   schedule: { src: '/assets/images/schedule-socmed.png', width: 1254, height: 1254 },
-  portrait: { src: '/assets/images/portrait-socmed.png', width: 945, height: 1268 },
-  landscape: { src: '/assets/images/landscape-socmedia.png', width: 1461, height: 924 },
+  portrait: { src: '/assets/images/portrait-socmedia.png', width: 945, height: 1268 },
+  landscape: { src: '/assets/images/landscape-socmediaa.png', width: 1461, height: 924 },
 } as const;
 
 const imageCache = new Map<string, Promise<HTMLImageElement>>();

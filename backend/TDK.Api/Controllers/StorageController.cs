@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using TDK.Application.DTOs.Auth;
 using TDK.Application.DTOs.Storage;
 using TDK.Application.Interfaces;
 
@@ -15,13 +16,15 @@ public sealed class StorageController : ControllerBase
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<StorageController> _logger;
     private readonly IEmailService _email;
+    private readonly IAuthService _auth;
 
-    public StorageController(IStorageManagementService storage, IWebHostEnvironment environment, ILogger<StorageController> logger, IEmailService email)
+    public StorageController(IStorageManagementService storage, IWebHostEnvironment environment, ILogger<StorageController> logger, IEmailService email, IAuthService auth)
     {
         _storage = storage;
         _environment = environment;
         _logger = logger;
         _email = email;
+        _auth = auth;
     }
 
     [HttpGet("status")]
@@ -38,6 +41,16 @@ public sealed class StorageController : ControllerBase
     [HttpGet("cleanup-history")]
     public async Task<IActionResult> GetCleanupHistory(CancellationToken cancellationToken) =>
         Ok(await _storage.GetCleanupHistoryAsync(cancellationToken));
+
+    [HttpPost("cleanup-history/{id:long}/delete")]
+    public async Task<IActionResult> DeleteCleanupHistory(long id, AdminCredentialRequest request, CancellationToken cancellationToken)
+    {
+        var verification = await _auth.VerifyAdminCredentialsAsync(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);
+        if (!verification.Success) return BadRequest(verification);
+        var result = await _storage.DeleteCleanupHistoryAsync(id, cancellationToken);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
 
     [HttpPost("cleanup")]
     public async Task<IActionResult> Cleanup(BookingCleanupRequest request, CancellationToken cancellationToken)

@@ -14,6 +14,10 @@ export const storageService = {
     const { data } = await api.get<ApiResponse<BookingCleanupHistory[]>>('/api/admin/storage/cleanup-history');
     return data;
   },
+  async deleteHistory(id: number, credentials: { email: string; password: string }) {
+    const { data } = await api.post<ApiResponse<boolean>>(`/api/admin/storage/cleanup-history/${id}/delete`, credentials);
+    return data;
+  },
   async cleanup(fromDate: string, throughDate: string) {
     const { data } = await api.post<ApiResponse<{ deletedBookingCount: number; deletedScheduleCount: number; deletedReceiptCount: number; fromDate: string; throughDate: string }>>('/api/admin/storage/cleanup', {
       fromDate,
