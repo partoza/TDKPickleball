@@ -6,6 +6,7 @@ import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, Calen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Schedule, ScheduleStatus } from '@/types';

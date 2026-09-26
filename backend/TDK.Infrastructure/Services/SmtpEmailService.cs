@@ -64,8 +64,11 @@ public class SmtpEmailService : IEmailService
         var paddleText = request.PaddleRentalQuantity > 0
             ? $"\nSelkirk Paddle Rental x {request.PaddleRentalQuantity}: PHP {request.PaddleRentalFee:N2}"
             : "";
+        var promoText = string.IsNullOrWhiteSpace(request.PromoCode)
+            ? ""
+            : $"\nPromo: {request.PromoCode}\nDiscount: -PHP {request.DiscountAmount:N2}";
         var notesText = string.IsNullOrWhiteSpace(request.Notes) ? "" : $"\nNotes: {request.Notes}";
-        var plainText = $"New public booking request {request.RequestReference}\nRequested by: {request.CustomerName}\nEmail: {request.Email}\nPhone: {request.Phone ?? "Not provided"}\n\n{scheduleText}{paddleText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nThe payment receipt is attached. Verify it manually, then add the booking from the admin booking page. No booking or schedule record has been created automatically.";
+        var plainText = $"New public booking request {request.RequestReference}\nRequested by: {request.CustomerName}\nEmail: {request.Email}\nPhone: {request.Phone ?? "Not provided"}\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nThe payment receipt is attached. Verify it manually, then add the booking from the admin booking page. No booking or schedule record has been created automatically.";
 
         var scheduleRows = string.Join("", request.Schedules.Select((schedule, index) => $"""
             <div style="margin:0 0 12px;padding:14px 16px;border:1px solid #e7e7e7;border-radius:10px;background:#fafafa;">
@@ -88,6 +91,7 @@ public class SmtpEmailService : IEmailService
             <div style="margin:0 0 24px;">{scheduleRows}</div>
             <div style="margin:0 0 24px;">
               {(request.PaddleRentalQuantity > 0 ? DetailRow($"Selkirk Paddle Rental × {request.PaddleRentalQuantity}", $"PHP {request.PaddleRentalFee:N2}") : "")}
+              {(!string.IsNullOrWhiteSpace(request.PromoCode) ? DetailRow($"Promo · {request.PromoCode}", $"-PHP {request.DiscountAmount:N2}") : "")}
               {DetailRow("Total expected payment", $"PHP {request.TotalAmount:N2}", true)}
             </div>
             {(string.IsNullOrWhiteSpace(request.Notes) ? "" : $"<div style=\"margin:0 0 24px;padding:14px 16px;border-left:3px solid {BrandRed};background:#fafafa;color:#555555;font-size:13px;line-height:1.6;\"><strong style=\"color:#111111;\">Customer notes:</strong><br>{Encode(request.Notes)}</div>")}
@@ -96,7 +100,7 @@ public class SmtpEmailService : IEmailService
 
         await SendMessageAsync(storeEmail, $"Booking request awaiting review - {request.RequestReference}", plainText, html, null, cancellationToken, true, receipt);
 
-        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
+        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
         var customerHtml = WrapEmail($"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Request received</div>
             <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">We received your booking request.</h1>
@@ -105,6 +109,7 @@ public class SmtpEmailService : IEmailService
             <div style="margin:0 0 24px;">{scheduleRows}</div>
             <div style="margin:0 0 24px;">
               {(request.PaddleRentalQuantity > 0 ? DetailRow($"Selkirk Paddle Rental × {request.PaddleRentalQuantity}", $"PHP {request.PaddleRentalFee:N2}") : "")}
+              {(!string.IsNullOrWhiteSpace(request.PromoCode) ? DetailRow($"Promo · {request.PromoCode}", $"-PHP {request.DiscountAmount:N2}") : "")}
               {DetailRow("Total expected payment", $"PHP {request.TotalAmount:N2}", true)}
             </div>
             <div style="padding:16px 18px;border:1px solid #f0d59a;border-radius:12px;background:#fff8e8;color:#6d4b00;font-size:13px;line-height:1.6;"><strong>This is not a confirmed booking.</strong><br>Please wait for the store to verify the receipt and reply before considering the court reserved.</div>

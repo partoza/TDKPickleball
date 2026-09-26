@@ -25,6 +25,18 @@ public class BookingController : ControllerBase
     [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> GetAvailability([FromQuery] DateOnly date, [FromQuery] int courtId) => Ok(await _bookingService.GetAvailabilityAsync(date, courtId));
 
+    [HttpPost("api/booking-requests/promo/validate")]
+    [Authorize(Roles = "Customer")]
+    [EnableRateLimiting("PublicRead")]
+    public async Task<IActionResult> ValidatePublicPromo([FromBody] PublicPromoValidationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.PromoCode) || request.PromoCode.Trim().Length > 100)
+            return BadRequest(new { success = false, message = "Enter a valid promo name" });
+
+        var result = await _bookingService.ValidatePublicPromoAsync(request.PromoCode);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
     [HttpPost("api/bookings")]
     [EnableRateLimiting("Email")]
     [Authorize(Roles = "Admin,Staff")]
@@ -116,7 +128,7 @@ public class BookingController : ControllerBase
         await using var receiptStream = new MemoryStream();
         await request.Receipt.CopyToAsync(receiptStream, cancellationToken);
         var result = await _bookingService.SubmitPublicRequestAsync(
-            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules),
+            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
             receiptStream.ToArray(),
             $"payment-receipt{detected.Value.Extension}",
             detected.Value.ContentType,
@@ -158,7 +170,7 @@ public class BookingController : ControllerBase
             return BadRequest(new { success = false, message = "Select between 1 and 20 booking schedules" });
 
         var result = await _bookingService.SubmitPayMongoRequestAsync(
-            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules),
+            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
             cancellationToken);
 
         return result.Success ? Ok(result) : BadRequest(result);
@@ -278,6 +290,7 @@ public sealed class PublicBookingRequestWithReceiptForm
     public string? Phone { get; set; }
     public string? Notes { get; set; }
     public int PaddleRentalQuantity { get; set; }
+    public string? PromoCode { get; set; }
     public string SchedulesJson { get; set; } = "[]";
     public IFormFile? Receipt { get; set; }
 }
@@ -288,5 +301,6 @@ public sealed class PublicPayMongoBookingRequestForm
     public string? Phone { get; set; }
     public string? Notes { get; set; }
     public int PaddleRentalQuantity { get; set; }
+    public string? PromoCode { get; set; }
     public string SchedulesJson { get; set; } = "[]";
 }

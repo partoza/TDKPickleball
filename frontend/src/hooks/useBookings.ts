@@ -61,6 +61,10 @@ export const useSubmitPublicBookingRequest = () => useMutation({
   mutationFn: bookingsService.submitPublicBookingRequest,
 });
 
+export const useValidatePublicPromo = () => useMutation({
+  mutationFn: bookingsService.validatePublicPromo,
+});
+
 export const useSubmitPublicPayMongoRequest = () => useMutation({
   mutationFn: bookingsService.submitPublicPayMongoRequest,
 });

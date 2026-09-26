@@ -1,10 +1,14 @@
 import { api } from './api';
-import { Booking, ApiResponse, RateType } from '@/types';
+import { Booking, ApiResponse, PublicPromo, RateType } from '@/types';
 import { withSeconds } from '@/lib/time-range';
 
 export const bookingsService = {
   getAvailability: async (date: string, courtId: string) => {
     const { data } = await api.get(`/api/bookings/availability?date=${date}&courtId=${courtId}`);
+    return data;
+  },
+  validatePublicPromo: async (promoCode: string): Promise<ApiResponse<PublicPromo>> => {
+    const { data } = await api.post('/api/booking-requests/promo/validate', { promoCode });
     return data;
   },
   createBooking: async (payload: any): Promise<ApiResponse<Booking>> => {
@@ -32,6 +36,7 @@ export const bookingsService = {
     form.append('phone', payload.phone || '');
     form.append('notes', payload.notes || '');
     form.append('paddleRentalQuantity', String(Number(payload.paddleRentalQuantity || 0)));
+    form.append('promoCode', payload.promoCode || '');
     form.append('schedulesJson', JSON.stringify(payload.schedules.map((schedule: any) => ({
       courtId: Number(schedule.courtId),
       bookingDate: schedule.bookingDate || schedule.date,
@@ -48,6 +53,7 @@ export const bookingsService = {
       phone: payload.phone || '',
       notes: payload.notes || '',
       paddleRentalQuantity: Number(payload.paddleRentalQuantity || 0),
+      promoCode: payload.promoCode || null,
       schedulesJson: JSON.stringify(payload.schedules.map((schedule: any) => ({
         courtId: Number(schedule.courtId),
         bookingDate: schedule.bookingDate || schedule.date,

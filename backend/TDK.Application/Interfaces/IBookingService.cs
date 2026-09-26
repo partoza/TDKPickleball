@@ -6,6 +6,7 @@ namespace TDK.Application.Interfaces;
 public interface IBookingService
 {
     Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId);
+    Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode);
     Task<ApiResponse<PublicBookingRequestReceiptDto>> SubmitPublicRequestAsync(PublicBookingRequestSubmissionDto request, byte[] receiptBytes, string receiptFileName, string receiptContentType, CancellationToken cancellationToken = default);
     Task<ApiResponse<PublicPayMongoRequestResponseDto>> SubmitPayMongoRequestAsync(PublicBookingRequestSubmissionDto request, CancellationToken cancellationToken = default);
     Task<ApiResponse<RevenueSummaryDto>> GetRevenueAsync(DateOnly fromDate, DateOnly throughDate);
