@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /tdkadmin/
+Disallow: /verify
+Disallow: /success
+Disallow: /auth/
+
+Sitemap: https://thedirtykitchen.vercel.app/sitemap.xml
