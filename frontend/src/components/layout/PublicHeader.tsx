@@ -23,7 +23,7 @@ export default function PublicHeader() {
   const navLinks = [
     { name: 'Home', href: ROUTES.HOME },
     { name: 'Schedule', href: ROUTES.SCHEDULE },
-    { name: 'Verify Court', href: ROUTES.VERIFY },
+    { name: 'Verify Booking', href: ROUTES.VERIFY },
     { name: 'Contact', href: ROUTES.CONTACT },
   ];
 
