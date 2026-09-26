@@ -359,7 +359,7 @@ public class SmtpEmailService : IEmailService
               </a>
             </div>
 
-            <div style="margin-top:32px;text-align:center;">{Button(verifyUrl, "Verify booking")}</div>
+            <div style="margin-top:32px;text-align:center;">{Button(verifyUrl, "Verify booking", true)}</div>
             """;
         return WrapEmail(content, booking.BookingReference);
     }
@@ -410,8 +410,8 @@ public class SmtpEmailService : IEmailService
         </table>
         """;
 
-    private static string Button(string url, string label) => $"""
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:9px;background:{BrandRed};"><a href="{Encode(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">{Encode(label)}</a></td></tr></table>
+    private static string Button(string url, string label, bool centered = false) => $"""
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"{(centered ? " align=\"center\"" : "")}><tr><td style="border-radius:9px;background:{BrandRed};"><a href="{Encode(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">{Encode(label)}</a></td></tr></table>
         """;
 
     private static string WrapEmail(string content, string preheader) => $"""
