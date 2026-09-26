@@ -615,7 +615,7 @@ export default function BookingPage() {
                   >
                     PayMongo QR Ph
                   </button>
-                </div>
+                </div>)}
 
                 {paymentMethod === 'manual' ? (
                   <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
