@@ -12,6 +12,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
+import { ScheduleStatus } from '@/types';
+import { cn } from '@/lib/utils';
 
 function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, bookings: Booking[], internalCoaches: any[] }) {
   const [now, setNow] = useState(new Date());
@@ -51,65 +55,96 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
     return `${mins} min left`;
   };
 
+  let activeStatus = ScheduleStatus.Available;
+  let mainName = '';
+  let mainLabel = '';
+  let subName = '';
+  let subLabel = '';
+  if (activeBooking) {
+    if (activeBooking.bookingType === RateType.Training) {
+      activeStatus = ScheduleStatus.Training;
+      mainName = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'Coach';
+      mainLabel = 'Coach';
+      subName = activeBooking.customerName;
+      subLabel = 'Trainee';
+    } else if (activeBooking.bookingType === RateType.Internal) {
+      activeStatus = ScheduleStatus.Internal;
+      mainName = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'Internal';
+      mainLabel = 'Internal';
+      subName = activeBooking.customerName;
+      subLabel = 'Reference';
+    } else {
+      activeStatus = ScheduleStatus.Booked;
+      mainName = activeBooking.customerName;
+      mainLabel = 'Player';
+    }
+  }
+
+  const getAvatarInitials = (name: string) => name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?';
+
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm relative overflow-hidden transition-all group">
+    <div className="rounded-2xl border bg-card p-5 shadow-sm relative overflow-hidden transition-all flex flex-col h-full group">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-lg leading-none m-0">{court.name}</h3>
         {timeStr < '08:00:00' ? (
           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">Closed</span>
         ) : activeBooking ? (
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</div>
-              <div className="text-[10px] text-muted-foreground">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</div>
-            </div>
-            <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">In use</span>
-          </div>
+          <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", STATUS_COLORS[activeStatus])}>
+             {STATUS_LABELS[activeStatus]}
+          </span>
         ) : (
-          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Available</span>
+          <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", STATUS_COLORS[ScheduleStatus.Available])}>
+             Available
+          </span>
         )}
       </div>
 
-      {activeBooking ? (
-        <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3 space-y-2 border border-slate-100 dark:border-white/5">
-          {activeBooking.bookingType === RateType.Training ? (
-            <>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Trainee:</span>
-                <span className="font-semibold">{activeBooking.customerName}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Coach:</span>
-                <span className="font-semibold">{internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'N/A'}</span>
-              </div>
-            </>
-          ) : activeBooking.bookingType === RateType.Internal ? (
-            <>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Internal:</span>
-                <span className="font-semibold">{internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Reference:</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">{activeBooking.customerName}</span>
-              </div>
-            </>
-          ) : (
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Player:</span>
-              <span className="font-semibold">{activeBooking.customerName}</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 text-center text-sm text-muted-foreground">
-          {(() => {
-            const nextBooking = bookings.find(b => b.courtId === court.id && b.bookingDate === todayStr && b.startTime > timeStr && b.status !== 'Cancelled');
-            if (nextBooking) return `Next booking at ${formatHour(nextBooking.startTime)}`;
-            return 'No upcoming bookings today';
-          })()}
-        </div>
-      )}
+      <div className="flex-1 flex flex-col justify-center">
+        {activeBooking ? (
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 flex flex-col gap-3 transition-colors group-hover:border-primary/20">
+             <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <Avatar className="h-10 w-10 border border-border shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                      <AvatarFallback className="bg-primary/5 text-primary text-[11px] font-bold">{getAvatarInitials(mainName)}</AvatarFallback>
+                   </Avatar>
+                   <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-foreground leading-tight">{mainName}</span>
+                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">{mainLabel}</span>
+                   </div>
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</span>
+                </div>
+             </div>
+             
+             {(subName || activeBooking.paddleRentalQuantity > 0) && (
+               <div className="pt-3 mt-1 border-t border-slate-200/80 dark:border-white/10 flex flex-col gap-1.5">
+                 {subName && (
+                   <div className="flex justify-between items-center text-[12px]">
+                     <span className="text-slate-500 font-medium">{subLabel}:</span>
+                     <span className="font-semibold text-slate-700 dark:text-slate-300">{subName}</span>
+                   </div>
+                 )}
+                 {activeBooking.paddleRentalQuantity > 0 && (
+                   <div className="flex justify-between items-center text-[12px]">
+                     <span className="text-slate-500 font-medium">Paddles Rented:</span>
+                     <span className="font-semibold text-slate-700 dark:text-slate-300 bg-primary/10 text-primary px-1.5 py-0.5 rounded-md">{activeBooking.paddleRentalQuantity} paddle{activeBooking.paddleRentalQuantity > 1 ? 's' : ''}</span>
+                   </div>
+                 )}
+               </div>
+             )}
+          </div>
+        ) : (
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 text-center text-sm text-muted-foreground h-full flex items-center justify-center min-h-[80px]">
+            {(() => {
+              const nextBooking = bookings.find(b => b.courtId === court.id && b.bookingDate === todayStr && b.startTime > timeStr && b.status !== 'Cancelled');
+              if (nextBooking) return `Next booking at ${formatHour(nextBooking.startTime)}`;
+              return 'No upcoming bookings today';
+            })()}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
