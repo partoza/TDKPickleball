@@ -50,5 +50,6 @@ export const ROUTES = {
     WELCOME: '/tdkadmin/welcome',
     PROFILE: '/tdkadmin/profile',
     WIDGET: '/tdkadmin/widget',
+    SOCIAL_MEDIA: '/tdkadmin/social-media',
   }
 };

@@ -23,6 +23,7 @@ import PasswordPage from '@/pages/admin/PasswordPage';
 import StoragePage from '@/pages/admin/StoragePage';
 import InternalCoachesPage from '@/pages/admin/InternalCoachesPage';
 import AdminWidgetPage from '@/pages/admin/AdminWidgetPage';
+import SocialMediaPage from '@/pages/admin/SocialMediaPage';
 import { ROUTES } from '@/lib/constants';
 
 export const router = createBrowserRouter([
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.ADMIN.INTERNAL_COACHES.replace('/tdkadmin/', ''), element: <InternalCoachesPage /> },
       { path: ROUTES.ADMIN.STORAGE.replace('/tdkadmin/', ''), element: <StoragePage /> },
       { path: ROUTES.ADMIN.PROFILE.replace('/tdkadmin/', ''), element: <PasswordPage /> },
+      { path: ROUTES.ADMIN.SOCIAL_MEDIA.replace('/tdkadmin/', ''), element: <SocialMediaPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

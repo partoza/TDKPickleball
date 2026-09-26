@@ -3,7 +3,7 @@ import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar } from '@heroicons/react/24/solid';
+import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar, MegaphoneIcon as Megaphone } from '@heroicons/react/24/solid';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -91,6 +91,7 @@ export default function AdminLayout() {
     { icon: LayoutDashboard, label: 'Overview', href: ROUTES.ADMIN.DASHBOARD },
     { icon: Calendar, label: 'Schedule', href: ROUTES.ADMIN.SCHEDULE },
     { icon: Ticket, label: 'Bookings', href: ROUTES.ADMIN.BOOKINGS },
+    { icon: Megaphone, label: 'Social', href: ROUTES.ADMIN.SOCIAL_MEDIA },
     ...(user?.role === 'Admin' ? [{ icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS }] : []),
   ];
 

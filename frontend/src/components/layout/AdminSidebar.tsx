@@ -14,6 +14,7 @@ import {
   CircleStackIcon as Database,
   ReceiptPercentIcon as Percent,
   ChartBarIcon as ChartBar,
+  MegaphoneIcon as Megaphone,
 } from '@heroicons/react/24/solid';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,7 @@ export default function AdminSidebar() {
     { icon: LayoutDashboard, label: 'Overview', href: ROUTES.ADMIN.DASHBOARD },
     { icon: Calendar, label: 'Schedule', href: ROUTES.ADMIN.SCHEDULE },
     { icon: Ticket, label: 'Bookings', href: ROUTES.ADMIN.BOOKINGS },
+    { icon: Megaphone, label: 'Social Media', href: ROUTES.ADMIN.SOCIAL_MEDIA },
     ...(user?.role === 'Admin' ? [{ icon: ChartBar, label: 'Revenue', href: ROUTES.ADMIN.REVENUE }] : []),
   ];
   
