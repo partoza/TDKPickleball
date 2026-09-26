@@ -12,7 +12,7 @@ namespace TDK.Api.Controllers;
 
 [ApiController]
 [Route("api/internal-coaches")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Staff")]
 public class InternalCoachesController : ControllerBase
 {
     private readonly IInternalCoachService _internalCoachService;
@@ -40,6 +40,7 @@ public class InternalCoachesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<InternalCoachProfileDto>>> Create(CreateInternalCoachProfileRequest request)
     {
         var result = await _internalCoachService.CreateAsync(request);
@@ -48,6 +49,7 @@ public class InternalCoachesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<InternalCoachProfileDto>>> Update(int id, UpdateInternalCoachProfileRequest request)
     {
         var result = await _internalCoachService.UpdateAsync(id, request);
@@ -56,6 +58,7 @@ public class InternalCoachesController : ControllerBase
     }
 
     [HttpPost("{id}/profile-image")]
+    [Authorize(Roles = "Admin")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(ProfileImageValidator.MaximumRequestBytes)]
     public async Task<IActionResult> UpdateProfileImage(int id, [FromForm] IFormFile? image, CancellationToken cancellationToken)
@@ -69,6 +72,7 @@ public class InternalCoachesController : ControllerBase
     }
 
     [HttpDelete("{id}/profile-image")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RemoveProfileImage(int id, CancellationToken cancellationToken)
     {
         var result = await _internalCoachService.RemoveProfileImageAsync(id, cancellationToken);
@@ -76,6 +80,7 @@ public class InternalCoachesController : ControllerBase
     }
 
     [HttpPost("{id}/delete")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> Delete(int id, AdminCredentialRequest request, CancellationToken cancellationToken)
     {
         var verification = await _authService.VerifyAdminCredentialsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, request.Email, request.Password);

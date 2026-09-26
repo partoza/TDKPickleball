@@ -9,7 +9,7 @@ namespace TDK.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Staff")]
 public class PromosController : ControllerBase
 {
     private readonly IPromoService _promoService;
@@ -43,6 +43,7 @@ public class PromosController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreatePromoRequest request)
     {
         var result = await _promoService.CreateAsync(request);
@@ -50,6 +51,7 @@ public class PromosController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePromoRequest request)
     {
         var result = await _promoService.UpdateAsync(id, request);
