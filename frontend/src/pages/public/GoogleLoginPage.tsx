@@ -74,7 +74,7 @@ export default function GoogleLoginPage() {
           theme: 'outline',
           size: 'large',
           text: 'signin_with',
-          shape: 'pill',
+          shape: 'rectangular',
           logo_alignment: 'left',
           width: Math.min(buttonRef.current.clientWidth || 400, 400),
         });
