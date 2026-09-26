@@ -161,7 +161,7 @@ export default function AdminWidgetPage() {
     return [...court1Upcoming, ...court2Upcoming].sort((a, b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
   }, [bookings, now, courts]);
 
-  if (authLoading) return <main className="grid min-h-screen place-items-center bg-slate-50"><img src="/assets/images/loading.png" alt="Loading" className="page-loading-mascot" /></main>;
+  if (authLoading) return <main className="grid min-h-screen place-items-center bg-background"><img src="/assets/images/loading.png" alt="Loading" className="page-loading-mascot" /></main>;
   if (!isAuthenticated || (user?.role !== 'Admin' && user?.role !== 'Staff')) return <Navigate to={`${ROUTES.ADMIN.LOGIN}?widget=1`} replace />;
   if (user.mustChangePassword) return <Navigate to={ROUTES.ADMIN.WELCOME} replace />;
 
