@@ -46,6 +46,17 @@ public class BookingService : IBookingService
         return ApiResponse<BookingAvailabilityDto>.Ok(new(date, courtId, available, occupied));
     }
 
+    public async Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode)
+    {
+        var (promo, error) = await ResolvePublicPromoAsync(promoCode);
+        if (promo is null)
+            return ApiResponse<PublicPromoDto>.Fail(error ?? "Promo name is invalid or unavailable");
+
+        return ApiResponse<PublicPromoDto>.Ok(
+            new(promo.Code, promo.Description, promo.Type, promo.Value),
+            "Promo applied");
+    }
+
     public async Task<ApiResponse<PublicBookingRequestReceiptDto>> SubmitPublicRequestAsync(
         PublicBookingRequestSubmissionDto request,
         byte[] receiptBytes,
@@ -57,6 +68,12 @@ public class BookingService : IBookingService
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Select between 1 and 20 booking schedules");
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail($"Paddle rental quantity must be between 0 and {MaximumPaddleRentalQuantity}");
+
+        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode);
+        if (promoError is not null)
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail(promoError);
+        if (promo?.MaxUses is int manualMaxUses && promo.CurrentUses + request.Schedules.Count > manualMaxUses)
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Promo does not have enough remaining uses for the selected schedules");
 
         for (var leftIndex = 0; leftIndex < request.Schedules.Count; leftIndex++)
         {
@@ -73,6 +90,7 @@ public class BookingService : IBookingService
 
         var requestedSchedules = new List<PublicBookingRequestScheduleDto>(request.Schedules.Count);
         decimal courtTotal = 0;
+        decimal discountTotal = 0;
         foreach (var schedule in request.Schedules)
         {
             var conflict = await ValidateSlotAsync(schedule.CourtId, schedule.BookingDate, schedule.StartTime, schedule.EndTime);
@@ -86,8 +104,10 @@ public class BookingService : IBookingService
             if (amount <= 0)
                 return ApiResponse<PublicBookingRequestReceiptDto>.Fail("No active rate covers one or more selected schedules");
 
-            courtTotal += amount;
-            requestedSchedules.Add(new(schedule.CourtId, court.Name, schedule.BookingDate, schedule.StartTime, schedule.EndTime, amount));
+            var discount = CalculatePromoDiscount(amount, promo);
+            discountTotal += discount;
+            courtTotal += amount - discount;
+            requestedSchedules.Add(new(schedule.CourtId, court.Name, schedule.BookingDate, schedule.StartTime, schedule.EndTime, amount - discount));
         }
 
         var submittedAt = _clock.UtcNow.UtcDateTime;
@@ -103,7 +123,9 @@ public class BookingService : IBookingService
             request.PaddleRentalQuantity,
             paddleRentalFee,
             courtTotal + paddleRentalFee,
-            submittedAt);
+            submittedAt,
+            promo?.Code,
+            discountTotal);
 
         try
         {
@@ -128,6 +150,12 @@ public class BookingService : IBookingService
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
             return ApiResponse<PublicPayMongoRequestResponseDto>.Fail($"Paddle rental quantity must be between 0 and {MaximumPaddleRentalQuantity}");
 
+        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode);
+        if (promoError is not null)
+            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail(promoError);
+        if (promo?.MaxUses is int payMongoMaxUses && promo.CurrentUses + request.Schedules.Count > payMongoMaxUses)
+            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Promo does not have enough remaining uses for the selected schedules");
+
         for (var leftIndex = 0; leftIndex < request.Schedules.Count; leftIndex++)
         {
             var left = request.Schedules[leftIndex];
@@ -151,14 +179,18 @@ public class BookingService : IBookingService
             if (court is null || !court.IsActive) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Court is not available");
             var amount = await _rates.CalculateRateAsync(schedule.StartTime, schedule.EndTime, RateType.Booking);
             if (amount <= 0) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("No active rate covers one or more selected schedules");
-            checkoutTotal += amount;
+            var discountedAmount = amount - CalculatePromoDiscount(amount, promo);
+            checkoutTotal += discountedAmount;
             
-            lineItems.Add(new PayMongoLineItem(
-                $"Court Booking - {court.Name}", 
-                amount, 
-                1, 
-                $"{schedule.BookingDate:MMM dd, yyyy} ({schedule.StartTime:HH:mm} - {schedule.EndTime:HH:mm})"
-            ));
+            if (discountedAmount > 0)
+            {
+                lineItems.Add(new PayMongoLineItem(
+                    promo is null ? $"Court Booking - {court.Name}" : $"Court Booking - {court.Name} ({promo.Code})",
+                    discountedAmount,
+                    1,
+                    $"{schedule.BookingDate:MMM dd, yyyy} ({schedule.StartTime:HH:mm} - {schedule.EndTime:HH:mm})"
+                ));
+            }
         }
 
         if (request.PaddleRentalQuantity > 0)
@@ -167,6 +199,9 @@ public class BookingService : IBookingService
             checkoutTotal += paddleRentalFee;
             lineItems.Add(new PayMongoLineItem("Paddle Rental", PaddleRentalPrice, request.PaddleRentalQuantity, "Pickleball Paddle Rental"));
         }
+
+        if (checkoutTotal <= 0)
+            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("This promo covers the full amount. Please use manual booking so the store can verify it.");
 
         var submittedAt = _clock.UtcNow.UtcDateTime;
         var requestReference = $"PM-{submittedAt:yyyyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
@@ -183,8 +218,9 @@ public class BookingService : IBookingService
         }
 
         var createdRefs = new List<string>();
-        foreach (var schedule in request.Schedules)
+        for (var scheduleIndex = 0; scheduleIndex < request.Schedules.Count; scheduleIndex++)
         {
+            var schedule = request.Schedules[scheduleIndex];
             var createReq = new CreateBookingRequest(
                 schedule.CourtId,
                 schedule.BookingDate,
@@ -197,8 +233,8 @@ public class BookingService : IBookingService
                 0,
                 RateType.Booking,
                 null,
-                null,
-                request.PaddleRentalQuantity
+                promo?.Id,
+                scheduleIndex == 0 ? request.PaddleRentalQuantity : 0
             );
             var res = await CreateAsync(createReq, false); 
             if (res.Success && res.Data != null) {
@@ -299,6 +335,8 @@ public class BookingService : IBookingService
                 group.Where(booking => !trainingIds.Contains(booking.Id)).Sum(BaseSale),
                 group.Where(booking => trainingIds.Contains(booking.Id)).Sum(BaseSale),
                 group.Sum(booking => booking.PaddleRentalFee),
+                group.Sum(booking => booking.DiscountAmount),
+                group.Count(booking => booking.PromoId.HasValue),
                 group.Sum(booking => booking.TotalAmount),
                 group.Sum(booking => booking.AmountPaid),
                 group.Sum(Outstanding),
@@ -314,6 +352,8 @@ public class BookingService : IBookingService
             bookings.Where(booking => !trainingIds.Contains(booking.Id)).Sum(BaseSale),
             bookings.Where(booking => trainingIds.Contains(booking.Id)).Sum(BaseSale),
             bookings.Sum(booking => booking.PaddleRentalFee),
+            bookings.Sum(booking => booking.DiscountAmount),
+            bookings.Count(booking => booking.PromoId.HasValue),
             bookings.Sum(booking => booking.PaddleRentalQuantity),
             bookings.Count,
             bookings.Count(booking => booking.Status == BookingStatus.Paid),
@@ -621,5 +661,32 @@ public class BookingService : IBookingService
         if (promo.EndDate.HasValue && DateOnly.FromDateTime(promo.EndDate.Value) < today) return "Promo has expired";
         if (promo.AppliesTo.HasValue && promo.AppliesTo.Value != rateType) return $"Promo is not available for {rateType} bookings";
         return null;
+    }
+
+    private async Task<(Promo? Promo, string? Error)> ResolvePublicPromoAsync(string? promoCode)
+    {
+        if (string.IsNullOrWhiteSpace(promoCode)) return (null, null);
+        var exactCode = promoCode.Trim();
+        if (exactCode.Length > 100) return (null, "Promo name is invalid or unavailable");
+
+        var promos = await _promos.GetAllAsync();
+        var promo = promos.FirstOrDefault(candidate =>
+            string.Equals(candidate.Code, exactCode, StringComparison.Ordinal));
+        if (promo is null || !promo.IsActive)
+            return (null, "Promo name is invalid or unavailable. Enter the exact promo name.");
+        if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value)
+            return (null, "Promo usage limit reached");
+
+        var availabilityError = ValidatePromoAvailability(promo, RateType.Booking);
+        return availabilityError is null ? (promo, null) : (null, availabilityError);
+    }
+
+    private static decimal CalculatePromoDiscount(decimal subtotal, Promo? promo)
+    {
+        if (promo is null) return 0;
+        var discount = promo.Type == DiscountType.Percentage
+            ? subtotal * (promo.Value / 100m)
+            : promo.Value;
+        return Math.Clamp(discount, 0, subtotal);
     }
 }

@@ -117,6 +117,13 @@ export interface Promo {
   isActive: boolean;
 }
 
+export interface PublicPromo {
+  code: string;
+  description: string;
+  type: DiscountType;
+  value: number;
+}
+
 export interface Rate {
   id: number;
   startTime: string;
@@ -224,6 +231,8 @@ export interface RevenueDaily {
   bookingSales: number;
   trainingSales: number;
   paddleRentalSales: number;
+  promoDiscounts: number;
+  promosAppliedCount: number;
   grossSales: number;
   collectedRevenue: number;
   outstandingBalance: number;
@@ -239,6 +248,8 @@ export interface RevenueSummary {
   bookingSales: number;
   trainingSales: number;
   paddleRentalSales: number;
+  promoDiscounts: number;
+  promosAppliedCount: number;
   paddleRentalCount: number;
   transactionCount: number;
   paidCount: number;

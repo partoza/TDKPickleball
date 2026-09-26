@@ -1,4 +1,4 @@
-using TDK.Domain.Enums;
+﻿using TDK.Domain.Enums;
 using TDK.Application.DTOs.Schedules;
 
 namespace TDK.Application.DTOs.Bookings;
@@ -12,10 +12,12 @@ public record AddPaddleRentalRequest(int Quantity);
 public record BookingAvailabilityDto(DateOnly Date, int CourtId, List<TimeSlotDto> AvailableSlots, List<TimeSlotDto> OccupiedSlots);
 public record ReceiptInfoDto(string FileName, string ContentType);
 public record PublicBookingRequestBlockDto(int CourtId, DateOnly BookingDate, TimeOnly StartTime, TimeOnly EndTime);
-public record PublicBookingRequestSubmissionDto(string CustomerName, string Email, string? Phone, string? Notes, int PaddleRentalQuantity, IReadOnlyList<PublicBookingRequestBlockDto> Schedules);
+public record PublicBookingRequestSubmissionDto(string CustomerName, string Email, string? Phone, string? Notes, int PaddleRentalQuantity, IReadOnlyList<PublicBookingRequestBlockDto> Schedules, string? PromoCode = null);
 public record PublicBookingRequestScheduleDto(int CourtId, string CourtName, DateOnly BookingDate, TimeOnly StartTime, TimeOnly EndTime, decimal Amount);
-public record PublicBookingRequestEmailDto(string RequestReference, string CustomerName, string Email, string? Phone, string? Notes, IReadOnlyList<PublicBookingRequestScheduleDto> Schedules, int PaddleRentalQuantity, decimal PaddleRentalFee, decimal TotalAmount, DateTime SubmittedAt);
+public record PublicBookingRequestEmailDto(string RequestReference, string CustomerName, string Email, string? Phone, string? Notes, IReadOnlyList<PublicBookingRequestScheduleDto> Schedules, int PaddleRentalQuantity, decimal PaddleRentalFee, decimal TotalAmount, DateTime SubmittedAt, string? PromoCode = null, decimal DiscountAmount = 0);
 public record PublicBookingRequestReceiptDto(string RequestReference, DateTime SubmittedAt);
 public record PublicPayMongoRequestResponseDto(string RequestReference, string CheckoutUrl, DateTime SubmittedAt, IReadOnlyList<string>? BookingReferences = null);
-public record RevenueDailyDto(DateOnly Date, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, decimal GrossSales, decimal CollectedRevenue, decimal OutstandingBalance, int TransactionCount);
-public record RevenueSummaryDto(DateOnly FromDate, DateOnly ThroughDate, decimal CollectedRevenue, decimal GrossSales, decimal OutstandingBalance, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, int PaddleRentalCount, int TransactionCount, int PaidCount, int ReservedCount, int CompletedCount, IReadOnlyList<RevenueDailyDto> Daily);
+public record PublicPromoValidationRequest(string PromoCode);
+public record PublicPromoDto(string Code, string Description, DiscountType Type, decimal Value);
+public record RevenueDailyDto(DateOnly Date, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, decimal PromoDiscounts, int PromosAppliedCount, decimal GrossSales, decimal CollectedRevenue, decimal OutstandingBalance, int TransactionCount);
+public record RevenueSummaryDto(DateOnly FromDate, DateOnly ThroughDate, decimal CollectedRevenue, decimal GrossSales, decimal OutstandingBalance, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, decimal PromoDiscounts, int PromosAppliedCount, int PaddleRentalCount, int TransactionCount, int PaidCount, int ReservedCount, int CompletedCount, IReadOnlyList<RevenueDailyDto> Daily);
