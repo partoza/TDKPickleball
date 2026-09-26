@@ -6,6 +6,7 @@ import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, Calen
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -130,7 +131,7 @@ export default function SchedulePage() {
   const updateMutation = useUpdateSchedule();
   const deleteMutation = useDeleteSchedule();
   
-  const { data: courtsRes } = useCourts();
+  const { data: courtsRes, isLoading: courtsLoading } = useCourts();
   const courts = courtsRes?.data || [];
   const { data: ratesRes } = useRates();
   const rates = ratesRes?.data || [];
@@ -165,7 +166,8 @@ export default function SchedulePage() {
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
   const weekDaysStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
 
-  const { data: schedules } = useAdminWeeklySchedules(weekDaysStrs, activeCourtId);
+  const { data: schedules, isLoading: scheduleLoading } = useAdminWeeklySchedules(weekDaysStrs, activeCourtId);
+  const isLoading = courtsLoading || scheduleLoading;
   const weekSchedules = schedules || [];
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
   const modalQuote = bookingModalData ? calculateRateQuote(rates, bookingModalData.startTimeStr, bookingModalData.endTimeStr, modalRateType) : null;
@@ -533,7 +535,9 @@ export default function SchedulePage() {
                               }
                             }}
                           >
-                            {slot ? (() => {
+                            {isLoading ? (
+                              <Skeleton className="w-full h-full min-h-[70px] rounded-xl" />
+                            ) : slot ? (() => {
                               const timedStatus = getTimedStatus(slot);
                               return (
                               <div className={cn(
