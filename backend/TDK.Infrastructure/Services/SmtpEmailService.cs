@@ -129,17 +129,21 @@ public class SmtpEmailService : IEmailService
 
     public Task SendTemporaryPasswordAsync(string email, string firstName, string temporaryPassword, CancellationToken cancellationToken = default)
     {
-        var plainText = $"Hello {firstName},\n\nYour temporary password is: {temporaryPassword}\n\nSign in and create a new password before accessing the administration portal.";
+        var plainText = $"Hello {firstName},\n\nYour administration account is ready.\nEmail: {email}\nTemporary password: {temporaryPassword}\n\nSign in and create a new password before accessing the administration portal.";
         var loginUrl = $"{GetFrontendUrl()}/tdkadmin";
         var html = WrapEmail($"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Account invitation</div>
             <h1 style="margin:12px 0 10px;font-size:28px;line-height:1.2;letter-spacing:-.03em;color:#111111;">Welcome to TDK.</h1>
             <p style="margin:0;color:#666666;font-size:15px;line-height:1.7;">Hello {Encode(firstName)}, your administration account is ready. Use this one-time password to sign in.</p>
             <div style="margin:28px 0;padding:18px 20px;border:1px solid #e7e7e7;border-radius:12px;background:#fafafa;">
-              <div style="margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#777777;">Temporary password</div>
+              <div style="margin-bottom:16px;">
+                <div style="margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#777777;">Email address</div>
+                <div style="font-size:16px;font-weight:600;color:#111111;">{Encode(email)}</div>
+              </div>
+              <div style="margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#777777;">Temporary password</div>
               <div style="font-family:SFMono-Regular,Consolas,Liberation Mono,monospace;font-size:20px;font-weight:700;letter-spacing:.04em;color:#111111;">{Encode(temporaryPassword)}</div>
             </div>
-            {Button(loginUrl, "Open admin console")}
+            {Button(loginUrl, "Sign-in Admin")}
             <p style="margin:24px 0 0;color:#777777;font-size:13px;line-height:1.6;">You will be asked to replace this password immediately. Do not forward this email.</p>
             """, "Secure account access");
         return SendMessageAsync(email, "Your TDK administration account", plainText, html, null, cancellationToken, true);
