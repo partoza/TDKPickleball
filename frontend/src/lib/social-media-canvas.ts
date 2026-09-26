@@ -75,15 +75,25 @@ export async function renderScheduleArtwork(
   ctx.lineTo(template.width / 2 + 82, 380);
   ctx.stroke();
 
-  const grid = { x: 64, y: 396, width: 1126, rowHeight: 205 };
+  const grid = { x: 64, y: 396, width: 1126, rowHeight: 205, maxRows: 3 };
   const cellWidth = grid.width / 2;
+  const selectedSlots = slots.slice(0, 6);
+  const rowCount = Math.ceil(selectedSlots.length / 2);
+  const contentHeight = rowCount * grid.rowHeight;
+  const contentY = grid.y + (grid.rowHeight * grid.maxRows - contentHeight) / 2;
+
   ctx.strokeStyle = 'rgba(255, 255, 255, .24)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(grid.x + cellWidth, grid.y);
-  ctx.lineTo(grid.x + cellWidth, grid.y + grid.rowHeight * 3);
-  for (let row = 1; row < 3; row++) {
-    const y = grid.y + row * grid.rowHeight;
+  for (let row = 0; row < rowCount; row++) {
+    if (selectedSlots.length - row * 2 >= 2) {
+      const top = contentY + row * grid.rowHeight;
+      ctx.moveTo(grid.x + cellWidth, top);
+      ctx.lineTo(grid.x + cellWidth, top + grid.rowHeight);
+    }
+  }
+  for (let row = 1; row < rowCount; row++) {
+    const y = contentY + row * grid.rowHeight;
     ctx.moveTo(grid.x, y);
     ctx.lineTo(grid.x + grid.width, y);
   }
@@ -94,14 +104,15 @@ export async function renderScheduleArtwork(
     ctx.shadowBlur = 10;
     ctx.fillStyle = 'rgba(255, 255, 255, .82)';
     ctx.font = '400 25px Poppins, Arial, sans-serif';
-    ctx.fillText('Select up to 6 available schedules', template.width / 2, grid.y + grid.rowHeight * 1.5);
+    ctx.fillText('Select up to 6 available schedules', template.width / 2, grid.y + grid.rowHeight * grid.maxRows / 2);
   }
 
-  slots.slice(0, 6).forEach((slot, index) => {
+  selectedSlots.forEach((slot, index) => {
     const column = index % 2;
     const row = Math.floor(index / 2);
-    const centerX = grid.x + cellWidth * column + cellWidth / 2;
-    const centerY = grid.y + grid.rowHeight * row + grid.rowHeight / 2;
+    const isCenteredLastSlot = selectedSlots.length % 2 === 1 && index === selectedSlots.length - 1;
+    const centerX = isCenteredLastSlot ? template.width / 2 : grid.x + cellWidth * column + cellWidth / 2;
+    const centerY = contentY + grid.rowHeight * row + grid.rowHeight / 2;
 
     ctx.shadowColor = 'rgba(38, 2, 12, .62)';
     ctx.shadowBlur = 10;
