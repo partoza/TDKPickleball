@@ -600,7 +600,7 @@ export default function BookingPage() {
                   <span className="font-mono text-2xl font-bold tabular-nums">{String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:{String(secondsLeft % 60).padStart(2, '0')}</span>
                 </div>
 
-                <div className="flex gap-2 p-1 bg-muted/50 rounded-xl border">
+                {false && (<div className="flex gap-2 p-1 bg-muted/50 rounded-xl border">
                   <button 
                     type="button" 
                     onClick={() => setPaymentMethod('manual')} 
