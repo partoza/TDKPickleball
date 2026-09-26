@@ -6,7 +6,6 @@ import { ROUTES } from '@/lib/constants';
 
 export default function SuccessPage() {
   const [searchParams] = useSearchParams();
-  const pmRef = searchParams.get('pmRef');
   const tdkRefs = searchParams.get('refs')?.split(',') || [];
   const simulated = searchParams.get('simulated');
   
