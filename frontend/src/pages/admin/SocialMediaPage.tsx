@@ -25,6 +25,7 @@ import {
   canvasToPng,
   createStoredZip,
   downloadBlob,
+  formatAvailableCourtLabel,
   PhotoAdjustment,
   PhotoOrientation,
   renderPhotoArtwork,
@@ -91,6 +92,7 @@ function ScheduleGenerator() {
       endTime: slot.endTime,
       label: formatTimeRange(slot.startTime, slot.endTime),
       courtCount: availableCourts.length,
+      courtNames: availableCourts.map(item => item.court.displayName || item.court.name),
     };
   }).filter(slot => slot.courtCount > 0 && !isPastManilaStart(date, slot.startTime)), [board, date]);
 
@@ -168,7 +170,7 @@ function ScheduleGenerator() {
                       <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-md border', checked ? 'border-primary bg-primary text-white' : 'border-border bg-background')}>
                         {checked && <CheckCircleIcon className="h-4 w-4" />}
                       </span>
-                      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{slot.label}</span><span className="block text-[11px] text-muted-foreground">{slot.courtCount} {slot.courtCount === 1 ? 'court' : 'courts'} available</span></span>
+                      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{slot.label}</span><span className="block text-[11px] text-muted-foreground">{formatAvailableCourtLabel(slot.courtNames)}</span></span>
                     </button>;
                   })}
                 </div> : <div className="rounded-xl border border-dashed p-7 text-center"><CalendarDaysIcon className="mx-auto h-8 w-8 text-muted-foreground/50" /><p className="mt-2 text-sm font-semibold">No available schedules</p><p className="mt-1 text-xs text-muted-foreground">Try a different date.</p></div>}

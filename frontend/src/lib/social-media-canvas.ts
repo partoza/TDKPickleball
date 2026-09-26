@@ -10,6 +10,7 @@ export interface ScheduleSlotArtwork {
   id: string;
   label: string;
   courtCount: number;
+  courtNames: string[];
 }
 
 export const SOCIAL_TEMPLATES = {
@@ -59,22 +60,22 @@ export async function renderScheduleArtwork(
   ctx.shadowOffsetY = 3;
 
   ctx.fillStyle = 'rgba(255, 255, 255, .72)';
-  ctx.font = '400 17px Poppins, Arial, sans-serif';
+  ctx.font = '400 19px Poppins, Arial, sans-serif';
   drawSpacedText(ctx, 'COURT AVAILABILITY', template.width / 2, 292, 5);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '600 38px Poppins, Arial, sans-serif';
-  ctx.fillText(dateLabel, template.width / 2, 337);
+  ctx.font = '600 43px Poppins, Arial, sans-serif';
+  ctx.fillText(dateLabel, template.width / 2, 340);
 
   ctx.shadowColor = 'transparent';
   ctx.strokeStyle = 'rgba(255, 255, 255, .46)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(template.width / 2 - 72, 374);
-  ctx.lineTo(template.width / 2 + 72, 374);
+  ctx.moveTo(template.width / 2 - 82, 380);
+  ctx.lineTo(template.width / 2 + 82, 380);
   ctx.stroke();
 
-  const grid = { x: 154, y: 405, width: 946, rowHeight: 172 };
+  const grid = { x: 108, y: 404, width: 1038, rowHeight: 184 };
   const cellWidth = grid.width / 2;
   ctx.strokeStyle = 'rgba(255, 255, 255, .24)';
   ctx.lineWidth = 1.5;
@@ -106,19 +107,38 @@ export async function renderScheduleArtwork(
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
     ctx.fillStyle = 'rgba(255, 255, 255, .62)';
-    ctx.font = '400 14px Poppins, Arial, sans-serif';
-    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 48, 3);
+    ctx.font = '400 16px Poppins, Arial, sans-serif';
+    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 55, 3.5);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '500 29px Poppins, Arial, sans-serif';
-    ctx.fillText(slot.label, centerX, centerY - 3, cellWidth - 40);
+    ctx.font = '500 36px Poppins, Arial, sans-serif';
+    ctx.fillText(slot.label, centerX, centerY - 4, cellWidth - 44);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, .72)';
-    ctx.font = '400 17px Poppins, Arial, sans-serif';
-    const courtLabel = `${slot.courtCount} ${slot.courtCount === 1 ? 'court' : 'courts'} available`;
-    ctx.fillText(courtLabel, centerX, centerY + 38, cellWidth - 40);
+    ctx.fillStyle = 'rgba(255, 255, 255, .78)';
+    ctx.font = '400 22px Poppins, Arial, sans-serif';
+    ctx.fillText(formatAvailableCourtLabel(slot.courtNames), centerX, centerY + 48, cellWidth - 44);
   });
   ctx.restore();
+}
+
+export function formatAvailableCourtLabel(courtNames: string[]) {
+  const names = courtNames.map(name => name.trim()).filter(Boolean);
+  if (!names.length) return 'No Courts Available';
+  if (names.length === 1) return `${names[0]} Available`;
+
+  const courtNumbers = names.map(name => name.match(/^Court\s+(.+)$/i)?.[1]);
+  if (courtNumbers.every(Boolean)) {
+    const values = courtNumbers as string[];
+    const joined = values.length === 2
+      ? `${values[0]} & ${values[1]}`
+      : `${values.slice(0, -1).join(', ')} & ${values.at(-1)}`;
+    return `Court ${joined} Available`;
+  }
+
+  const joined = names.length === 2
+    ? `${names[0]} & ${names[1]}`
+    : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
+  return `${joined} Available`;
 }
 
 export async function renderPhotoArtwork(
