@@ -16,8 +16,8 @@ import { getApiErrorMessage } from '@/services/api';
 import { ScheduleStatus } from '@/types';
 import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 import { Button } from '@/components/ui/button';
+import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -53,21 +53,18 @@ interface GeneratedPhoto {
 
 export default function SocialMediaPage() {
   return (
-    <div className="mx-auto w-full max-w-[1700px] space-y-6 px-1 pb-12 sm:px-3" style={{ fontFamily: 'Poppins, sans-serif' }}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-primary">
-            <SparklesIcon className="h-4 w-4" /> Content studio
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Social Media Generator</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Create a daily availability post or frame up to 20 photos using the official templates. All photo processing stays in this browser.</p>
-        </div>
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 pb-12 sm:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="mb-6 pl-1">
+        <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-slate-50">Social Media Generator</h1>
+        <p className="mt-2 max-w-[600px] text-[14px] leading-relaxed text-slate-500 dark:text-slate-400">
+          Create daily availability posts or frame up to 20 photos using the official templates. All photo processing stays in this browser.
+        </p>
       </div>
 
       <Tabs defaultValue="schedule" className="space-y-5">
         <TabsList className="h-11 w-full justify-start rounded-xl bg-black/[.055] p-1 dark:bg-white/[.08] sm:w-auto">
-          <TabsTrigger value="schedule" className="h-9 flex-1 px-5 sm:flex-none">Schedule Post</TabsTrigger>
-          <TabsTrigger value="photos" className="h-9 flex-1 px-5 sm:flex-none">Photo Posts</TabsTrigger>
+          <TabsTrigger value="schedule" className="h-9 flex-1 px-5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm sm:flex-none">Schedule Post</TabsTrigger>
+          <TabsTrigger value="photos" className="h-9 flex-1 px-5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm sm:flex-none">Photo Posts</TabsTrigger>
         </TabsList>
         <TabsContent value="schedule" className="mt-0"><ScheduleGenerator /></TabsContent>
         <TabsContent value="photos" className="mt-0"><PhotoGenerator /></TabsContent>
@@ -145,10 +142,10 @@ function ScheduleGenerator() {
           <CardDescription>Choose one date and up to six available schedules.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-5">
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Post date</span>
-            <Input type="date" value={date} onChange={event => setDate(event.target.value)} className="h-11 rounded-xl bg-background" />
-          </label>
+          <div className="flex flex-col gap-1.5">
+            <label className="block pl-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Post date</label>
+            <AdminDatePicker value={date} onChange={setDate} />
+          </div>
 
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -334,7 +331,13 @@ function PhotoGenerator() {
       </Card>
 
       <PreviewShell label="Photo preview" dimensions={`${template.width} × ${template.height} PNG`}>
-        <canvas ref={previewRef} className={cn('block h-auto w-full rounded-xl shadow-2xl', orientation === 'portrait' ? 'max-w-[570px]' : 'max-w-[880px]')} aria-label="Photo post preview" />
+        {activePhoto ? <canvas ref={previewRef} className={cn('block h-auto w-full rounded-xl shadow-2xl', orientation === 'portrait' ? 'max-w-[570px]' : 'max-w-[880px]')} aria-label="Photo post preview" /> : <div className={cn('grid w-full place-items-center rounded-xl border-2 border-dashed border-border/80 bg-muted/25 px-6 text-center', orientation === 'portrait' ? 'max-w-[570px]' : 'max-w-[880px]')} style={{ aspectRatio: `${template.width} / ${template.height}` }}>
+          <div className="max-w-sm">
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary"><PhotoIcon className="h-8 w-8" /></span>
+            <p className="mt-4 text-base font-semibold text-foreground">Your photo preview will appear here</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">Upload a JPG, PNG, or WEBP image to see it framed with the official {orientation} template.</p>
+          </div>
+        </div>}
       </PreviewShell>
     </div>
 

@@ -40,98 +40,83 @@ export async function renderScheduleArtwork(
 ) {
   const template = SOCIAL_TEMPLATES.schedule;
   const background = await loadCanvasImage(template.src);
-  await document.fonts?.load('700 48px Poppins');
+  await Promise.all([
+    document.fonts?.load('400 18px Poppins'),
+    document.fonts?.load('500 28px Poppins'),
+    document.fonts?.load('600 38px Poppins'),
+  ]);
   canvas.width = template.width;
   canvas.height = template.height;
   const ctx = requiredContext(canvas);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(background, 0, 0, template.width, template.height);
 
-  const panel = { x: 154, y: 280, width: 946, height: 716, radius: 34 };
   ctx.save();
-  ctx.shadowColor = 'rgba(15, 6, 8, .30)';
-  ctx.shadowBlur = 32;
-  ctx.shadowOffsetY = 14;
-  roundedRect(ctx, panel.x, panel.y, panel.width, panel.height, panel.radius);
-  ctx.fillStyle = 'rgba(255, 255, 255, .95)';
-  ctx.fill();
-  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(38, 2, 12, .60)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
 
-  ctx.save();
-  roundedRect(ctx, panel.x, panel.y, panel.width, panel.height, panel.radius);
-  ctx.clip();
-  ctx.fillStyle = '#f4f4f6';
-  ctx.fillRect(panel.x, panel.y, panel.width, 110);
-  ctx.strokeStyle = 'rgba(22, 22, 24, .12)';
+  ctx.fillStyle = 'rgba(255, 255, 255, .72)';
+  ctx.font = '400 17px Poppins, Arial, sans-serif';
+  drawSpacedText(ctx, 'COURT AVAILABILITY', template.width / 2, 292, 5);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '600 38px Poppins, Arial, sans-serif';
+  ctx.fillText(dateLabel, template.width / 2, 337);
+
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = 'rgba(255, 255, 255, .46)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(panel.x, panel.y + 110);
-  ctx.lineTo(panel.x + panel.width, panel.y + 110);
+  ctx.moveTo(template.width / 2 - 72, 374);
+  ctx.lineTo(template.width / 2 + 72, 374);
   ctx.stroke();
 
-  ['#ff5f57', '#febc2e', '#28c840'].forEach((color, index) => {
-    ctx.beginPath();
-    ctx.arc(panel.x + 42 + index * 34, panel.y + 40, 10, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-  });
-
-  ctx.fillStyle = '#6b6b70';
-  ctx.font = '600 22px Poppins, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('DAILY COURT SCHEDULE', panel.x + panel.width / 2, panel.y + 47);
-  ctx.fillStyle = '#161618';
-  ctx.font = '700 34px Poppins, Arial, sans-serif';
-  ctx.fillText(dateLabel, panel.x + panel.width / 2, panel.y + 88);
-
-  const gridX = panel.x + 42;
-  const gridY = panel.y + 144;
-  const gap = 20;
-  const cellWidth = (panel.width - 84 - gap) / 2;
-  const cellHeight = 158;
+  const grid = { x: 154, y: 405, width: 946, rowHeight: 172 };
+  const cellWidth = grid.width / 2;
+  ctx.strokeStyle = 'rgba(255, 255, 255, .24)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(grid.x + cellWidth, grid.y);
+  ctx.lineTo(grid.x + cellWidth, grid.y + grid.rowHeight * 3);
+  for (let row = 1; row < 3; row++) {
+    const y = grid.y + row * grid.rowHeight;
+    ctx.moveTo(grid.x, y);
+    ctx.lineTo(grid.x + grid.width, y);
+  }
+  ctx.stroke();
 
   if (!slots.length) {
-    ctx.fillStyle = '#8e8e93';
-    ctx.font = '600 30px Poppins, Arial, sans-serif';
-    ctx.fillText('Select up to 6 available schedules', panel.x + panel.width / 2, panel.y + 430);
+    ctx.shadowColor = 'rgba(38, 2, 12, .55)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = 'rgba(255, 255, 255, .82)';
+    ctx.font = '400 25px Poppins, Arial, sans-serif';
+    ctx.fillText('Select up to 6 available schedules', template.width / 2, grid.y + grid.rowHeight * 1.5);
   }
 
   slots.slice(0, 6).forEach((slot, index) => {
     const column = index % 2;
     const row = Math.floor(index / 2);
-    const x = gridX + column * (cellWidth + gap);
-    const y = gridY + row * (cellHeight + gap);
+    const centerX = grid.x + cellWidth * column + cellWidth / 2;
+    const centerY = grid.y + grid.rowHeight * row + grid.rowHeight / 2;
 
-    roundedRect(ctx, x, y, cellWidth, cellHeight, 24);
+    ctx.shadowColor = 'rgba(38, 2, 12, .62)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 2;
+    ctx.fillStyle = 'rgba(255, 255, 255, .62)';
+    ctx.font = '400 14px Poppins, Arial, sans-serif';
+    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 48, 3);
+
     ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(22, 22, 24, .10)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.font = '500 29px Poppins, Arial, sans-serif';
+    ctx.fillText(slot.label, centerX, centerY - 3, cellWidth - 40);
 
-    roundedRect(ctx, x + 22, y + 22, 54, 54, 15);
-    ctx.fillStyle = '#72151d';
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 26px Poppins, Arial, sans-serif';
-    ctx.fillText(String(index + 1).padStart(2, '0'), x + 49, y + 59);
-
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#161618';
-    ctx.font = '700 27px Poppins, Arial, sans-serif';
-    ctx.fillText(slot.label, x + 92, y + 57, cellWidth - 112);
-    ctx.fillStyle = '#74747a';
-    ctx.font = '500 19px Poppins, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, .72)';
+    ctx.font = '400 17px Poppins, Arial, sans-serif';
     const courtLabel = `${slot.courtCount} ${slot.courtCount === 1 ? 'court' : 'courts'} available`;
-    ctx.fillText(courtLabel, x + 92, y + 91, cellWidth - 112);
-
-    ctx.fillStyle = '#f2f2f7';
-    roundedRect(ctx, x + 22, y + 111, cellWidth - 44, 25, 13);
-    ctx.fill();
-    ctx.fillStyle = '#28a745';
-    roundedRect(ctx, x + 22, y + 111, Math.max(80, (cellWidth - 44) * Math.min(1, slot.courtCount / 4)), 25, 13);
-    ctx.fill();
-    ctx.textAlign = 'center';
+    ctx.fillText(courtLabel, centerX, centerY + 38, cellWidth - 40);
   });
   ctx.restore();
 }
@@ -247,9 +232,18 @@ function crc32(data: Uint8Array) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, height, radius);
+function drawSpacedText(ctx: CanvasRenderingContext2D, text: string, centerX: number, y: number, spacing: number) {
+  const characters = [...text];
+  const widths = characters.map(character => ctx.measureText(character).width);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0) + spacing * Math.max(0, characters.length - 1);
+  let x = centerX - totalWidth / 2;
+  const originalAlign = ctx.textAlign;
+  ctx.textAlign = 'left';
+  characters.forEach((character, index) => {
+    ctx.fillText(character, x, y);
+    x += widths[index] + spacing;
+  });
+  ctx.textAlign = originalAlign;
 }
 
 function requiredContext(canvas: HTMLCanvasElement) {
