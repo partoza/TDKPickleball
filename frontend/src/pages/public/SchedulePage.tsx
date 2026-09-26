@@ -330,8 +330,17 @@ export default function SchedulePage() {
         </div>
 
         {/* Flush Schedule Grid */}
-        <div className="overflow-x-auto custom-scrollbar">
-          <div className="min-w-full md:min-w-[950px] border border-slate-300 rounded-xl overflow-hidden bg-white">
+        <div className="relative">
+          {isLoading && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+              <div className="bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-200 px-5 py-2.5 rounded-full flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+                <LoadingIndicator size="sm" className="text-primary" />
+                <span className="text-[13px] font-bold text-slate-700">Loading Schedule...</span>
+              </div>
+            </div>
+          )}
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-full md:min-w-[950px] border border-slate-300 rounded-xl overflow-hidden bg-white">
             
             {/* Header Row */}
             <div className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] border-b border-slate-300 bg-slate-50/50">
@@ -470,6 +479,7 @@ export default function SchedulePage() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
