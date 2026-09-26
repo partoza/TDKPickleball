@@ -5,6 +5,7 @@ import { useCourts } from '@/hooks/useCourts';
 import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Schedule, ScheduleStatus } from '@/types';
@@ -159,7 +160,8 @@ export default function SchedulePage() {
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
   const weekDaysStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
 
-  const { data: weeklyBoardData } = usePublicWeeklySchedules(weekDaysStrs);
+  const { data: weeklyBoardData, isLoading: scheduleLoading } = usePublicWeeklySchedules(weekDaysStrs);
+  const isLoading = courtsLoading || scheduleLoading;
 
   const weekSchedules: Schedule[] = [];
   if (weeklyBoardData) {
@@ -408,7 +410,9 @@ export default function SchedulePage() {
                               isSelectedDay ? "block" : "hidden md:block"
                             )}
                           >
-                            {slot ? (() => {
+                            {isLoading ? (
+                              <Skeleton className="w-full h-full min-h-[70px] rounded-xl" />
+                            ) : slot ? (() => {
                               const timedStatus = getTimedStatus(slot);
                               return (
                               <div className={cn(
