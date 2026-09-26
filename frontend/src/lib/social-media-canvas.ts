@@ -42,8 +42,8 @@ export async function renderScheduleArtwork(
   const template = SOCIAL_TEMPLATES.schedule;
   const background = await loadCanvasImage(template.src);
   await Promise.all([
-    document.fonts?.load('400 26px Poppins'),
-    document.fonts?.load('500 42px Poppins'),
+    document.fonts?.load('400 34px Poppins'),
+    document.fonts?.load('500 64px Poppins'),
     document.fonts?.load('600 43px Poppins'),
   ]);
   canvas.width = template.width;
@@ -78,7 +78,9 @@ export async function renderScheduleArtwork(
   const grid = { x: 64, y: 396, width: 1126, rowHeight: 205, maxRows: 3 };
   const cellWidth = grid.width / 2;
   const selectedSlots = slots.slice(0, 6);
-  const rowCount = Math.ceil(selectedSlots.length / 2);
+  const typography = scheduleTypography(selectedSlots.length);
+  const stackTwoSlots = selectedSlots.length === 2;
+  const rowCount = stackTwoSlots ? 2 : Math.ceil(selectedSlots.length / 2);
   const contentHeight = rowCount * grid.rowHeight;
   const contentY = grid.y + (grid.rowHeight * grid.maxRows - contentHeight) / 2;
 
@@ -86,7 +88,7 @@ export async function renderScheduleArtwork(
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   for (let row = 0; row < rowCount; row++) {
-    if (selectedSlots.length - row * 2 >= 2) {
+    if (!stackTwoSlots && selectedSlots.length - row * 2 >= 2) {
       const top = contentY + row * grid.rowHeight;
       ctx.moveTo(grid.x + cellWidth, top);
       ctx.lineTo(grid.x + cellWidth, top + grid.rowHeight);
@@ -109,27 +111,52 @@ export async function renderScheduleArtwork(
 
   selectedSlots.forEach((slot, index) => {
     const column = index % 2;
-    const row = Math.floor(index / 2);
-    const isCenteredLastSlot = selectedSlots.length % 2 === 1 && index === selectedSlots.length - 1;
+    const row = stackTwoSlots ? index : Math.floor(index / 2);
+    const isCenteredLastSlot = stackTwoSlots || (selectedSlots.length % 2 === 1 && index === selectedSlots.length - 1);
     const centerX = isCenteredLastSlot ? template.width / 2 : grid.x + cellWidth * column + cellWidth / 2;
     const centerY = contentY + grid.rowHeight * row + grid.rowHeight / 2;
+    const textWidth = selectedSlots.length <= 2 ? grid.width - 120 : cellWidth - 36;
 
     ctx.shadowColor = 'rgba(38, 2, 12, .62)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
     ctx.fillStyle = 'rgba(255, 255, 255, .62)';
-    ctx.font = '400 17px Poppins, Arial, sans-serif';
-    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY - 64, 3.5);
+    ctx.font = `400 ${typography.slot}px Poppins, Arial, sans-serif`;
+    drawSpacedText(ctx, `SLOT ${String(index + 1).padStart(2, '0')}`, centerX, centerY + typography.slotY, typography.tracking);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '500 42px Poppins, Arial, sans-serif';
-    ctx.fillText(slot.label, centerX, centerY - 5, cellWidth - 36);
+    setFittedFont(ctx, slot.label, 500, typography.time, typography.minimumTime, textWidth);
+    ctx.fillText(slot.label, centerX, centerY + typography.timeY);
 
     ctx.fillStyle = 'rgba(255, 255, 255, .78)';
-    ctx.font = '400 26px Poppins, Arial, sans-serif';
-    ctx.fillText(formatAvailableCourtLabel(slot.courtNames), centerX, centerY + 57, cellWidth - 36);
+    const availabilityLabel = formatAvailableCourtLabel(slot.courtNames);
+    setFittedFont(ctx, availabilityLabel, 400, typography.availability, 24, textWidth);
+    ctx.fillText(availabilityLabel, centerX, centerY + typography.availabilityY);
   });
   ctx.restore();
+}
+
+function scheduleTypography(slotCount: number) {
+  if (slotCount <= 1) return { slot: 22, time: 64, minimumTime: 52, availability: 34, slotY: -79, timeY: -5, availabilityY: 73, tracking: 4.5 };
+  if (slotCount === 2) return { slot: 21, time: 58, minimumTime: 48, availability: 33, slotY: -76, timeY: -5, availabilityY: 70, tracking: 4.25 };
+  if (slotCount <= 4) return { slot: 18, time: 46, minimumTime: 40, availability: 28, slotY: -68, timeY: -5, availabilityY: 61, tracking: 3.75 };
+  return { slot: 17, time: 42, minimumTime: 38, availability: 26, slotY: -64, timeY: -5, availabilityY: 57, tracking: 3.5 };
+}
+
+function setFittedFont(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  weight: number,
+  preferredSize: number,
+  minimumSize: number,
+  maxWidth: number,
+) {
+  ctx.font = `${weight} ${preferredSize}px Poppins, Arial, sans-serif`;
+  const measuredWidth = ctx.measureText(text).width;
+  const size = measuredWidth > maxWidth
+    ? Math.max(minimumSize, Math.floor(preferredSize * maxWidth / measuredWidth))
+    : preferredSize;
+  ctx.font = `${weight} ${size}px Poppins, Arial, sans-serif`;
 }
 
 export function formatAvailableCourtLabel(courtNames: string[]) {
