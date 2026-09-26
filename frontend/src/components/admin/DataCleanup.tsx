@@ -66,6 +66,8 @@ export function DataCleanupButton({ className }: { className?: string }) {
       client.invalidateQueries({ queryKey: ['booking-cleanup-history'] });
       client.invalidateQueries({ queryKey: ['bookings'] });
       client.invalidateQueries({ queryKey: ['admin-revenue'] });
+      client.invalidateQueries({ queryKey: ['schedules'] });
+      client.invalidateQueries({ queryKey: ['availability'] });
       toast.success(response.message || `${response.data?.deletedScheduleCount ?? 0} elapsed schedule records deleted`);
     },
     onError: error => toast.error(getApiErrorMessage(error, 'Elapsed schedule records could not be deleted')),
@@ -82,7 +84,7 @@ export function DataCleanupButton({ className }: { className?: string }) {
 
       <Dialog open={setupOpen} onOpenChange={value => { if (!cleanup.isPending) setSetupOpen(value); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Choose schedule data</DialogTitle><DialogDescription>Choose a schedule-date range. Elapsed booked, training, internal, and unavailable records are eligible. Pending reservations remain stored.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Choose schedule data</DialogTitle><DialogDescription>Choose a schedule-date range. Elapsed booked, training, internal, and unavailable records are eligible. Related bookings are removed from Revenue automatically. Pending reservations remain stored.</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div className="mac-segmented grid grid-cols-4 gap-0.5 rounded-lg p-0.5" aria-label="Cleanup date range type">
               {(['day', 'week', 'month', 'year'] as CleanupGranularity[]).map(mode => <Button key={mode} type="button" variant="ghost" aria-pressed={granularity === mode} onClick={() => setGranularity(mode)} className={cn('h-8 rounded-md px-2 text-xs capitalize shadow-none', granularity === mode ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90' : 'text-muted-foreground')}>{mode === 'day' ? 'Daily' : mode === 'week' ? 'Weekly' : mode === 'month' ? 'Monthly' : 'Yearly'}</Button>)}
@@ -101,15 +103,15 @@ export function DataCleanupButton({ className }: { className?: string }) {
                 <div className="flex justify-between"><span className="text-muted-foreground">Selected range</span><strong className="text-right">{formatDate(preview.fromDate)} – {formatDate(preview.throughDate)}</strong></div>
               </div> : <p className="text-sm text-destructive dark:text-white" role="alert">{preview && !hasMatchingPreview ? 'The backend must be restarted before date-range cleanup can run.' : storageError(previewQuery.error, previewQuery.data?.message || 'The preview could not be loaded.')}</p>}
             </div>
-            <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"><ShieldExclamationIcon className="h-5 w-5 shrink-0" /><p className="text-sm"><strong>Permanent action.</strong> Eligible schedules, related non-reservation bookings, and matching receipt files cannot be restored. Pending reservations are excluded. The cleanup audit entry will remain.</p></div>
-            <DialogFooter><Button variant="outline" onClick={() => setSetupOpen(false)}>Cancel</Button><Button variant="destructive" className="storage-delete-button" disabled={!validRange || !hasMatchingPreview || !preview?.eligibleScheduleCount || previewQuery.isFetching} onClick={() => setConfirmOpen(true)}>Review permanent deletion</Button></DialogFooter>
+            <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"><ShieldExclamationIcon className="h-5 w-5 shrink-0" /><p className="text-sm"><strong>Permanent action.</strong> Eligible schedules, related non-reservation bookings, their Revenue data, and matching receipt files cannot be restored. Pending reservations are excluded. The cleanup audit entry will remain.</p></div>
+            <DialogFooter><Button variant="outline" onClick={() => setSetupOpen(false)}>Cancel</Button><Button variant="destructive" className="storage-delete-button" disabled={!validRange || !hasMatchingPreview || !(preview && (preview.eligibleScheduleCount > 0 || preview.eligibleBookingCount > 0)) || previewQuery.isFetching} onClick={() => setConfirmOpen(true)}>Review permanent deletion</Button></DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete {preview?.eligibleScheduleCount ?? 0} elapsed schedule records?</AlertDialogTitle><AlertDialogDescription>This permanently deletes eligible schedules dated {formatDate(fromDate)} through {formatDate(throughDate)}, {preview?.eligibleBookingCount ?? 0} related non-reservation bookings, and {preview?.receiptCount ?? 0} receipt files. Pending reservations remain. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Delete the selected elapsed data?</AlertDialogTitle><AlertDialogDescription>This permanently deletes {preview?.eligibleScheduleCount ?? 0} eligible schedules dated {formatDate(fromDate)} through {formatDate(throughDate)}, {preview?.eligibleBookingCount ?? 0} related non-reservation bookings and their Revenue data, and {preview?.receiptCount ?? 0} receipt files. Pending reservations remain. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel disabled={cleanup.isPending}>Go back</AlertDialogCancel><AlertDialogAction className="storage-delete-button bg-destructive hover:bg-destructive/90" disabled={cleanup.isPending} onClick={event => { event.preventDefault(); cleanup.mutate(); }}>{cleanup.isPending && <LoadingIndicator className="mr-2" label="Deleting completed data" />}Permanently delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

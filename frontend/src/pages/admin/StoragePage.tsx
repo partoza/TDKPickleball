@@ -33,7 +33,8 @@ export default function StoragePage() {
   const status = statusQuery.data?.data;
   const history = historyQuery.data?.data || [];
   const paginatedHistory = history.slice(historyPage * 10, (historyPage + 1) * 10);
-  const usedPercent = Math.min(100, status?.usedPercent ?? 0);
+  const measurementAvailable = status?.storageMeasurementAvailable !== false;
+  const usedPercent = measurementAvailable ? Math.min(100, status?.usedPercent ?? 0) : 0;
   const thresholdPercent = status ? Math.min(100, status.warningThresholdMegabytes / status.limitMegabytes * 100) : 80;
 
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -49,15 +50,15 @@ export default function StoragePage() {
       <CardHeader className="border-b bg-muted/20">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div><CardTitle className="flex items-center gap-2"><CircleStackIcon className="h-5 w-5 text-primary" />Database usage</CardTitle><CardDescription>TiDB/MySQL table and index usage with a 5 GB limit and warning threshold at 4 GB.</CardDescription></div>
-          <Badge className={cn('w-fit gap-1.5', status.isHealthy ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-red-600 hover:bg-red-600')}>
-            {status.isHealthy ? <CheckCircleIcon className="h-3.5 w-3.5" /> : <ExclamationTriangleIcon className="h-3.5 w-3.5" />}
-            {status.isHealthy ? 'Good' : 'Action needed'}
+          <Badge className={cn('w-fit gap-1.5', !measurementAvailable ? 'bg-slate-600 hover:bg-slate-600' : status.isHealthy ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-red-600 hover:bg-red-600')}>
+            {measurementAvailable && status.isHealthy ? <CheckCircleIcon className="h-3.5 w-3.5" /> : <ExclamationTriangleIcon className="h-3.5 w-3.5" />}
+            {!measurementAvailable ? 'Metrics unavailable' : status.isHealthy ? 'Good' : 'Action needed'}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Metric label="Database used" value={`${formatMb(status.usedMegabytes)} MB`} note={`${status.usedPercent.toFixed(1)}% of 5 GB`} />
+          <Metric label="Database used" value={measurementAvailable ? `${formatMb(status.usedMegabytes)} MB` : 'Unavailable'} note={measurementAvailable ? `${status.usedPercent.toFixed(1)}% of 5 GB` : 'Cleanup is still available'} />
           <Metric label="Warning threshold" value={`${formatMb(status.warningThresholdMegabytes)} MB`} note="Cleanup recommended at this point" />
           <Metric label="Cleanup eligible" value={status.cleanupEligibleRecordCount.toLocaleString()} note="Elapsed schedules; reservations excluded" />
         </div>
@@ -69,9 +70,9 @@ export default function StoragePage() {
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground"><span>Tables and indexes in the current database</span><span>4 GB threshold</span></div>
         </div>
-        <div className={cn('flex gap-3 rounded-xl border p-4', status.isHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100')}>
-          {status.isHealthy ? <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" /> : <ShieldExclamationIcon className="mt-0.5 h-5 w-5 shrink-0" />}
-          <div><p className="font-semibold">{status.isHealthy ? 'Storage level is good' : 'Storage has reached the warning threshold'}</p><p className="text-sm opacity-80">{status.isHealthy ? `You have ${(status.warningThresholdMegabytes - status.usedMegabytes).toFixed(2)} MB before cleanup is recommended.` : 'Delete eligible elapsed schedules now to reduce used database space.'}</p></div>
+        <div className={cn('flex gap-3 rounded-xl border p-4', !measurementAvailable ? 'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100' : status.isHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100')}>
+          {measurementAvailable && status.isHealthy ? <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" /> : <ShieldExclamationIcon className="mt-0.5 h-5 w-5 shrink-0" />}
+          <div><p className="font-semibold">{!measurementAvailable ? 'Storage measurement is restricted by the database host' : status.isHealthy ? 'Storage level is good' : 'Storage has reached the warning threshold'}</p><p className="text-sm opacity-80">{!measurementAvailable ? 'Cleanup, previews, Revenue removal, and deletion history remain fully available.' : status.isHealthy ? `You have ${(status.warningThresholdMegabytes - status.usedMegabytes).toFixed(2)} MB before cleanup is recommended.` : 'Delete eligible elapsed schedules now to reduce used database space.'}</p></div>
         </div>
       </CardContent>
     </Card> : <ErrorCard message={storageError(statusQuery.error, statusQuery.data?.message || 'Storage status is unavailable')} />}

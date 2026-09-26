@@ -8,6 +8,7 @@ public record StorageStatusDto(
     decimal WarningThresholdMegabytes,
     decimal UsedPercent,
     bool IsHealthy,
+    bool StorageMeasurementAvailable,
     int CleanupEligibleRecordCount,
     DateTime CheckedAtUtc);
 

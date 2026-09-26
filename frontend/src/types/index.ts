@@ -200,6 +200,7 @@ export interface StorageStatus {
   warningThresholdMegabytes: number;
   usedPercent: number;
   isHealthy: boolean;
+  storageMeasurementAvailable: boolean;
   cleanupEligibleRecordCount: number;
   checkedAtUtc: string;
 }

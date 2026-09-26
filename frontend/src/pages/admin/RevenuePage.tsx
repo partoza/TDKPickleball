@@ -3,7 +3,6 @@ import { endOfMonth, endOfWeek, endOfYear, format, startOfMonth, startOfWeek, st
 import { BanknotesIcon, CalendarDaysIcon, ChartBarIcon, ClockIcon, RectangleGroupIcon, TrophyIcon } from '@heroicons/react/24/solid';
 import { useRevenue } from '@/hooks/useRevenue';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
-import { DataCleanupButton } from '@/components/admin/DataCleanup';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
@@ -49,12 +48,9 @@ export default function RevenuePage() {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 pb-12 sm:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Revenue</h2>
-          <p className="mt-1 text-muted-foreground">Track collected revenue, booked sales, outstanding balances, and sales by service.</p>
-        </div>
-        <DataCleanupButton />
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Revenue</h2>
+        <p className="mt-1 text-muted-foreground">Track collected revenue, booked sales, outstanding balances, and sales by service.</p>
       </div>
 
       <Card className="overflow-hidden">

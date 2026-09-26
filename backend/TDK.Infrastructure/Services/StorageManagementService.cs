@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Data;
 using TDK.Application.DTOs.Common;
 using TDK.Application.DTOs.Storage;
@@ -16,19 +17,18 @@ public sealed class StorageManagementService : IStorageManagementService
     private static readonly SemaphoreSlim CleanupLock = new(1, 1);
     private readonly TdkDbContext _context;
     private readonly IBusinessClock _clock;
+    private readonly ILogger<StorageManagementService> _logger;
 
-    public StorageManagementService(TdkDbContext context, IBusinessClock clock)
+    public StorageManagementService(TdkDbContext context, IBusinessClock clock, ILogger<StorageManagementService> logger)
     {
         _context = context;
         _clock = clock;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<StorageStatusDto>> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        var used = await _context.Database.SqlQueryRaw<decimal>(
-            "SELECT CAST(COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.tables WHERE table_schema = DATABASE()")
-            .SingleAsync(cancellationToken);
-        used = decimal.Round(used, 2);
+        var (used, measurementAvailable) = await GetUsedStorageAsync(cancellationToken);
         var manilaNow = _clock.ToManilaTime(_clock.UtcNow);
         var today = DateOnly.FromDateTime(manilaNow.DateTime);
         var currentTime = TimeOnly.FromDateTime(manilaNow.DateTime);
@@ -40,6 +40,7 @@ public sealed class StorageManagementService : IStorageManagementService
             WarningThresholdMegabytes,
             decimal.Round(Math.Min(100m, used / LimitMegabytes * 100m), 1),
             used < WarningThresholdMegabytes,
+            measurementAvailable,
             eligibleScheduleCount,
             _clock.UtcNow.UtcDateTime));
     }
@@ -104,32 +105,40 @@ public sealed class StorageManagementService : IStorageManagementService
             var manilaNow = _clock.ToManilaTime(_clock.UtcNow);
             var today = DateOnly.FromDateTime(manilaNow.DateTime);
             var currentTime = TimeOnly.FromDateTime(manilaNow.DateTime);
-            var schedules = EligibleSchedules(today, currentTime)
+            var eligibleSchedules = EligibleSchedules(today, currentTime)
                 .Where(x => x.ScheduleDate >= request.FromDate && x.ScheduleDate <= request.ThroughDate);
-            var bookingIds = await schedules.Where(x => x.BookingId.HasValue)
+            var scheduleIds = await eligibleSchedules.Select(x => x.Id).ToArrayAsync(cancellationToken);
+            var linkedBookingIds = await eligibleSchedules.Where(x => x.BookingId.HasValue)
                 .Select(x => x.BookingId!.Value).Distinct().ToArrayAsync(cancellationToken);
-            var bookings = EligibleBookings(today, currentTime)
+            var eligibleBookingIds = await EligibleBookings(today, currentTime)
                 .Where(x => x.BookingDate >= request.FromDate && x.BookingDate <= request.ThroughDate &&
-                    (bookingIds.Contains(x.Id) || !x.Schedules.Any()));
-            var scheduleCount = await schedules.CountAsync(cancellationToken);
-            var bookingCount = await bookings.CountAsync(cancellationToken);
+                    (linkedBookingIds.Contains(x.Id) || !x.Schedules.Any()))
+                .Select(x => x.Id)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
 
-            if (bookingCount == 0 && scheduleCount == 0)
+            if (eligibleBookingIds.Length == 0 && scheduleIds.Length == 0)
                 return ApiResponse<BookingCleanupResultDto>.Fail("No eligible elapsed schedules match the selected date range");
 
-            var oldestScheduleDate = await schedules.Select(x => (DateOnly?)x.ScheduleDate).MinAsync(cancellationToken);
-            var oldestBookingDate = await bookings.Select(x => (DateOnly?)x.BookingDate).MinAsync(cancellationToken);
+            var oldestScheduleDate = await _context.Schedules.Where(x => scheduleIds.Contains(x.Id))
+                .Select(x => (DateOnly?)x.ScheduleDate).MinAsync(cancellationToken);
+            var oldestBookingDate = await _context.Bookings.Where(x => eligibleBookingIds.Contains(x.Id))
+                .Select(x => (DateOnly?)x.BookingDate).MinAsync(cancellationToken);
             var oldestRecordDate = oldestScheduleDate.HasValue && oldestBookingDate.HasValue
                 ? (oldestScheduleDate < oldestBookingDate ? oldestScheduleDate : oldestBookingDate)
                 : oldestScheduleDate ?? oldestBookingDate;
-            var receiptFileNames = await bookings
+            var receiptFileNames = await _context.Bookings.Where(x => eligibleBookingIds.Contains(x.Id))
                 .Select(x => x.ReceiptFileName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
                 .Distinct()
                 .ToArrayAsync(cancellationToken);
-            var deletedScheduleCount = await schedules.ExecuteDeleteAsync(cancellationToken);
-            var deletedCount = await bookings.ExecuteDeleteAsync(cancellationToken);
+            var deletedScheduleCount = await _context.Schedules.Where(x => scheduleIds.Contains(x.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            var deletedCount = await _context.Bookings.Where(x => eligibleBookingIds.Contains(x.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            if (deletedScheduleCount != scheduleIds.Length || deletedCount != eligibleBookingIds.Length)
+                throw new InvalidOperationException("Cleanup record counts changed during the transaction; no records were committed.");
             var audit = new BookingCleanupAudit
             {
                 SelectedFromDate = request.FromDate,
@@ -177,6 +186,22 @@ public sealed class StorageManagementService : IStorageManagementService
         if (throughDate > _clock.ManilaToday)
             return "The cleanup range cannot extend into the future";
         return null;
+    }
+
+    private async Task<(decimal UsedMegabytes, bool Available)> GetUsedStorageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var used = await _context.Database.SqlQueryRaw<decimal>(
+                "SELECT CAST(COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.tables WHERE table_schema = DATABASE()")
+                .SingleAsync(cancellationToken);
+            return (decimal.Round(used, 2), true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning(exception, "The database host did not expose information_schema storage measurements; cleanup remains available");
+            return (0m, false);
+        }
     }
 
     private IQueryable<Schedule> EligibleSchedules(DateOnly today, TimeOnly currentTime) =>

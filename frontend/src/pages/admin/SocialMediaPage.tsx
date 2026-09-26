@@ -129,7 +129,7 @@ function ScheduleGenerator() {
     }
     try {
       const blob = await canvasToPng(canvasRef.current);
-      downloadBlob(blob, `tdk-available-courts-${date}.png`);
+      downloadBlob(blob, scheduleOutputName(date));
       toast.success('Schedule PNG downloaded.');
     } catch {
       toast.error('The schedule image could not be exported.');
@@ -278,6 +278,7 @@ function PhotoGenerator() {
     setProgress(0);
     clearGenerated();
     const results: GeneratedPhoto[] = [];
+    const generatedOn = getManilaDate();
     try {
       for (let index = 0; index < photos.length; index++) {
         const photo = photos[index];
@@ -286,7 +287,7 @@ function PhotoGenerator() {
         const blob = await canvasToPng(canvas);
         const url = URL.createObjectURL(blob);
         generatedUrls.current.add(url);
-        results.push({ id: photo.id, name: outputName(photo.file.name, orientation, index), blob, url });
+        results.push({ id: photo.id, name: photoOutputName(orientation, generatedOn, index), blob, url });
         setGenerated([...results]);
         setProgress(index + 1);
         await new Promise(resolve => window.setTimeout(resolve, 0));
@@ -303,7 +304,7 @@ function PhotoGenerator() {
     if (!generated.length) return;
     try {
       const zip = await createStoredZip(generated.map(item => ({ name: item.name, blob: item.blob })));
-      downloadBlob(zip, `tdk-${orientation}-social-posts.zip`);
+      downloadBlob(zip, photoArchiveName(orientation, getManilaDate()));
     } catch {
       toast.error('The ZIP file could not be created.');
     }
@@ -364,7 +365,18 @@ function formatTimeRange(start: string, end: string) {
   return `${formatOne(start)} – ${formatOne(end)}`;
 }
 
-function outputName(original: string, orientation: PhotoOrientation, index: number) {
-  const base = original.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '') || `photo-${index + 1}`;
-  return `${base}-${orientation}.png`;
+function scheduleOutputName(date: string) {
+  return `TDK-Court-Availability-${date}.png`;
+}
+
+function photoOutputName(orientation: PhotoOrientation, date: string, index: number) {
+  return `TDK-${capitalize(orientation)}-Post-${date}-${String(index + 1).padStart(2, '0')}.png`;
+}
+
+function photoArchiveName(orientation: PhotoOrientation, date: string) {
+  return `TDK-${capitalize(orientation)}-Posts-${date}.zip`;
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

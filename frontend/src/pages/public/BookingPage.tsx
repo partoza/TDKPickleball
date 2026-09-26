@@ -535,7 +535,7 @@ export default function BookingPage() {
                       }}
                       className={cn('sm:flex-1', promoError && 'border-red-500 ring-red-500')}
                     />
-                    <Button type="button" variant="outline" onClick={handleApplyPromo} disabled={validatePromo.isPending || !promoName.trim()}>
+                    <Button type="button" className="sm:px-6" onClick={handleApplyPromo} disabled={validatePromo.isPending || !promoName.trim()}>
                       {validatePromo.isPending ? <LoadingIndicator label="Checking promo" /> : 'Apply Promo'}
                     </Button>
                   </div>
