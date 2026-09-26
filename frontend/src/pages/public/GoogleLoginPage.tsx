@@ -76,7 +76,7 @@ export default function GoogleLoginPage() {
           text: 'signin_with',
           shape: 'rectangular',
           logo_alignment: 'left',
-          width: Math.min(buttonRef.current.clientWidth || 400, 400),
+          width: (buttonRef.current.parentElement?.clientWidth || 400) / 1.15,
         });
       })
       .catch((scriptError) => {
@@ -125,8 +125,12 @@ export default function GoogleLoginPage() {
             <p className="mt-4 text-[15px] text-slate-500 leading-relaxed">We use your verified Google email for the booking. Your display name remains editable later.</p>
           </div>
           
-          <div className="relative flex min-h-[52px] w-full items-center justify-center overflow-hidden rounded-full bg-white">
-            <div ref={buttonRef} className={isVerifying ? 'pointer-events-none opacity-50' : ''} />
+          <div className="relative flex min-h-[52px] w-full items-center justify-start overflow-hidden rounded-xl bg-white">
+            <div 
+              ref={buttonRef} 
+              className={isVerifying ? 'pointer-events-none opacity-50' : ''} 
+              style={{ transform: 'scale(1.15)', transformOrigin: 'left center' }} 
+            />
             {isVerifying && <div className="absolute inset-0 flex items-center justify-center bg-white/90"><LoadingIndicator label="Verifying your Google email" /></div>}
           </div>
           {error && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-700">{error}</p>}
