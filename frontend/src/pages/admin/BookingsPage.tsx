@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
-import { EyeIcon as Eye, PlusIcon as Plus, MinusIcon as Minus, QrCodeIcon as QrCode, ViewfinderCircleIcon as ScanLine, CalendarDaysIcon as CalendarClock, CheckIcon as Check, XMarkIcon as X, MagnifyingGlassIcon as Search, FunnelIcon as Filter, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, TrashIcon as Trash, NoSymbolIcon as VoidIcon, ChevronRightIcon as ChevronRight } from '@heroicons/react/24/solid';
+import { EyeIcon as Eye, PlusIcon as Plus, MinusIcon as Minus, QrCodeIcon as QrCode, ViewfinderCircleIcon as ScanLine, CalendarDaysIcon as CalendarClock, CheckIcon as Check, XMarkIcon as X, MagnifyingGlassIcon as Search, FunnelIcon as Filter, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, TrashIcon as Trash, NoSymbolIcon as VoidIcon } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { toast } from 'sonner';
@@ -469,13 +469,6 @@ export default function BookingsPage() {
         {selected && <BookingDetails booking={selected} />}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setSelected(null)}>Close</Button>
-          {selected?.status === BookingStatus.Requested && getRequestReference(selected) && (
-            <Button asChild>
-              <a href={`/verify?reference=${encodeURIComponent(getRequestReference(selected)!)}`} target="_blank" rel="noreferrer">
-                View request <ChevronRight className="ml-1 h-4 w-4" />
-              </a>
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
