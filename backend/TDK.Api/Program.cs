@@ -1,3 +1,5 @@
+try
+{
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TDK.Api.Extensions;
@@ -118,6 +120,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+}
 
 static string ClientIp(HttpContext context) =>
     context.Connection.RemoteIpAddress?.MapToIPv6().ToString() ?? "unknown";
@@ -131,3 +134,9 @@ static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, TimeSpan windo
 };
 
 
+
+catch (Exception ex)
+{
+    System.IO.File.WriteAllText("startup_crash.txt", ex.ToString());
+    throw;
+}
