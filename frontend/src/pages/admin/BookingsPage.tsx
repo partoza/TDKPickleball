@@ -8,7 +8,7 @@ import { EyeIcon as Eye, PlusIcon as Plus, MinusIcon as Minus, QrCodeIcon as QrC
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { toast } from 'sonner';
-import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useCompleteBooking, useConfirmBooking, useCreateBooking, useDeleteBooking, useRescheduleBooking, useVerifyBooking, useVoidPaddleRental } from '@/hooks/useBookings';
+import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useConfirmBooking, useCreateBooking, useDeleteBooking, useRescheduleBooking, useVerifyBooking, useVoidPaddleRental } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { Booking, BookingStatus, Promo, RateType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +52,7 @@ export default function BookingsPage() {
   const courts = courtsResponse?.data || [];
   const rates = ratesResponse?.data || [];
   const [selected, setSelected] = useState<Booking | null>(null);
+  const [paymentActionTarget, setPaymentActionTarget] = useState<Booking | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -109,7 +110,7 @@ export default function BookingsPage() {
   const create = useCreateBooking(); const move = useRescheduleBooking(); const verify = useVerifyBooking(); const addPaddleRental = useAddPaddleRental();
   const { data: availabilityResponse, isFetching: availabilityLoading } = useAvailability(form.bookingDate, form.courtId);
   const availability = availabilityResponse?.data;
-  const markPaid = useConfirmBooking(); const cancel = useCancelBooking(); const complete = useCompleteBooking(); const remove = useDeleteBooking();
+  const markPaid = useConfirmBooking(); const cancel = useCancelBooking(); const remove = useDeleteBooking();
   const busy = creatingBatch || create.isPending || move.isPending;
   const [page, setPage] = useState(0);
   const [clock, setClock] = useState(Date.now());
@@ -198,14 +199,16 @@ export default function BookingsPage() {
     const errors = validate(false); setFormErrors(errors); if (Object.keys(errors).length) return;
     move.mutate({ id: reschedule.id, payload: { courtId: Number(form.courtId), bookingDate: form.bookingDate, startTime: form.startTime, endTime: form.endTime } }, { onSuccess: r => { if (!r.success) return toast.error(r.message); toast.success('Booking rescheduled'); setReschedule(null); }, onError: error => toast.error(getApiErrorMessage(error, 'Could not reschedule')) });
   };
-  const act = (booking: Booking, action: 'paid'|'complete') => {
-    const mutation = action === 'paid' ? markPaid : complete;
-    mutation.mutate(booking.id, {
+  const confirmPaymentAction = () => {
+    if (!paymentActionTarget) return;
+    const booking = paymentActionTarget;
+    markPaid.mutate(booking.id, {
       onSuccess: response => {
         if (!response.success) { toast.error(response.message || 'Action failed'); return; }
-        toast.success(booking.status === BookingStatus.Requested ? 'Booking request confirmed' : `Booking marked ${action}`);
+        toast.success(booking.status === BookingStatus.Requested ? 'Booking request confirmed' : 'Booking marked as paid');
+        setPaymentActionTarget(null);
       },
-      onError: () => toast.error('Action failed'),
+      onError: error => toast.error(getApiErrorMessage(error, booking.status === BookingStatus.Requested ? 'Booking request could not be confirmed' : 'Booking could not be marked as paid')),
     });
   };
   const cancelBooking = () => {
@@ -277,7 +280,7 @@ export default function BookingsPage() {
     <div className="grid gap-4 sm:grid-cols-3"><Metric label="Matching bookings" value={filteredBookings.length.toString()} /><Metric label="Paid" value={filteredBookings.filter(b => b.status === 'Paid').length.toString()} /><Metric label="Remaining balance" value={`₱${totalRemaining.toLocaleString()}`} /></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>Booking records</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-3">{[1,2,3,4].map(x => <Skeleton key={x} className="h-14 w-full rounded-xl" />)}</div> : <div className="space-y-4">
       <div className="overflow-x-auto rounded-xl border hidden md:block"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Booked by</TableHead><TableHead>Schedule</TableHead><TableHead>Payment</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
-      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell><div className="font-mono text-xs font-semibold">{b.bookingReference}</div>{b.status === BookingStatus.Requested && getRequestReference(b) && <div className="mt-1 font-mono text-[10px] font-semibold text-primary">{getRequestReference(b)}</div>}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` · ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}–{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={bookingStatusClass(b.status)}>{bookingStatusLabel(b.status)}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== BookingStatus.Cancelled && b.status !== BookingStatus.Requested && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity < 50 && <IconButton label="Add paddle rental" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity > 0 && <IconButton label="Void paddle rental" onClick={() => setVoidPaddleTarget(b)}><VoidIcon /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label={b.status === BookingStatus.Requested ? 'Confirm booking request' : 'Mark paid'} onClick={() => act(b, 'paid')}><Check /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label="Cancel" onClick={() => setCancelTarget(b)}><X /></IconButton>}{b.status === BookingStatus.Cancelled && <IconButton label="Delete" onClick={() => setDeleteTarget(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
+      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell><div className="font-mono text-xs font-semibold">{b.bookingReference}</div>{b.status === BookingStatus.Requested && getRequestReference(b) && <div className="mt-1 font-mono text-[10px] font-semibold text-primary">{getRequestReference(b)}</div>}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` · ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}–{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={bookingStatusClass(b.status)}>{bookingStatusLabel(b.status)}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== BookingStatus.Cancelled && b.status !== BookingStatus.Requested && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity < 50 && <IconButton label="Add paddle rental" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity > 0 && <IconButton label="Void paddle rental" onClick={() => setVoidPaddleTarget(b)}><VoidIcon /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label={b.status === BookingStatus.Requested ? 'Confirm booking request' : 'Mark paid'} onClick={() => setPaymentActionTarget(b)}><Check /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label="Cancel" onClick={() => setCancelTarget(b)}><X /></IconButton>}{b.status === BookingStatus.Cancelled && <IconButton label="Delete" onClick={() => setDeleteTarget(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
       {!filteredBookings.length && <TableRow><TableCell colSpan={6} className="py-12 text-center text-slate-500">No bookings match these filters.</TableCell></TableRow>}
     </TableBody></Table></div>
     <div className="grid md:hidden gap-4">
@@ -306,7 +309,7 @@ export default function BookingsPage() {
             {b.status !== BookingStatus.Cancelled && b.status !== BookingStatus.Requested && <Button variant="outline" size="sm" className="flex-1 min-w-0" onClick={() => setQrBooking(b)}><QrCode className="mr-1 h-3.5 w-3.5" /> QR</Button>}
             {(b.status === 'Paid' || b.status === 'Reserved') && b.paddleRentalQuantity < 50 && <Button variant="outline" size="sm" className="flex-1 min-w-[30%]" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus className="mr-1 h-3.5 w-3.5" /> Paddle</Button>}{(b.status === 'Paid' || b.status === 'Reserved') && b.paddleRentalQuantity > 0 && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => setVoidPaddleTarget(b)}><VoidIcon className="mr-1 h-3.5 w-3.5" /> Void paddles</Button>}
             {canReschedule(b) && <Button variant="outline" size="sm" className="flex-1 min-w-[30%]" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock className="mr-1 h-3.5 w-3.5" /> Move</Button>}
-            {(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <Button variant={b.status === BookingStatus.Requested ? 'default' : 'outline'} size="sm" className="flex-1 min-w-[30%]" onClick={() => act(b, 'paid')}><Check className="mr-1 h-3.5 w-3.5" /> {b.status === BookingStatus.Requested ? 'Confirm' : 'Paid'}</Button>}
+            {(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <Button variant={b.status === BookingStatus.Requested ? 'default' : 'outline'} size="sm" className="flex-1 min-w-[30%]" onClick={() => setPaymentActionTarget(b)}><Check className="mr-1 h-3.5 w-3.5" /> {b.status === BookingStatus.Requested ? 'Confirm' : 'Paid'}</Button>}
             {(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => setCancelTarget(b)}><X className="mr-1 h-3.5 w-3.5" /> Cancel</Button>}
             {b.status === 'Cancelled' && <Button variant="outline" size="sm" className="flex-1 min-w-[30%] text-red-600" onClick={() => setDeleteTarget(b)}><Trash className="mr-1 h-3.5 w-3.5" /> Delete</Button>}
           </div>
@@ -514,6 +517,32 @@ export default function BookingsPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={!!paymentActionTarget} onOpenChange={open => { if (!open && !markPaid.isPending) setPaymentActionTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{paymentActionTarget?.status === BookingStatus.Requested ? 'Confirm booking request?' : 'Mark booking as paid?'}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {paymentActionTarget?.status === BookingStatus.Requested
+              ? `This will approve ${paymentActionTarget.bookingReference}, reserve the selected court time, and email the player a booking confirmation.`
+              : `This will record the full payment for ${paymentActionTarget?.bookingReference || 'this booking'} and update its status to Paid.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {paymentActionTarget && (
+          <div className="rounded-xl border bg-muted/25 px-4 py-3 text-sm">
+            <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Booked by</span><span className="font-semibold text-foreground">{paymentActionTarget.customerName}</span></div>
+            <div className="mt-2 flex items-center justify-between gap-4"><span className="text-muted-foreground">Total amount</span><span className="font-semibold text-foreground">₱{paymentActionTarget.totalAmount.toLocaleString()}</span></div>
+          </div>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={markPaid.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction disabled={markPaid.isPending} onClick={event => { event.preventDefault(); confirmPaymentAction(); }}>
+            {markPaid.isPending ? (
+              <>{paymentActionTarget?.status === BookingStatus.Requested ? 'Confirming request' : 'Marking as paid'}<LoadingIndicator className="ml-2" label={paymentActionTarget?.status === BookingStatus.Requested ? 'Confirming booking request' : 'Marking booking as paid'} /></>
+            ) : paymentActionTarget?.status === BookingStatus.Requested ? 'Confirm request' : 'Mark as paid'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <AlertDialog open={!!voidPaddleTarget} onOpenChange={open => { if (!open && !voidPaddleRental.isPending) setVoidPaddleTarget(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
