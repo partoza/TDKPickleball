@@ -708,7 +708,7 @@ public class BookingService : IBookingService
         {
             var courtName = (await _courts.GetByIdAsync(booking.CourtId))?.Name ?? "Court";
             try { await _email.SendCancellationAsync(booking, courtName, normalizedReason, wasRequested); }
-            catch { /* email failure is non-critical; booking is already cancelled */ }
+            catch (Exception ex) { return ApiResponse<bool>.Fail($"Booking cancelled but email failed: {ex.Message}"); }
         }
         return ApiResponse<bool>.Ok(true, wasRequested ? "Booking request declined" : "Booking cancelled");
     }
