@@ -36,9 +36,10 @@ export default function AdminLayout() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.preventDefault();
     setIsRefreshing(true);
-    await queryClient.invalidateQueries();
+    await queryClient.refetchQueries();
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
@@ -141,7 +142,7 @@ export default function AdminLayout() {
               <Sun className="h-5 w-5 hidden dark:block" />
               <Moon className="h-5 w-5 block dark:hidden" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={handleRefresh} className="mac-toolbar-button text-muted-foreground hover:text-foreground relative hover:scale-[1.03] active:scale-[0.85] active:opacity-75 transition-all duration-200" aria-label="Refresh data">
+              <Button variant="ghost" size="icon" type="button" onClick={handleRefresh} className="mac-toolbar-button text-muted-foreground hover:text-foreground relative hover:scale-[1.03] active:scale-[0.85] active:opacity-75 transition-all duration-200" aria-label="Refresh data">
                 <Refresh className={cn("h-5 w-5", isRefreshing && "animate-spin")} />
               </Button>
               <DropdownMenu>
@@ -158,7 +159,7 @@ export default function AdminLayout() {
                 </div>
                 <DropdownMenuSeparator />
                 <div className="max-h-[360px] overflow-y-auto">
-                  {notificationsQuery.isLoading && <p className="px-3 py-6 text-center text-xs text-muted-foreground">Loading notificationsÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦</p>}
+                  {notificationsQuery.isLoading && <p className="px-3 py-6 text-center text-xs text-muted-foreground">Loading notificationsÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦</p>}
                   {notificationsQuery.isError && <button type="button" className="w-full rounded-lg px-3 py-6 text-center text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => notificationsQuery.refetch()}>Notifications could not be loaded. Tap to retry.</button>}
                   {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.map(notification => {
                     const unread = !seenNotificationIds.includes(notification.id);
