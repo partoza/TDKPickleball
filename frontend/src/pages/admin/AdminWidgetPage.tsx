@@ -12,7 +12,7 @@ import { getManilaNow } from '@/lib/manila-time';
 import { Booking, BookingStatus, Court, RateType, Schedule, ScheduleStatus } from '@/types';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
-import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
+import { AdminIconLoader, AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
@@ -118,7 +118,7 @@ export default function AdminWidgetPage() {
     return [...court1Upcoming, ...court2Upcoming].sort((a, b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
   }, [bookings, now, courts]);
 
-  if (authLoading) return <main className="min-h-screen bg-background py-8"><AdminPageSkeleton label="Loading schedule widget" /></main>;
+  if (authLoading) return <AdminIconLoader label="Loading schedule widget" />;
   if (!isAuthenticated || (user?.role !== 'Admin' && user?.role !== 'Staff')) return <Navigate to={`${ROUTES.ADMIN.LOGIN}?widget=1`} replace />;
   if (user.mustChangePassword) return <Navigate to={ROUTES.ADMIN.WELCOME} replace />;
 

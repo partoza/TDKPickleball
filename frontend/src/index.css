@@ -236,7 +236,6 @@
 
 [data-slot="dialog-footer"] [data-slot="button"][data-variant="destructive"],
 [data-slot="dialog-footer"] [data-modal-action="danger"],
-[data-slot="dialog-footer"] [data-modal-action="cancel"],
 [data-slot="dialog-footer"] [data-modal-action="confirm"][class~="bg-destructive"] {
   border-color: rgb(220 38 38) !important;
   background: rgb(220 38 38) !important;
@@ -256,7 +255,6 @@
   padding: 0;
 }
 
-.schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="cancel"],
 .schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="danger"] {
   border-color: rgb(220 38 38) !important;
   background: rgb(220 38 38) !important;

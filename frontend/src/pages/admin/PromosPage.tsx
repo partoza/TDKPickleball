@@ -160,8 +160,8 @@ export default function PromosPage() {
             )}
 
             <DialogFooter>
-              <Button data-modal-action="cancel" type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>Cancel</Button>
-              <Button data-modal-action="confirm" type="submit" disabled={!form.code.trim() || Number(form.value) <= 0 || isSaving}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={!form.code.trim() || Number(form.value) <= 0 || isSaving}>
                 {isSaving && <LoadingIndicator className="mr-2" label={editing ? 'Saving promo' : 'Creating promo'} />}
                 {isSaving ? (editing ? 'Saving changes…' : 'Creating promo…') : (editing ? 'Save changes' : 'Create Promo')}
               </Button>

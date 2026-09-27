@@ -228,8 +228,8 @@ export default function InternalCoachesPage() {
               </div>
             )}
             <DialogFooter>
-              <Button data-modal-action="cancel" type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>Cancel</Button>
-              <Button data-modal-action="confirm" type="submit" disabled={!form.name.trim() || isSaving}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>Cancel</Button>
+              <Button type="submit" disabled={!form.name.trim() || isSaving}>
                 {isSaving && <LoadingIndicator className="mr-2" label={editing ? 'Saving profile' : 'Adding profile'} />}
                 {isSaving ? (editing ? 'Saving changes…' : 'Adding profile…') : (editing ? 'Save changes' : 'Add profile')}
               </Button>

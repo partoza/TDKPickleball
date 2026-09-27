@@ -429,13 +429,13 @@ export default function AvailabilityChecker() {
         </div>
 
         <div data-slot="dialog-footer" className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
-          <button data-modal-action="cancel"
+          <button
             className="h-10 px-4 rounded-xl text-[13px] font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm" 
             onClick={() => setIsOpen(false)}
           >
             Close
           </button>
-          <button data-modal-action="confirm"
+          <button
             onClick={handleCheck}
             disabled={isLoading || isFetching || !isValidTimeRange(startTime, endTime)}
             className="h-10 px-6 rounded-xl text-[13px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"

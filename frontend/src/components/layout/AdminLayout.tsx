@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
-import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
+import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
 
 export default function AdminLayout() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
@@ -76,7 +76,7 @@ export default function AdminLayout() {
   };
 
   if (isLoading) {
-    return <div className="admin-shell min-h-screen py-8"><AdminPageSkeleton label="Loading admin" /></div>;
+    return <AdminIconLoader className="admin-shell" label="Loading admin" />;
   }
 
   if (!isAuthenticated || (user?.role !== 'Admin' && user?.role !== 'Staff')) {
