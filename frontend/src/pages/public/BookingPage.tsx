@@ -736,7 +736,7 @@ export default function BookingPage() {
         </form>
       </Card>
       <Dialog open={receiptPreviewOpen} onOpenChange={setReceiptPreviewOpen}>
-        <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden p-4 sm:p-6">
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden">
           <DialogHeader>
             <DialogTitle>Payment receipt preview</DialogTitle>
             <DialogDescription>{receipt?.name || 'Uploaded payment receipt'}</DialogDescription>

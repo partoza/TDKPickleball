@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -82,6 +82,8 @@ export default function RatesPage() {
     disabled: !isValidTimeRange(form.startTime, option.value),
   }));
 
+  if (isLoading) return <AdminPageSkeleton label="Loading rates" />;
+
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex items-end justify-between">
       <div><h1 className="text-3xl font-bold tracking-tight">Rates</h1><p className="mt-1 text-slate-500">Customize pricing for bookings, training, and free play.</p></div>
@@ -90,8 +92,7 @@ export default function RatesPage() {
 
 
     <Card className="rounded-2xl"><CardHeader><CardTitle>Pricing schedule</CardTitle></CardHeader><CardContent>
-      {isLoading ? <div className="space-y-3">{[1, 2].map(x => <Skeleton key={x} className="h-14" />)}</div> :
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div className="rounded-xl border dark:border-white/10 hidden md:block"><Table><TableHeader><TableRow>
             <TableHead>Pricing ID</TableHead><TableHead>Rate type</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Rate / hour</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader><TableBody>{rates.slice(page * 10, (page + 1) * 10).map(rate => <TableRow key={rate.id}>
@@ -132,7 +133,7 @@ export default function RatesPage() {
               </div>
             </div>
           )}
-        </div>}
+        </div>
     </CardContent></Card>
 
     <Dialog open={editing !== undefined} onOpenChange={openState => { if (!openState) { setEditing(undefined); setErrors({}); } }}>

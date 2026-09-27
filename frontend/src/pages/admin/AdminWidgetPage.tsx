@@ -12,6 +12,7 @@ import { getManilaNow } from '@/lib/manila-time';
 import { Booking, BookingStatus, Court, RateType, Schedule, ScheduleStatus } from '@/types';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
@@ -117,7 +118,7 @@ export default function AdminWidgetPage() {
     return [...court1Upcoming, ...court2Upcoming].sort((a, b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
   }, [bookings, now, courts]);
 
-  if (authLoading) return <main className="grid min-h-screen place-items-center bg-background"><img src="/assets/images/loading.png" alt="Loading" className="page-loading-mascot" /></main>;
+  if (authLoading) return <main className="min-h-screen bg-background py-8"><AdminPageSkeleton label="Loading schedule widget" /></main>;
   if (!isAuthenticated || (user?.role !== 'Admin' && user?.role !== 'Staff')) return <Navigate to={`${ROUTES.ADMIN.LOGIN}?widget=1`} replace />;
   if (user.mustChangePassword) return <Navigate to={ROUTES.ADMIN.WELCOME} replace />;
 
@@ -141,7 +142,7 @@ export default function AdminWidgetPage() {
         </div>
       </header>
 
-      {isError ? <div className="rounded-[28px] border border-[#ff3b30]/20 bg-[#ff3b30]/8 p-6 text-center text-[#c9342c]"><p className="font-semibold tracking-[-0.02em]">Live overview is unavailable.</p><button className="mt-2 text-[13px] font-medium underline" onClick={() => refetch()}>Try again</button></div> : loading ? <div className="grid min-h-[420px] place-items-center"><img src="/assets/images/loading.png" alt="Loading overview" className="page-loading-mascot" /></div> : <>
+      {isError ? <div className="rounded-[28px] border border-[#ff3b30]/20 bg-[#ff3b30]/8 p-6 text-center text-[#c9342c]"><p className="font-semibold tracking-[-0.02em]">Live overview is unavailable.</p><button className="mt-2 text-[13px] font-medium underline" onClick={() => refetch()}>Try again</button></div> : loading ? <AdminPageSkeleton className="px-0 pb-0" label="Loading schedule widget" /> : <>
         <div className="grid gap-5 md:grid-cols-2">{courts.map(court => <CourtWidget key={court.id} court={court} bookings={bookings} schedules={schedules} internalCoaches={internalCoaches} now={now} />)}{!courts.length && <div className="rounded-3xl border bg-white p-6 text-slate-500">No active courts configured.</div>}</div>
 
         <section className="relative mt-4 overflow-hidden rounded-[28px] border border-white/40 bg-white/70 p-5 text-[#1c1c1e] shadow-[0_12px_35px_-24px_rgba(0,0,0,.38)] backdrop-blur-2xl sm:p-6">

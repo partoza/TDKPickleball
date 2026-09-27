@@ -7,6 +7,7 @@ import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -301,6 +302,8 @@ export default function SchedulePage() {
       onError: (error: any) => toast.error(error.response?.status === 401 ? 'Your admin session expired. Please sign in again.' : getApiErrorMessage(error, 'Unable to save schedule'))
     });
   };
+
+  if (isLoading) return <AdminPageSkeleton label="Loading court schedule" />;
 
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -812,16 +815,16 @@ export default function SchedulePage() {
             )}
           </div>
           
-          <div className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-3 shrink-0 rounded-b-2xl">
-            {bookingModalData?.id && user?.role === 'Admin' && <button type="button" className="mr-auto flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-[13px] font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-50 dark:border-red-900/70 dark:bg-[#3a3a3c] dark:hover:bg-red-950/40" onClick={openDeleteConfirmation} disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}><Trash className="h-4 w-4" />Delete</button>}
-            <button 
+          <div data-slot="dialog-footer" className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-3 shrink-0 rounded-b-2xl">
+            {bookingModalData?.id && user?.role === 'Admin' && <button data-modal-action="danger" type="button" className="mr-auto flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-[13px] font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-50 dark:border-red-900/70 dark:bg-[#3a3a3c] dark:hover:bg-red-950/40" onClick={openDeleteConfirmation} disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}><Trash className="h-4 w-4" />Delete</button>}
+            <button data-modal-action="cancel"
               className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground dark:border-white/15 dark:bg-[#3a3a3c] dark:text-slate-100 dark:hover:bg-[#48484a] dark:hover:text-white" 
               onClick={() => setBookingModalData(null)}
               disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}
             >
               Cancel
             </button>
-            <button 
+            <button data-modal-action="confirm"
               onClick={handleSaveSchedule}
               disabled={savingBatch || bulkUpdateMutation.isPending || updateMutation.isPending}
               className="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg h-9 px-4 text-[13px] font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[.98] bg-primary hover:bg-primary/90 text-white shadow-sm"
@@ -834,7 +837,7 @@ export default function SchedulePage() {
       </Dialog>
 
       <Dialog open={!!deleteTarget} onOpenChange={open => { if (!open && !deleteMutation.isPending) { setDeleteTarget(null); setDeleteCredentials({ email: '', password: '' }); setDeleteError(''); } }}>
-        <DialogContent className="sm:max-w-md p-0 bg-white dark:bg-[#252527] rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 overflow-hidden">
+        <DialogContent className="schedule-form-modal sm:max-w-md p-0 bg-white dark:bg-[#252527] rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 overflow-hidden">
           <div className="px-6 pt-6 pb-2">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Delete schedule permanently?</DialogTitle>
@@ -855,9 +858,9 @@ export default function SchedulePage() {
               {deleteError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{deleteError}</p>}
             </div>
           </div>
-          <div className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-3 rounded-b-2xl">
-            <button type="button" className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Cancel</button>
-            <button type="button" className="flex h-9 items-center gap-2 rounded-lg bg-red-600 px-4 text-[13px] font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60" onClick={handleDeleteSchedule} disabled={deleteMutation.isPending}>
+          <div data-slot="dialog-footer" className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-3 rounded-b-2xl">
+            <button data-modal-action="cancel" type="button" className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-slate-200 dark:border-white/15 bg-white dark:bg-[#3a3a3c] text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#444446] transition-colors shadow-sm" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Cancel</button>
+            <button data-modal-action="danger" type="button" className="flex h-9 items-center gap-2 rounded-lg bg-red-600 px-4 text-[13px] font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60" onClick={handleDeleteSchedule} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending && <LoadingIndicator label="Deleting schedule" />}Permanently delete
             </button>
           </div>
@@ -866,7 +869,7 @@ export default function SchedulePage() {
 
       {/* View Details Modal */}
       <Dialog open={!!viewModalData} onOpenChange={(open) => !open && setViewModalData(null)}>
-        <DialogContent className="sm:max-w-[425px] p-0 bg-white rounded-xl border-slate-200 shadow-xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+        <DialogContent className="schedule-form-modal sm:max-w-[425px] p-0 bg-white text-slate-900 dark:bg-[#2c2c2e] dark:text-slate-100 rounded-xl border-slate-200 dark:border-white/10 shadow-xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
           <div className="px-6 pt-6 pb-2 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">Schedule Details</DialogTitle>
@@ -968,9 +971,9 @@ export default function SchedulePage() {
             )}
           </div>
           
-          <div className="p-4 sm:px-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-            {viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0 }); setViewModalData(null); }}>Edit Details</button>}
-            <button 
+          <div data-slot="dialog-footer" className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-2">
+            {viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button data-modal-action="confirm" className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0 }); setViewModalData(null); }}>Edit Details</button>}
+            <button data-modal-action="cancel"
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}
             >

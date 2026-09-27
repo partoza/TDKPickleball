@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
 import { TABLE_PAGE_SIZE, TablePagination } from '@/components/admin/TablePagination';
 import {
@@ -150,6 +151,8 @@ export default function InternalCoachesPage() {
     await updateInternalCoach(profile.id, { name: profile.name, email: profile.email, phone: profile.phone, type: profile.type, isActive: !profile.isActive });
   };
 
+  if (loading && !internalCoaches.length) return <AdminPageSkeleton label="Loading internal profiles" />;
+
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -244,9 +247,7 @@ export default function InternalCoachesPage() {
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search name, email, or phone" /></div><Select value={statusFilter} onValueChange={(value: 'all' | 'active' | 'inactive') => { setStatusFilter(value); setPage(0); }}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
       </div>
         <div className="mt-6 rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
-          {loading && !internalCoaches.length ? (
-            <div className="flex min-h-40 items-center justify-center p-8"><LoadingIndicator label="Loading profiles" /></div>
-          ) : filteredProfiles.length === 0 ? (
+          {filteredProfiles.length === 0 ? (
             <div className="p-8 text-center flex flex-col items-center justify-center">
               <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4 dark:bg-white/5">
                 <Plus className="h-6 w-6 text-slate-400" />

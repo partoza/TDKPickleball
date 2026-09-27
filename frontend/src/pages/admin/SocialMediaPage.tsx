@@ -18,7 +18,7 @@ import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 import { Button } from '@/components/ui/button';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
@@ -136,6 +136,8 @@ function ScheduleGenerator() {
     }
   };
 
+  if (isLoading || isFetching) return <AdminPageSkeleton className="px-0 pb-0" label="Loading social media schedules" />;
+
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
       <Card className="overflow-hidden rounded-2xl border-black/10 shadow-sm dark:border-white/10">
@@ -161,8 +163,7 @@ function ScheduleGenerator() {
               </div>
             </div>
 
-            {isLoading || isFetching ? <div className="space-y-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-14 rounded-xl" />)}</div>
-              : isError ? <InlineError text={getApiErrorMessage(error, 'Unable to retrieve schedules.')} />
+            {isError ? <InlineError text={getApiErrorMessage(error, 'Unable to retrieve schedules.')} />
                 : availableSlots.length ? <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
                   {availableSlots.map(slot => {
                     const checked = selected.includes(slot.id);

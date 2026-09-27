@@ -15,6 +15,7 @@ import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialD
 import { TablePagination } from '@/components/admin/TablePagination';
 import { getPromoValidity } from '@/lib/promo-availability';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 
 export default function PromosPage() {
   const { promos, loading, fetchPromos, createPromo, updatePromo, deletePromo } = usePromos();
@@ -98,6 +99,8 @@ export default function PromosPage() {
     }
   };
 
+  if (loading && !promos.length) return <AdminPageSkeleton label="Loading promos" />;
+
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -168,9 +171,7 @@ export default function PromosPage() {
       </Dialog>
 
       <div className="rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
-        {loading && !promos.length ? (
-          <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>
-        ) : promos.length === 0 ? (
+        {promos.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center justify-center">
             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4 dark:bg-white/5">
               <Percent className="h-6 w-6 text-slate-400" />

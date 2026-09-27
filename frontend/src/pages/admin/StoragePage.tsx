@@ -23,6 +23,7 @@ import { TablePagination } from '@/components/admin/TablePagination';
 import { DataCleanupButton } from '@/components/admin/DataCleanup';
 import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
 import { Button } from '@/components/ui/button';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 
 const statusKey = ['database-storage-status'];
 const historyKey = ['booking-cleanup-history'];
@@ -54,6 +55,8 @@ export default function StoragePage() {
   const allocatedMegabytes = status?.allocatedMegabytes ?? status?.usedMegabytes ?? 0;
   const usedPercent = measurementAvailable ? Math.min(100, status?.usedPercent ?? 0) : 0;
   const thresholdPercent = status ? Math.min(100, status.warningThresholdMegabytes / status.limitMegabytes * 100) : 80;
+
+  if (statusQuery.isLoading || historyQuery.isLoading) return <AdminPageSkeleton label="Loading data storage" />;
 
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

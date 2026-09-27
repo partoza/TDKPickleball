@@ -233,7 +233,7 @@ export default function AvailabilityChecker() {
           </button>
         </DialogTrigger>
       
-      <DialogContent className="schedule-form-modal sm:max-w-[500px] p-0 bg-white text-slate-900 rounded-2xl border-slate-200 shadow-2xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+      <DialogContent className="schedule-form-modal sm:max-w-[500px] p-0 bg-white text-slate-900 dark:bg-[#2c2c2e] dark:text-slate-100 rounded-2xl border-slate-200 dark:border-white/10 shadow-2xl gap-0 flex flex-col max-h-[90vh] overflow-hidden">
         <div className="px-6 pt-6 pb-2 sm:px-7 sm:pt-7 sm:pb-2 shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
@@ -428,14 +428,14 @@ export default function AvailabilityChecker() {
           </div>
         </div>
 
-        <div className="p-4 sm:px-7 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0 rounded-b-2xl">
-          <button 
+        <div data-slot="dialog-footer" className="p-4 sm:px-7 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 shrink-0 rounded-b-2xl">
+          <button data-modal-action="cancel"
             className="h-10 px-4 rounded-xl text-[13px] font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm" 
             onClick={() => setIsOpen(false)}
           >
             Close
           </button>
-          <button 
+          <button data-modal-action="confirm"
             onClick={handleCheck}
             disabled={isLoading || isFetching || !isValidTimeRange(startTime, endTime)}
             className="h-10 px-6 rounded-xl text-[13px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"

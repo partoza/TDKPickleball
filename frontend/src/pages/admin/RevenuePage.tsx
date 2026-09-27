@@ -5,7 +5,7 @@ import { useRevenue } from '@/hooks/useRevenue';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/admin/TablePagination';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,8 @@ export default function RevenuePage() {
   const rows = [...(revenue?.daily || [])].reverse();
   const paginatedRows = rows.slice(page * TABLE_PAGE_SIZE, (page + 1) * TABLE_PAGE_SIZE);
 
+  if (report.isLoading) return <AdminPageSkeleton label="Loading revenue report" />;
+
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 pb-12 sm:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -68,9 +70,7 @@ export default function RevenuePage() {
         </CardContent>
       </Card>
 
-      {report.isLoading ? (
-        <div className="flex min-h-72 items-center justify-center"><LoadingIndicator size="lg" label="Loading revenue report" /></div>
-      ) : report.isError || !revenue ? (
+      {report.isError || !revenue ? (
         <Card><CardContent className="flex min-h-48 flex-col items-center justify-center gap-4 text-center"><p className="text-sm text-red-600">Revenue data could not be loaded.</p><Button variant="outline" onClick={() => report.refetch()}>Try again</Button></CardContent></Card>
       ) : (
         <>

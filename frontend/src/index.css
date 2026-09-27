@@ -187,12 +187,127 @@
   animation: mac-content-in 300ms cubic-bezier(.25,.46,.45,.94) both;
 }
 
+.admin-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--primary) 9%, var(--muted));
+}
+
+.admin-skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: admin-skeleton-shimmer 1.45s ease-in-out infinite;
+}
+
+.dark .admin-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .09), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-skeleton::after { animation: none; }
+}
+
 .admin-shell button:not(:disabled),
 .admin-shell [role="button"]:not([aria-disabled="true"]),
 .admin-shell a[href],
 .admin-shell label[for] { cursor: pointer; }
 .admin-shell button:disabled,
 .admin-shell [role="button"][aria-disabled="true"] { cursor: not-allowed; }
+
+/* Shared modal system: fixed chrome, scrollable content, and semantic actions. */
+[data-slot="dialog-content"] {
+  color-scheme: light dark;
+}
+
+[data-slot="dialog-body"] {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+}
+
+[data-slot="dialog-content"] label {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+
+[data-slot="dialog-footer"] [data-slot="button"]:first-of-type {
+  border-color: rgb(220 38 38) !important;
+  background: rgb(220 38 38) !important;
+  color: white !important;
+}
+
+[data-slot="dialog-footer"] [data-slot="button"]:first-of-type:hover {
+  border-color: rgb(185 28 28) !important;
+  background: rgb(185 28 28) !important;
+}
+
+[data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]) {
+  border-color: rgb(5 150 105) !important;
+  background: rgb(5 150 105) !important;
+  color: white !important;
+}
+
+[data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]):hover {
+  border-color: rgb(4 120 87) !important;
+  background: rgb(4 120 87) !important;
+}
+
+[data-slot="dialog-footer"] [data-slot="button"][data-variant="destructive"],
+[data-slot="dialog-footer"] [data-modal-action="danger"],
+[data-slot="dialog-footer"] [data-modal-action="cancel"],
+[data-slot="dialog-footer"] [data-modal-action="confirm"][class~="bg-destructive"] {
+  border-color: rgb(220 38 38) !important;
+  background: rgb(220 38 38) !important;
+  color: white !important;
+}
+
+[data-slot="dialog-footer"] [data-modal-action="confirm"]:not([class~="bg-destructive"]) {
+  border-color: rgb(5 150 105) !important;
+  background: rgb(5 150 105) !important;
+  color: white !important;
+}
+
+.schedule-form-modal [data-slot="dialog-header"] {
+  position: static;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.schedule-form-modal > div.border-t:last-of-type button:not(:last-of-type) {
+  border-color: rgb(220 38 38) !important;
+  background: rgb(220 38 38) !important;
+  color: white !important;
+}
+
+.schedule-form-modal > div.border-t:last-of-type button:last-of-type {
+  border-color: rgb(5 150 105) !important;
+  background: rgb(5 150 105) !important;
+  color: white !important;
+}
+
+.schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="cancel"],
+.schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="danger"] {
+  border-color: rgb(220 38 38) !important;
+  background: rgb(220 38 38) !important;
+  color: white !important;
+}
+
+.schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="confirm"] {
+  border-color: rgb(5 150 105) !important;
+  background: rgb(5 150 105) !important;
+  color: white !important;
+}
+
+.dark [data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]),
+.dark .schedule-form-modal > div.border-t:last-of-type button:last-of-type {
+  border-color: rgb(22 163 74) !important;
+  background: rgb(22 163 74) !important;
+}
 
 .mac-traffic-lights { display: flex; align-items: center; gap: 8px; }
 .mac-traffic-lights span { width: 12px; height: 12px; border-radius: 999px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.14); }
@@ -377,6 +492,7 @@ button:active {
 }
 
 @keyframes loading-indicator-spin { to { transform: rotate(360deg); } }
+@keyframes admin-skeleton-shimmer { to { transform: translateX(100%); } }
 
 @keyframes mascot-loading {
   0%, 100% { transform: translateY(0) rotate(-3deg) scale(1); }
