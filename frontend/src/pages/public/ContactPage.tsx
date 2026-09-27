@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { EXTERNAL_LINKS } from '@/lib/constants';
 
 export default function ContactPage() {
   return (
@@ -22,7 +23,7 @@ export default function ContactPage() {
           
           <div className="mb-10 max-w-2xl w-full hover:-translate-y-1 transition-transform duration-300 drop-shadow-2xl">
             <a 
-              href="https://www.facebook.com/profile.php?id=61592414877242" 
+              href={EXTERNAL_LINKS.FACEBOOK_PAGE}
               target="_blank" 
               rel="noopener noreferrer"
               className="block"
@@ -41,7 +42,7 @@ export default function ContactPage() {
             className="h-14 md:h-16 px-8 md:px-10 text-base md:text-xl font-bold rounded-full shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all duration-300"
           >
             <a 
-              href="https://www.facebook.com/profile.php?id=61592414877242" 
+              href={EXTERNAL_LINKS.FACEBOOK_MESSAGE}
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center"

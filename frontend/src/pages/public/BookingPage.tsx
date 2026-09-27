@@ -11,13 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DiscountType, PublicPromo, RateType } from '@/types';
-import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, HomeIcon as Home, CalendarDaysIcon as CalendarDays, CameraIcon as Camera, EnvelopeIcon as Envelope, MinusIcon, PlusIcon, TagIcon as Tag } from '@heroicons/react/24/solid';
+import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCodeIcon as QrCode, ArrowUpTrayIcon as Upload, ArrowDownTrayIcon as Download, HomeIcon as Home, CalendarDaysIcon as CalendarDays, CameraIcon as Camera, EnvelopeIcon as Envelope, MinusIcon, PlusIcon, TagIcon as Tag, ChatBubbleLeftRightIcon as ChatBubble } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { calculateRateQuote } from '@/lib/rate-calculation';
 import { cn } from '@/lib/utils';
 import { formatTimeLabel } from '@/components/admin/AdminFormControls';
 import { useAuth } from '@/hooks/useAuth';
-import { ROUTES } from '@/lib/constants';
+import { EXTERNAL_LINKS, ROUTES } from '@/lib/constants';
 import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
 import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -343,7 +343,7 @@ export default function BookingPage() {
       <div className="container mx-auto max-w-4xl px-4 py-8 sm:py-14">
         <Card className="relative overflow-hidden border-border/70 bg-card shadow-[0_24px_70px_-36px_rgba(15,23,42,0.4)]">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary" />
-          <div ref={confirmationRef} className="px-5 py-8 text-center sm:px-10 sm:py-11">
+          <div ref={confirmationRef} className="px-5 py-8 text-center sm:px-10 sm:py-12">
             <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:ring-emerald-950/30">
               <CheckIcon className="h-8 w-8" aria-hidden="true" />
             </div>
@@ -353,11 +353,16 @@ export default function BookingPage() {
               Your request is now listed in the booking records and the selected schedule is held in blue while the store verifies your receipt. It becomes a confirmed booking after an admin approves it.
             </CardDescription>
 
-            <div className="mx-auto mt-8 max-w-2xl space-y-4 text-left">
-              <div className="rounded-2xl border bg-muted/25 p-5 sm:p-6">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Request reference</p>
-                <p className="mt-2 break-all font-mono text-lg font-bold tracking-tight text-foreground sm:text-xl">{requestReference}</p>
-                <p className="mt-2 text-sm leading-5 text-muted-foreground">Keep this reference when contacting the store. The booking remains in Requested status until an admin confirms it.</p>
+            <div className="mx-auto mt-8 max-w-2xl space-y-5 text-left">
+              <div className="rounded-2xl border bg-muted/20 p-5 shadow-sm sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Request reference</p>
+                    <p className="mt-2 break-all font-mono text-lg font-bold tracking-tight text-foreground sm:text-xl">{requestReference}</p>
+                  </div>
+                  <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-700 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-300">Pending review</span>
+                </div>
+                <p className="mt-4 border-t pt-4 text-sm leading-6 text-muted-foreground">Keep this reference when contacting the store. Your selected schedule remains in Requested status until an admin reviews and confirms it.</p>
               </div>
 
               <div className="overflow-hidden rounded-2xl border bg-background">
@@ -375,24 +380,39 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-blue-900 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-100">
-                <div className="flex items-start gap-3">
-                  <Envelope className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <div>
-                    <p className="text-sm font-semibold">A copy was emailed to your verified account</p>
-                    <p className="mt-1 break-all text-xs leading-5 text-blue-700 dark:text-blue-300">{email}. Check your inbox or spam folder for the request details and receipt copy.</p>
+              <div className="overflow-hidden rounded-2xl border bg-background shadow-sm">
+                <div className="border-b bg-muted/25 px-5 py-3">
+                  <p className="text-sm font-semibold text-foreground">What happens next</p>
+                </div>
+                <div className="divide-y">
+                  <div className="flex items-start gap-3 px-5 py-4">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"><Envelope className="h-4 w-4" /></span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Check your email</p>
+                      <p className="mt-1 break-all text-xs leading-5 text-muted-foreground">A request summary and receipt copy were sent to {email}. Check your inbox and spam folder.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 px-5 py-4">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"><Camera className="h-4 w-4" /></span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Keep this confirmation</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Download or screenshot this page and retain it until the store confirms your booking.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+              <div className="flex flex-col gap-4 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/70 dark:bg-blue-950/25 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <Camera className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#1877F2] text-white"><ChatBubble className="h-5 w-5" /></span>
                   <div>
-                    <p className="text-sm font-semibold">Save this confirmation before leaving</p>
-                    <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-300">Take a screenshot or download a copy below. Keep it until the store replies and confirms your booking.</p>
+                    <p className="text-sm font-semibold text-foreground">Need help with your request?</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Message us on Facebook and include reference <span className="font-mono font-semibold text-foreground">{requestReference}</span>.</p>
                   </div>
                 </div>
+                <Button asChild type="button" className="h-10 shrink-0 rounded-xl bg-[#1877F2] px-5 text-white shadow-sm hover:bg-[#166fe5]">
+                  <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">Message us on Facebook</a>
+                </Button>
               </div>
             </div>
 
