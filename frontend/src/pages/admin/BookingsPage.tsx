@@ -524,13 +524,13 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
           <Detail k="Status" v={bookingStatusLabel(b.status)} />
           <Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} />
           {b.rescheduledAt && <Detail k="Rescheduled by" v={b.rescheduledByName || 'Legacy record'} />}
-          {b.rescheduledAt && <Detail k="Rescheduled on" v={`${formatManilaDatabaseTime(b.rescheduledAt)} (Manila time)`} />}
+          {b.rescheduledAt && <Detail k="Rescheduled on" v={formatManilaDatabaseTime(b.rescheduledAt)} />}
           {b.cancelledAt && <Detail k="Cancelled by" v={b.cancelledByName || 'Legacy record'} />}
-          {b.cancelledAt && <Detail k="Cancelled on" v={`${formatManilaDatabaseTime(b.cancelledAt)} (Manila time)`} />}
+          {b.cancelledAt && <Detail k="Cancelled on" v={formatManilaDatabaseTime(b.cancelledAt)} />}
           {b.confirmedAt && <Detail k="Confirmed / marked paid by" v={b.confirmedByName || 'Legacy record'} />}
-          {b.confirmedAt && <Detail k="Confirmed / marked paid on" v={`${formatManilaDatabaseTime(b.confirmedAt)} (Manila time)`} />}
+          {b.confirmedAt && <Detail k="Confirmed / marked paid on" v={formatManilaDatabaseTime(b.confirmedAt)} />}
           <Detail k="Listed by" v={b.listedByName || 'Legacy record'} />
-          <Detail k="Listed on" v={`${formatManilaDatabaseTime(b.createdAt)} (Manila time)`} />
+          <Detail k="Listed on" v={formatManilaDatabaseTime(b.createdAt)} />
         </div>
       </div>
 
@@ -542,7 +542,7 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
           <Detail k="Court Booking" v={`₱${b.subtotal.toLocaleString()}`} />
           {b.discountAmount > 0 && <Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />}
           {b.paddleRentalQuantity > 0 && <Detail k={`Selkirk Paddle Rental × ${b.paddleRentalQuantity}`} v={`₱${b.paddleRentalFee.toLocaleString()}`} />}
-          {b.voidedPaddleRentalQuantity > 0 && <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 dark:border-red-900/60 dark:bg-red-950/20"><div className="grid gap-2"><Detail k={`Voided Paddle Rental × ${b.voidedPaddleRentalQuantity}`} v={`₱${b.voidedPaddleRentalFee.toLocaleString()}`} valueClass="font-semibold text-red-600 dark:text-red-400" /><Detail k="Voided by" v={b.paddleRentalVoidedByName || 'Staff'} /><Detail k="Voided on" v={`${formatManilaDatabaseTime(b.paddleRentalVoidedAt)} (Manila time)`} /></div></div>}
+          {b.voidedPaddleRentalQuantity > 0 && <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 dark:border-red-900/60 dark:bg-red-950/20"><div className="grid gap-2"><Detail k={`Voided Paddle Rental × ${b.voidedPaddleRentalQuantity}`} v={`₱${b.voidedPaddleRentalFee.toLocaleString()}`} valueClass="font-semibold text-red-600 dark:text-red-400" /><Detail k="Voided by" v={b.paddleRentalVoidedByName || 'Staff'} /><Detail k="Voided on" v={formatManilaDatabaseTime(b.paddleRentalVoidedAt)} /></div></div>}
           <div className="border-t dark:border-white/10 pt-3 mt-1"><Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" /></div>
           
           <div className="border-t dark:border-white/10 pt-3 mt-1 space-y-3">
