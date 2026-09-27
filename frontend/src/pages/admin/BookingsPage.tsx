@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+﻿import { useEffect, useMemo, useState, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
@@ -382,7 +382,7 @@ export default function BookingsPage() {
               <div><Label>Email (optional)</Label><Input aria-invalid={!!formErrors.email} className={cn(formErrors.email && 'field-invalid')} type="email" value={form.email} onChange={event => { setForm({...form, email: event.target.value}); setFormErrors(current => ({...current, email: ''})); }} placeholder="e.g. john@example.com" /><FieldError message={formErrors.email} /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={event => setForm({...form, phone: event.target.value})} placeholder="e.g. 09123456789" /></div>
               <div><Label>Payment *</Label><Select value={form.paymentStatus} onValueChange={(paymentStatus: BookingStatus) => { setForm({...form, paymentStatus, amountPaid: paymentStatus === BookingStatus.Paid ? '' : form.amountPaid}); setFormErrors(current => ({...current, amountPaid: ''})); }}><SelectTrigger><SelectValue placeholder="Select payment status" /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
-              {form.paymentStatus === BookingStatus.Reserved && <div><Label>Reservation Amount</Label><Input aria-invalid={!!formErrors.amountPaid} className={cn(formErrors.amountPaid && 'field-invalid')} type="number" min="0" max={addGrandTotal} step="0.01" value={form.amountPaid} onChange={event => { setForm({...form, amountPaid: event.target.value === '' ? '' : Number(event.target.value)}); setFormErrors(current => ({...current, amountPaid: ''})); }} placeholder="0" /><FieldError message={formErrors.amountPaid} /></div>}
+              {form.paymentStatus === BookingStatus.Reserved && <div><Label>Downpayment</Label><Input aria-invalid={!!formErrors.amountPaid} className={cn(formErrors.amountPaid && 'field-invalid')} type="number" min="0" max={addGrandTotal} step="0.01" value={form.amountPaid} onChange={event => { setForm({...form, amountPaid: event.target.value === '' ? '' : Number(event.target.value)}); setFormErrors(current => ({...current, amountPaid: ''})); }} placeholder="0" /><FieldError message={formErrors.amountPaid} /></div>}
               <div className="sm:col-span-2">
                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Paddle Rental</label>
                 <div className="mt-1.5 flex items-center justify-between rounded-xl border bg-white p-3 dark:bg-[#3a3a3c]">
