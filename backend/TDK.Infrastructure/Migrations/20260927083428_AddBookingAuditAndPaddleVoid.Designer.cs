@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TDK.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using TDK.Infrastructure.Data;
 namespace TDK.Infrastructure.Migrations
 {
     [DbContext(typeof(TdkDbContext))]
-    partial class TdkDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927083428_AddBookingAuditAndPaddleVoid")]
+    partial class AddBookingAuditAndPaddleVoid
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -174,28 +177,6 @@ namespace TDK.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)");
 
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CancelledByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("CancelledByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("varchar(450)");
-
-                    b.Property<DateTime?>("ConfirmedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ConfirmedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("ConfirmedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("varchar(450)");
-
                     b.Property<int>("CourtId")
                         .HasColumnType("int");
 
@@ -271,14 +252,6 @@ namespace TDK.Infrastructure.Migrations
 
                     b.Property<DateTime?>("RescheduledAt")
                         .HasColumnType("datetime(6)");
-
-                    b.Property<string>("RescheduledByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("RescheduledByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("varchar(450)");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time(6)");

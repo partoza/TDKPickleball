@@ -8,6 +8,8 @@ public sealed class ManilaBusinessClock : IBusinessClock
 
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
 
+    public DateTime ManilaNow => DateTime.SpecifyKind(ToManilaTime(UtcNow).DateTime, DateTimeKind.Unspecified);
+
     public DateTimeOffset ToManilaTime(DateTimeOffset instant) =>
         TimeZoneInfo.ConvertTime(instant, ManilaTimeZone);
 

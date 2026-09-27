@@ -185,6 +185,8 @@ export default function BookingPage() {
     const newErrors: any = {};
     if (!customerName.trim()) { newErrors.customerName = 'Full name is required.'; isValid = false; }
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { newErrors.email = 'Enter a valid email address.'; isValid = false; }
+    if (!phone.trim()) { newErrors.phone = 'Contact number is required.'; isValid = false; }
+    else if (!/^\+?[0-9][0-9\s\-()]{5,28}[0-9]$/.test(phone.trim()) || (phone.match(/\d/g) || []).length < 7) { newErrors.phone = 'Enter a valid contact number.'; isValid = false; }
     
     setErrors(newErrors);
     return isValid;
@@ -310,7 +312,7 @@ export default function BookingPage() {
         setSubmitError(result.message || 'The booking request could not be sent. Please try again.');
       }
     } catch (error: any) {
-      setSubmitError(error.response?.data?.message || 'The booking request could not be sent. No booking was created.');
+      setSubmitError(error.response?.data?.message || 'The booking request could not be recorded. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -345,17 +347,17 @@ export default function BookingPage() {
             <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:ring-emerald-950/30">
               <CheckIcon className="h-8 w-8" aria-hidden="true" />
             </div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">Request received</p>
-            <CardTitle className="text-2xl tracking-tight sm:text-3xl">Booking request sent</CardTitle>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Booking Requested</p>
+            <CardTitle className="text-2xl tracking-tight sm:text-3xl">Your request is awaiting confirmation</CardTitle>
             <CardDescription className="mx-auto mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-              We sent your receipt and requested schedule to the store for manual verification. Your court is not booked yet; please wait for the store’s reply.
+              Your request is now listed in the booking records and the selected schedule is held in blue while the store verifies your receipt. It becomes a confirmed booking after an admin approves it.
             </CardDescription>
 
             <div className="mx-auto mt-8 max-w-2xl space-y-4 text-left">
               <div className="rounded-2xl border bg-muted/25 p-5 sm:p-6">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Request reference</p>
                 <p className="mt-2 break-all font-mono text-lg font-bold tracking-tight text-foreground sm:text-xl">{requestReference}</p>
-                <p className="mt-2 text-sm leading-5 text-muted-foreground">Keep this reference when contacting the store. It is a request number, not a confirmed booking reference.</p>
+                <p className="mt-2 text-sm leading-5 text-muted-foreground">Keep this reference when contacting the store. The booking remains in Requested status until an admin confirms it.</p>
               </div>
 
               <div className="overflow-hidden rounded-2xl border bg-background">
@@ -484,8 +486,8 @@ export default function BookingPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" placeholder="e.g. 09171234567" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <Label htmlFor="phone">Contact Number *</Label>
+                    <Input id="phone" inputMode="tel" autoComplete="tel" maxLength={30} aria-invalid={!!errors.phone} className={cn(errors.phone && 'field-invalid')} placeholder="e.g. 09171234567" value={phone} onChange={e => { setPhone(e.target.value); setErrors((current: any) => ({ ...current, phone: '' })); }} />
                     <FieldError message={errors.phone} />
                   </div>
                 </div>

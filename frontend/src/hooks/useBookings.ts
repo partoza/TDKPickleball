@@ -46,6 +46,17 @@ export const useAddPaddleRental = () => {
   });
 };
 
+export const useVoidPaddleRental = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bookingsService.voidPaddleRental,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.BOOKINGS] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULES] });
+    },
+  });
+};
+
 export const useCreateBooking = () => {
   const queryClient = useQueryClient();
   return useMutation({

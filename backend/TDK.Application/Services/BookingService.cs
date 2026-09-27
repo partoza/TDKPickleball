@@ -64,6 +64,8 @@ public class BookingService : IBookingService
         string receiptContentType,
         CancellationToken cancellationToken = default)
     {
+        if (!IsValidPublicPhone(request.Phone))
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("A valid contact number is required");
         if (request.Schedules.Count is < 1 or > 20)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Select between 1 and 20 booking schedules");
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
@@ -89,6 +91,7 @@ public class BookingService : IBookingService
         }
 
         var requestedSchedules = new List<PublicBookingRequestScheduleDto>(request.Schedules.Count);
+        var validatedSchedules = new List<(PublicBookingRequestBlockDto Block, Court Court, decimal Subtotal, decimal Discount)>(request.Schedules.Count);
         decimal courtTotal = 0;
         decimal discountTotal = 0;
         foreach (var schedule in request.Schedules)
@@ -108,16 +111,17 @@ public class BookingService : IBookingService
             discountTotal += discount;
             courtTotal += amount - discount;
             requestedSchedules.Add(new(schedule.CourtId, court.Name, schedule.BookingDate, schedule.StartTime, schedule.EndTime, amount - discount));
+            validatedSchedules.Add((schedule, court, amount, discount));
         }
 
-        var submittedAt = _clock.UtcNow.UtcDateTime;
+        var submittedAt = _clock.ManilaNow;
         var requestReference = $"REQ-{submittedAt:yyyyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
         var paddleRentalFee = request.PaddleRentalQuantity * PaddleRentalPrice;
         var emailRequest = new PublicBookingRequestEmailDto(
             requestReference,
             request.CustomerName.Trim(),
             request.Email.Trim(),
-            request.Phone?.Trim(),
+            request.Phone.Trim(),
             request.Notes?.Trim(),
             requestedSchedules,
             request.PaddleRentalQuantity,
@@ -127,24 +131,84 @@ public class BookingService : IBookingService
             promo?.Code,
             discountTotal);
 
+        var createdBookings = new List<Booking>(validatedSchedules.Count);
+        var promoUsesReserved = false;
         try
         {
+            if (promo is not null)
+            {
+                promo.CurrentUses += validatedSchedules.Count;
+                _promos.Update(promo);
+                await _promos.SaveChangesAsync();
+                promoUsesReserved = true;
+            }
+
+            for (var scheduleIndex = 0; scheduleIndex < validatedSchedules.Count; scheduleIndex++)
+            {
+                var (block, _, subtotal, discount) = validatedSchedules[scheduleIndex];
+                var conflict = await ValidateSlotAsync(block.CourtId, block.BookingDate, block.StartTime, block.EndTime);
+                if (conflict is not null) throw new InvalidOperationException(conflict);
+
+                var paddleQuantity = scheduleIndex == 0 ? request.PaddleRentalQuantity : 0;
+                var paddleFee = paddleQuantity * PaddleRentalPrice;
+                var booking = new Booking
+                {
+                    BookingReference = await GenerateReferenceAsync(),
+                    CourtId = block.CourtId,
+                    CustomerName = request.CustomerName.Trim(),
+                    Email = request.Email.Trim(),
+                    Phone = request.Phone.Trim(),
+                    BookingDate = block.BookingDate,
+                    StartTime = block.StartTime,
+                    EndTime = block.EndTime,
+                    Subtotal = subtotal,
+                    DiscountAmount = discount,
+                    PaddleRentalQuantity = paddleQuantity,
+                    PaddleRentalFee = paddleFee,
+                    TotalAmount = subtotal - discount + paddleFee,
+                    AmountPaid = 0,
+                    Status = BookingStatus.Requested,
+                    Notes = $"[PublicRequest:{requestReference}] {request.Notes}".Trim(),
+                    CreatedAt = submittedAt,
+                    PromoId = promo?.Id,
+                    ListedByName = $"Public request · {request.CustomerName.Trim()}"
+                };
+                await _bookings.AddAsync(booking);
+                await _bookings.SaveChangesAsync();
+                createdBookings.Add(booking);
+                await AssignScheduleAsync(booking);
+            }
+
             await _email.SendPublicBookingRequestAsync(emailRequest, receiptBytes, receiptFileName, receiptContentType, cancellationToken);
         }
         catch
         {
-            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("The request could not be delivered to the store. No booking was created; please try again.");
+            foreach (var booking in createdBookings)
+            {
+                await ReleaseScheduleAsync(booking.Id);
+                _bookings.Delete(booking);
+            }
+            if (createdBookings.Count > 0) await _bookings.SaveChangesAsync();
+            if (promo is not null && promoUsesReserved)
+            {
+                promo.CurrentUses = Math.Max(0, promo.CurrentUses - validatedSchedules.Count);
+                _promos.Update(promo);
+                await _promos.SaveChangesAsync();
+            }
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("The booking request could not be recorded. Please try again.");
         }
 
         return ApiResponse<PublicBookingRequestReceiptDto>.Ok(
             new(requestReference, submittedAt),
-            "Booking request sent for manual receipt verification. No booking has been created yet.");
+            "Booking request recorded and awaiting admin confirmation.");
     }
 
     public async Task<ApiResponse<PublicPayMongoRequestResponseDto>> SubmitPayMongoRequestAsync(
         PublicBookingRequestSubmissionDto request,
         CancellationToken cancellationToken = default)
     {
+        if (!IsValidPublicPhone(request.Phone))
+            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("A valid contact number is required");
         if (request.Schedules.Count is < 1 or > 20)
             return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Select between 1 and 20 booking schedules");
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
@@ -245,7 +309,7 @@ public class BookingService : IBookingService
         return ApiResponse<PublicPayMongoRequestResponseDto>.Ok(new(requestReference, checkoutUrl, submittedAt, createdRefs));
     }
 
-    public async Task<ApiResponse<BookingDto>> CreateAsync(CreateBookingRequest request, bool sendConfirmation = true)
+    public async Task<ApiResponse<BookingDto>> CreateAsync(CreateBookingRequest request, bool sendConfirmation = true, string? listedByUserId = null, string? listedByName = null)
     {
         var conflict = await ValidateSlotAsync(request.CourtId, request.BookingDate, request.StartTime, request.EndTime);
         if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
@@ -277,13 +341,18 @@ public class BookingService : IBookingService
         if (effectiveAmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
         if (effectiveAmountPaid > total) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{total:N2}");
         var paid = effectiveAmountPaid;
+        var manilaNow = _clock.ManilaNow;
+        var isPaid = paid >= total;
         var booking = new Booking {
             BookingReference = await GenerateReferenceAsync(), CourtId = request.CourtId,
             CustomerName = request.CustomerName.Trim(), Email = request.Email?.Trim() ?? "", Phone = request.Phone?.Trim(),
             BookingDate = request.BookingDate, StartTime = request.StartTime, EndTime = request.EndTime,
             Subtotal = subtotal, DiscountAmount = discount, PaddleRentalQuantity = request.PaddleRentalQuantity, PaddleRentalFee = paddleRentalFee,
-            TotalAmount = total, AmountPaid = paid, Status = paid >= total ? BookingStatus.Paid : BookingStatus.Reserved,
-            Notes = request.Notes?.Trim(), CreatedAt = _clock.UtcNow.UtcDateTime, InternalCoachProfileId = request.InternalCoachProfileId, PromoId = request.PromoId
+            TotalAmount = total, AmountPaid = paid, Status = isPaid ? BookingStatus.Paid : BookingStatus.Reserved,
+            Notes = request.Notes?.Trim(), CreatedAt = manilaNow, InternalCoachProfileId = request.InternalCoachProfileId, PromoId = request.PromoId,
+            ListedByUserId = listedByUserId, ListedByName = NormalizeActorName(listedByName, "Online booking"),
+            ConfirmedAt = isPaid ? manilaNow : null, ConfirmedByUserId = isPaid ? listedByUserId : null,
+            ConfirmedByName = isPaid ? NormalizeActorName(listedByName, "Online booking") : null
         };
         await _bookings.AddAsync(booking); await _bookings.SaveChangesAsync();
         await AssignScheduleAsync(booking, request.RateType);
@@ -311,7 +380,8 @@ public class BookingService : IBookingService
         var bookings = (await _bookings.FindAsync(booking =>
                 booking.BookingDate >= fromDate &&
                 booking.BookingDate <= throughDate &&
-                booking.Status != BookingStatus.Cancelled))
+                booking.Status != BookingStatus.Cancelled &&
+                booking.Status != BookingStatus.Requested))
             .ToList();
 
         var bookingIds = bookings.Select(booking => booking.Id).ToHashSet();
@@ -375,14 +445,26 @@ public class BookingService : IBookingService
     {
         var normalized = bookingReference.Trim().ToUpperInvariant();
         var b = (await _bookings.FindAsync(x => x.BookingReference == normalized)).FirstOrDefault();
-        if (b is null || b.Status == BookingStatus.Cancelled) return ApiResponse<BookingDto>.Fail("Booking reference is invalid or cancelled");
-        return ApiResponse<BookingDto>.Ok(ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", await GetRateTypeAsync(b.Id)), "Valid booking");
+        if (b is null || b.Status is BookingStatus.Cancelled or BookingStatus.Requested) return ApiResponse<BookingDto>.Fail("Booking reference is invalid or not yet confirmed");
+        var publicDto = ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", await GetRateTypeAsync(b.Id)) with
+        {
+            ListedByName = null,
+            VoidedPaddleRentalQuantity = 0,
+            VoidedPaddleRentalFee = 0,
+            PaddleRentalVoidedAt = null,
+            PaddleRentalVoidedByName = null,
+            RescheduledByName = null,
+            CancelledByName = null,
+            ConfirmedByName = null
+        };
+        return ApiResponse<BookingDto>.Ok(publicDto, "Valid booking");
     }
 
-    public async Task<ApiResponse<BookingDto>> UpdateAsync(long id, UpdateBookingRequest request)
+    public async Task<ApiResponse<BookingDto>> UpdateAsync(long id, UpdateBookingRequest request, string userId, string userName)
     {
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
+        var wasPaid = b.Status == BookingStatus.Paid;
         var rateType = await GetRateTypeAsync(id);
         var subtotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
         if (subtotal <= 0) return ApiResponse<BookingDto>.Fail("No active rate covers the selected time");
@@ -431,12 +513,15 @@ public class BookingService : IBookingService
             if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
             await ReleaseScheduleAsync(id);
         }
-        var utcNow = _clock.UtcNow.UtcDateTime;
+        var manilaNow = _clock.ManilaNow;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
         b.CustomerName = request.CustomerName.Trim(); b.Email = request.Email?.Trim() ?? ""; b.Phone = request.Phone?.Trim(); b.Notes = request.Notes?.Trim();
         b.Subtotal = subtotal; b.DiscountAmount = discount; b.PaddleRentalQuantity = paddleRentalQuantity; b.PaddleRentalFee = paddleRentalFee;
         b.TotalAmount = newTotal; b.AmountPaid = effectiveAmountPaid; b.PromoId = request.PromoId;
-        b.Status = request.Status; b.InternalCoachProfileId = request.InternalCoachProfileId; b.UpdatedAt = utcNow; if (moved) b.RescheduledAt = utcNow; _bookings.Update(b); await _bookings.SaveChangesAsync();
+        b.Status = request.Status; b.InternalCoachProfileId = request.InternalCoachProfileId; b.UpdatedAt = manilaNow;
+        if (moved) { b.RescheduledAt = manilaNow; b.RescheduledByUserId = userId; b.RescheduledByName = NormalizeActorName(userName); }
+        if (!wasPaid && b.Status == BookingStatus.Paid) { b.ConfirmedAt = manilaNow; b.ConfirmedByUserId = userId; b.ConfirmedByName = NormalizeActorName(userName); }
+        _bookings.Update(b); await _bookings.SaveChangesAsync();
         if (moved)
         {
             await AssignScheduleAsync(b, rateType);
@@ -445,10 +530,11 @@ public class BookingService : IBookingService
         return ApiResponse<BookingDto>.Ok(ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", rateType), "Booking updated");
     }
 
-    public async Task<ApiResponse<BookingDto>> RescheduleAsync(long id, RescheduleBookingRequest request)
+    public async Task<ApiResponse<BookingDto>> RescheduleAsync(long id, RescheduleBookingRequest request, string userId, string userName)
     {
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
+        var wasPaid = b.Status == BookingStatus.Paid;
         if (b.Status is not (BookingStatus.Paid or BookingStatus.Reserved)) return ApiResponse<BookingDto>.Fail("Only paid and reservation bookings can be rescheduled");
         if (b.RescheduledAt.HasValue) return ApiResponse<BookingDto>.Fail("A booking can only be rescheduled once");
         if (!CanReschedule(b)) return ApiResponse<BookingDto>.Fail("Rescheduling is available only within 24 hours after the booking was created");
@@ -462,10 +548,11 @@ public class BookingService : IBookingService
         var newTotal = newSubtotal - adjustedDiscount + b.PaddleRentalFee;
         if (b.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"The existing amount paid cannot exceed the new total amount of ₱{newTotal:N2}");
         await ReleaseScheduleAsync(id);
-        var utcNow = _clock.UtcNow.UtcDateTime;
+        var manilaNow = _clock.ManilaNow;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
-        b.Subtotal = newSubtotal; b.DiscountAmount = adjustedDiscount; b.TotalAmount = newTotal; b.UpdatedAt = utcNow; b.RescheduledAt = utcNow; b.ReminderSentAt = null;
+        b.Subtotal = newSubtotal; b.DiscountAmount = adjustedDiscount; b.TotalAmount = newTotal; b.UpdatedAt = manilaNow; b.RescheduledAt = manilaNow; b.RescheduledByUserId = userId; b.RescheduledByName = NormalizeActorName(userName); b.ReminderSentAt = null;
         b.Status = b.AmountPaid >= b.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
+        if (!wasPaid && b.Status == BookingStatus.Paid) { b.ConfirmedAt = manilaNow; b.ConfirmedByUserId = userId; b.ConfirmedByName = NormalizeActorName(userName); }
         _bookings.Update(b); await _bookings.SaveChangesAsync(); await AssignScheduleAsync(b, rateType);
         var courtName = (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court";
         await TrySendConfirmationAsync(b, courtName, rateType, true);
@@ -490,7 +577,7 @@ public class BookingService : IBookingService
         booking.TotalAmount = booking.Subtotal - booking.DiscountAmount + booking.PaddleRentalFee;
         booking.AmountPaid += additionalFee;
         booking.Status = booking.AmountPaid >= booking.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
-        booking.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        booking.UpdatedAt = _clock.ManilaNow;
         _bookings.Update(booking);
         await _bookings.SaveChangesAsync();
 
@@ -498,23 +585,79 @@ public class BookingService : IBookingService
         return ApiResponse<BookingDto>.Ok(ToDto(booking, courtName, await GetRateTypeAsync(booking.Id)), $"{quantity} paid paddle rental{(quantity == 1 ? "" : "s")} added");
     }
 
-    public async Task<ApiResponse<bool>> ConfirmAsync(long id)
+    public async Task<ApiResponse<BookingDto>> VoidPaddleRentalAsync(long id, string userId, string userName)
+    {
+        var booking = await _bookings.GetByIdAsync(id);
+        if (booking is null) return ApiResponse<BookingDto>.Fail("Booking not found");
+        if (booking.Status is not (BookingStatus.Paid or BookingStatus.Reserved))
+            return ApiResponse<BookingDto>.Fail("Paddle rentals can only be voided for active paid or reservation bookings");
+        if (booking.PaddleRentalQuantity <= 0 || booking.PaddleRentalFee <= 0)
+            return ApiResponse<BookingDto>.Fail("This booking has no active paddle rentals to void");
+
+        var voidedFee = booking.PaddleRentalFee;
+        booking.VoidedPaddleRentalQuantity += booking.PaddleRentalQuantity;
+        booking.VoidedPaddleRentalFee += voidedFee;
+        booking.PaddleRentalQuantity = 0;
+        booking.PaddleRentalFee = 0;
+        booking.TotalAmount = Math.Max(0, booking.Subtotal - booking.DiscountAmount);
+        booking.AmountPaid = Math.Min(booking.AmountPaid, booking.TotalAmount);
+        booking.Status = booking.AmountPaid >= booking.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
+        booking.PaddleRentalVoidedAt = _clock.ManilaNow;
+        booking.PaddleRentalVoidedByUserId = userId;
+        booking.PaddleRentalVoidedByName = string.IsNullOrWhiteSpace(userName) ? "Staff" : userName.Trim();
+        booking.UpdatedAt = _clock.ManilaNow;
+        _bookings.Update(booking);
+        await _bookings.SaveChangesAsync();
+
+        var courtName = (await _courts.GetByIdAsync(booking.CourtId))?.Name ?? "Court";
+        return ApiResponse<BookingDto>.Ok(ToDto(booking, courtName, await GetRateTypeAsync(booking.Id)), "Paddle rental voided");
+    }
+
+    public async Task<ApiResponse<bool>> ConfirmAsync(long id, string userId, string userName)
     {
         var booking = await _bookings.GetByIdAsync(id);
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
-        if (booking.Status != BookingStatus.Reserved) return ApiResponse<bool>.Fail("Only reservations can be marked as paid");
-        return await SetStatusAsync(id, BookingStatus.Paid);
+        if (booking.Status is not (BookingStatus.Reserved or BookingStatus.Requested)) return ApiResponse<bool>.Fail("Only reservations and booking requests can be confirmed");
+        var wasRequested = booking.Status == BookingStatus.Requested;
+        booking.Status = BookingStatus.Paid;
+        booking.AmountPaid = booking.TotalAmount;
+        var manilaNow = _clock.ManilaNow;
+        booking.UpdatedAt = manilaNow;
+        booking.ConfirmedAt = manilaNow;
+        booking.ConfirmedByUserId = userId;
+        booking.ConfirmedByName = NormalizeActorName(userName);
+        _bookings.Update(booking);
+        await _bookings.SaveChangesAsync();
+        if (wasRequested)
+        {
+            foreach (var schedule in await _schedules.FindAsync(schedule => schedule.BookingId == id && schedule.Status == ScheduleStatus.Requested))
+            {
+                schedule.Status = ScheduleStatus.Booked;
+                schedule.UpdatedAt = _clock.UtcNow.UtcDateTime;
+                _schedules.Update(schedule);
+            }
+            await _schedules.SaveChangesAsync();
+            await TrySendConfirmationAsync(booking, (await _courts.GetByIdAsync(booking.CourtId))?.Name ?? "Court", RateType.Booking);
+        }
+        return ApiResponse<bool>.Ok(true, wasRequested ? "Booking request confirmed" : "Reservation marked as paid");
     }
     public Task<ApiResponse<bool>> CompleteAsync(long id) => SetStatusAsync(id, BookingStatus.Completed);
 
-    public async Task<ApiResponse<bool>> CancelAsync(long id)
+    public async Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName)
     {
         var booking = await _bookings.GetByIdAsync(id);
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
-        if (booking.Status != BookingStatus.Reserved) return ApiResponse<bool>.Fail("Only reservations can be cancelled");
-        var result = await SetStatusAsync(id, BookingStatus.Cancelled);
-        if (result.Success) await ReleaseScheduleAsync(id);
-        return result;
+        if (booking.Status is not (BookingStatus.Reserved or BookingStatus.Requested)) return ApiResponse<bool>.Fail("Only reservations and booking requests can be cancelled");
+        var manilaNow = _clock.ManilaNow;
+        booking.Status = BookingStatus.Cancelled;
+        booking.CancelledAt = manilaNow;
+        booking.CancelledByUserId = userId;
+        booking.CancelledByName = NormalizeActorName(userName);
+        booking.UpdatedAt = manilaNow;
+        _bookings.Update(booking);
+        await _bookings.SaveChangesAsync();
+        await ReleaseScheduleAsync(id);
+        return ApiResponse<bool>.Ok(true, "Booking cancelled");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(long id)
@@ -536,7 +679,7 @@ public class BookingService : IBookingService
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
         booking.ReceiptFileName = fileName;
         booking.ReceiptContentType = contentType;
-        booking.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        booking.UpdatedAt = _clock.ManilaNow;
         _bookings.Update(booking);
         await _bookings.SaveChangesAsync();
         return ApiResponse<bool>.Ok(true);
@@ -570,7 +713,7 @@ public class BookingService : IBookingService
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<bool>.Fail("Booking not found");
         b.Status = status; if (status == BookingStatus.Paid) b.AmountPaid = b.TotalAmount;
-        b.UpdatedAt = _clock.UtcNow.UtcDateTime; _bookings.Update(b); await _bookings.SaveChangesAsync(); return ApiResponse<bool>.Ok(true);
+        b.UpdatedAt = _clock.ManilaNow; _bookings.Update(b); await _bookings.SaveChangesAsync(); return ApiResponse<bool>.Ok(true);
     }
 
     private async Task<string?> ValidateSlotAsync(int courtId, DateOnly date, TimeOnly start, TimeOnly end, long? excludedBookingId = null)
@@ -593,7 +736,9 @@ public class BookingService : IBookingService
 
     private async Task AssignScheduleAsync(Booking b, RateType rateType = RateType.Booking)
     {
-        var scheduleStatus = rateType == RateType.Training ? ScheduleStatus.Training : ScheduleStatus.Booked;
+        var scheduleStatus = b.Status == BookingStatus.Requested
+            ? ScheduleStatus.Requested
+            : rateType == RateType.Training ? ScheduleStatus.Training : ScheduleStatus.Booked;
         var startMinutes = Minutes(b.StartTime, false); var endMinutes = Minutes(b.EndTime, true);
         var slots = (await _timeSlots.GetAllAsync()).Where(t => Minutes(t.StartTime, false) >= startMinutes && Minutes(t.EndTime, true) <= endMinutes).ToList();
         foreach (var slot in slots) {
@@ -641,18 +786,20 @@ public class BookingService : IBookingService
     }
     private bool CanReschedule(Booking booking)
     {
-        // SQL Server may materialize a UTC DateTime with Kind=Unspecified, so restore
-        // the storage contract before comparing it with the current UTC instant.
-        var createdAtUtc = booking.CreatedAt.Kind == DateTimeKind.Utc
-            ? booking.CreatedAt
-            : DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc);
-        var nowUtc = _clock.UtcNow.UtcDateTime;
-
-        return !booking.RescheduledAt.HasValue && nowUtc >= createdAtUtc && nowUtc <= createdAtUtc.AddHours(24);
+        var nowManila = _clock.ManilaNow;
+        return !booking.RescheduledAt.HasValue && nowManila >= booking.CreatedAt && nowManila <= booking.CreatedAt.AddHours(24);
     }
     private static bool IsWithinCourtHours(TimeSlot slot, Court court) => slot.StartTime >= court.OpenTime && (court.CloseTime == TimeOnly.MinValue || slot.EndTime <= court.CloseTime);
+    private static bool IsValidPublicPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return false;
+        var value = phone.Trim();
+        return value.Length is >= 7 and <= 30 && value.Count(char.IsDigit) >= 7 &&
+               value.All(character => char.IsDigit(character) || character is ' ' or '+' or '-' or '(' or ')');
+    }
+    private static string NormalizeActorName(string? userName, string fallback = "Staff") => string.IsNullOrWhiteSpace(userName) ? fallback : userName.Trim();
     private static int Minutes(TimeOnly value, bool midnightAsEnd) => value == TimeOnly.MinValue && midnightAsEnd ? 1440 : value.Hour * 60 + value.Minute;
-    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee);
+    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee, b.ListedByName, b.VoidedPaddleRentalQuantity, b.VoidedPaddleRentalFee, b.PaddleRentalVoidedAt, b.PaddleRentalVoidedByName, b.RescheduledByName, b.CancelledAt, b.CancelledByName, b.ConfirmedAt, b.ConfirmedByName);
 
     private string? ValidatePromoAvailability(Promo promo, RateType rateType)
     {

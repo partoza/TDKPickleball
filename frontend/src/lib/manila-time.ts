@@ -36,3 +36,19 @@ export const isPastManilaStart = (date: string, startTime: string, instant: Date
   const [hour, minute] = startTime.slice(0, 5).split(':').map(Number);
   return hour * 60 + minute <= now.minutes;
 };
+
+export const formatManilaDatabaseTime = (value?: string) => {
+  if (!value) return '—';
+  const includesOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const instant = new Date(includesOffset ? value : `${value}Z`);
+  if (Number.isNaN(instant.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: includesOffset ? MANILA_TIME_ZONE : 'UTC',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(instant);
+};

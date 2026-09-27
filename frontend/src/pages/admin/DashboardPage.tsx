@@ -7,12 +7,12 @@ import { ROUTES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useBookings } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
-import { Booking, RateType } from '@/types';
+import { Booking, BookingStatus, RateType } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
@@ -59,19 +59,29 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
   let activeStatus = ScheduleStatus.Available;
   let mainName = '';
   let mainLabel = '';
+  let mainProfilePictureUrl: string | undefined;
   let subName = '';
   let subLabel = '';
+  let subProfilePictureUrl: string | undefined;
   if (activeBooking) {
-    if (activeBooking.bookingType === RateType.Training) {
+    if (activeBooking.status === BookingStatus.Requested) {
+      activeStatus = ScheduleStatus.Requested;
+      mainName = activeBooking.customerName;
+      mainLabel = 'Requested by';
+    } else if (activeBooking.bookingType === RateType.Training) {
       activeStatus = ScheduleStatus.Training;
-      mainName = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'Coach';
-      mainLabel = 'Coach';
-      subName = activeBooking.customerName;
-      subLabel = 'Trainee';
+      const coach = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId);
+      mainName = activeBooking.customerName;
+      mainLabel = 'Trainee';
+      subName = coach?.name || 'Coach not assigned';
+      subLabel = 'Coach';
+      subProfilePictureUrl = coach?.profilePictureUrl;
     } else if (activeBooking.bookingType === RateType.Internal) {
       activeStatus = ScheduleStatus.Internal;
-      mainName = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId)?.name || 'Internal';
+      const internal = internalCoaches.find(profile => profile.id === activeBooking.internalCoachProfileId);
+      mainName = internal?.name || 'Internal';
       mainLabel = 'Internal';
+      mainProfilePictureUrl = internal?.profilePictureUrl;
       subName = activeBooking.customerName;
       subLabel = 'Reference';
     } else {
@@ -106,6 +116,7 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <Avatar className="h-10 w-10 border border-border shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                      {mainProfilePictureUrl && <AvatarImage src={mainProfilePictureUrl} alt={mainName} className="object-cover" />}
                       <AvatarFallback className="bg-primary/5 text-primary text-[11px] font-bold">{getAvatarInitials(mainName)}</AvatarFallback>
                    </Avatar>
                    <div className="flex flex-col">
@@ -122,10 +133,23 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
              {(subName || activeBooking.paddleRentalQuantity > 0) && (
                <div className="pt-3 mt-1 border-t border-slate-200/80 dark:border-white/10 flex flex-col gap-1.5">
                  {subName && (
-                   <div className="flex justify-between items-center text-[12px]">
-                     <span className="text-slate-500 font-medium">{subLabel}:</span>
-                     <span className="font-semibold text-slate-700 dark:text-slate-300">{subName}</span>
-                   </div>
+                   activeBooking.bookingType === RateType.Training ? (
+                     <div className="flex items-center gap-2.5 text-[12px]">
+                       <Avatar className="h-8 w-8 border border-border shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                         {subProfilePictureUrl && <AvatarImage src={subProfilePictureUrl} alt={subName} className="object-cover" />}
+                         <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-bold">{getAvatarInitials(subName)}</AvatarFallback>
+                       </Avatar>
+                       <div className="flex min-w-0 flex-col">
+                         <span className="truncate font-semibold text-slate-700 dark:text-slate-300">{subName}</span>
+                         <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{subLabel}</span>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="flex justify-between items-center text-[12px]">
+                       <span className="text-slate-500 font-medium">{subLabel}:</span>
+                       <span className="font-semibold text-slate-700 dark:text-slate-300">{subName}</span>
+                     </div>
+                   )
                  )}
                  {activeBooking.paddleRentalQuantity > 0 && (
                    <div className="flex justify-between items-center text-[12px]">

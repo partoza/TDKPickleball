@@ -5,10 +5,13 @@ import { ArrowPathIcon, ClockIcon, RectangleGroupIcon, ArrowLeftIcon } from '@he
 import { useAuth } from '@/hooks/useAuth';
 import { useBookings } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
+import { useAdminSchedules } from '@/hooks/useSchedule';
+import { useInternalCoaches } from '@/hooks/useInternalCoaches';
 import { ROUTES } from '@/lib/constants';
 import { getManilaNow } from '@/lib/manila-time';
-import { Booking, Court } from '@/types';
+import { Booking, BookingStatus, Court, RateType, Schedule, ScheduleStatus } from '@/types';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
@@ -30,23 +33,50 @@ const displayCountdown = (totalSeconds: number) => {
 
 const displayTime = (value: string) => format(new Date(`2000-01-01T${value}`), 'h:mm a');
 
-function CourtWidget({ court, bookings, now }: { court: Court; bookings: Booking[]; now: ReturnType<typeof getManilaNow> }) {
+const statusStyles: Record<ScheduleStatus, string> = {
+  [ScheduleStatus.Available]: 'bg-emerald-600 text-white',
+  [ScheduleStatus.Booked]: 'bg-[#851923] text-white',
+  [ScheduleStatus.Training]: 'bg-orange-500 text-white',
+  [ScheduleStatus.Internal]: 'bg-violet-600 text-white',
+  [ScheduleStatus.Unavailable]: 'bg-slate-600 text-white',
+  [ScheduleStatus.Requested]: 'bg-blue-600 text-white',
+};
+
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || '?';
+
+function PersonBadge({ name, label, profilePictureUrl }: { name: string; label: string; profilePictureUrl?: string }) {
+  return <div className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-black/[0.06] bg-white/65 p-2.5 shadow-sm">
+    {profilePictureUrl ? <img src={profilePictureUrl} alt={name} className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm" /> : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-white shadow-sm">{initials(name)}</span>}
+    <span className="flex min-w-0 flex-col"><span className="truncate text-[13px] font-bold text-[#1c1c1e]">{name}</span><span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#8e8e93]">{label}</span></span>
+  </div>;
+}
+
+function CourtWidget({ court, bookings, schedules, internalCoaches, now }: { court: Court; bookings: Booking[]; schedules: Schedule[]; internalCoaches: any[]; now: ReturnType<typeof getManilaNow> }) {
   const todaysBookings = bookings.filter(booking => booking.courtId === court.id && booking.bookingDate === now.date && booking.status !== 'Cancelled');
-  const active = todaysBookings.find(booking => secondsFromTime(booking.startTime) <= now.seconds && secondsFromTime(booking.endTime) > now.seconds);
+  const todaysSchedules = schedules.filter(schedule => Number(schedule.courtId) === court.id && schedule.date === now.date && schedule.status !== ScheduleStatus.Available);
+  const activeSchedule = todaysSchedules.find(schedule => secondsFromTime(schedule.startTime) <= now.seconds && secondsFromTime(schedule.endTime) > now.seconds);
+  const activeBooking = activeSchedule?.bookingId
+    ? todaysBookings.find(booking => booking.id === activeSchedule.bookingId)
+    : todaysBookings.find(booking => secondsFromTime(booking.startTime) <= now.seconds && secondsFromTime(booking.endTime) > now.seconds);
+  const activeStatus = activeSchedule?.status || (activeBooking?.status === BookingStatus.Requested ? ScheduleStatus.Requested : activeBooking?.bookingType === RateType.Training ? ScheduleStatus.Training : activeBooking?.bookingType === RateType.Internal ? ScheduleStatus.Internal : activeBooking ? ScheduleStatus.Booked : undefined);
+  const activeStartTime = activeBooking?.startTime || activeSchedule?.startTime;
+  const activeEndTime = activeBooking?.endTime || activeSchedule?.endTime;
+  const isActive = Boolean(activeStatus && activeStartTime && activeEndTime);
   const next = todaysBookings.find(booking => secondsFromTime(booking.startTime) > now.seconds);
-  const remainingSeconds = active ? secondsFromTime(active.endTime) - now.seconds : 0;
-  const sessionSeconds = active ? secondsFromTime(active.endTime) - secondsFromTime(active.startTime) : 0;
-  const remainingPercent = active && sessionSeconds > 0 ? Math.min(100, Math.max(0, remainingSeconds / sessionSeconds * 100)) : 0;
+  const remainingSeconds = isActive ? secondsFromTime(activeEndTime!) - now.seconds : 0;
+  const sessionSeconds = isActive ? secondsFromTime(activeEndTime!) - secondsFromTime(activeStartTime!) : 0;
+  const remainingPercent = isActive && sessionSeconds > 0 ? Math.min(100, Math.max(0, remainingSeconds / sessionSeconds * 100)) : 0;
+  const assignedProfile = internalCoaches.find(profile => profile.id === (activeBooking?.internalCoachProfileId || activeSchedule?.internalCoachProfileId));
 
   return <section className="relative flex min-h-[330px] flex-col overflow-hidden rounded-[34px] border border-white/40 bg-white/70 p-6 text-[#1c1c1e] shadow-[0_30px_60px_-20px_rgba(0,0,0,.3)] backdrop-blur-2xl sm:p-8">
     <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-[#88cc22] opacity-[0.15] blur-[50px]" />
     <div className="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[#851923] opacity-[0.12] blur-[50px]" />
     <div className="relative z-10 flex items-start justify-between gap-3">
       <div><p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8e8e93]">Live court</p><h2 className="mt-1 text-[28px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[34px]">{court.displayName || court.name}</h2></div>
-      <span className={`rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] ${now.seconds < 8 * 3600 ? 'bg-white/60 text-slate-500 shadow-sm border border-white/40' : active ? 'bg-[#851923] text-white shadow-sm' : 'bg-[#34c759]/20 text-[#248a3d] shadow-sm border border-white/40'}`}>{now.seconds < 8 * 3600 ? 'Closed' : active ? 'In use' : 'Available'}</span>
+      <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold tracking-[-0.01em] shadow-sm ${now.seconds < 8 * 3600 ? 'bg-slate-600 text-white' : activeStatus ? statusStyles[activeStatus] : statusStyles[ScheduleStatus.Available]}`}>{now.seconds < 8 * 3600 ? 'Closed' : activeStatus || 'Available'}</span>
     </div>
     <div className="relative z-10 mt-7 flex flex-1 flex-col justify-center rounded-[26px] border border-white/60 bg-white/50 px-5 py-6 shadow-sm backdrop-blur-md sm:px-7">
-      {now.seconds < 8 * 3600 ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Currently Closed</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">8:00 AM</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court opens in the morning</p></> : active ? <><p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#851923]">Time remaining</p><p className="mt-2 tabular-nums text-[48px] font-bold leading-none tracking-[-0.06em] text-[#1c1c1e] sm:text-[64px]">{displayCountdown(remainingSeconds)}</p><div className="mt-6 h-2.5 overflow-hidden rounded-full bg-black/[0.07]"><div className="h-full rounded-full bg-[#851923] transition-[width] duration-1000 ease-linear" style={{ width: `${remainingPercent}%` }} /></div><p className="mt-3 text-[14px] font-medium text-[#6e6e73]">Session ends at {displayTime(active.endTime)}</p></> : next ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Next session</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">{displayTime(next.startTime)}</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court is available until then</p></> : <><p className="text-[24px] font-bold tracking-[-0.035em] text-[#1c1c1e]">Available</p><p className="mt-2 text-[14px] text-[#6e6e73]">Open until 12:00 AM</p></>}
+      {now.seconds < 8 * 3600 ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Currently Closed</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">8:00 AM</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court opens in the morning</p></> : isActive ? <><p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#851923]">Time remaining</p><p className="mt-2 tabular-nums text-[48px] font-bold leading-none tracking-[-0.06em] text-[#1c1c1e] sm:text-[64px]">{displayCountdown(remainingSeconds)}</p><div className="mt-6 h-2.5 overflow-hidden rounded-full bg-black/[0.07]"><div className="h-full rounded-full bg-[#851923] transition-[width] duration-1000 ease-linear" style={{ width: `${remainingPercent}%` }} /></div><p className="mt-3 text-[14px] font-medium text-[#6e6e73]">Session ends at {displayTime(activeEndTime!)}</p>{activeStatus !== ScheduleStatus.Unavailable && <div className="mt-4 grid gap-2 sm:grid-cols-2">{activeStatus === ScheduleStatus.Booked && activeBooking && <PersonBadge name={activeBooking.customerName} label="Player" />}{activeStatus === ScheduleStatus.Requested && activeBooking && <PersonBadge name={activeBooking.customerName} label="Requested by" />}{activeStatus === ScheduleStatus.Training && activeBooking && <PersonBadge name={activeBooking.customerName} label="Trainee" />}{activeStatus === ScheduleStatus.Training && <PersonBadge name={assignedProfile?.name || 'Coach not assigned'} label="Coach" profilePictureUrl={assignedProfile?.profilePictureUrl} />}{activeStatus === ScheduleStatus.Internal && <PersonBadge name={assignedProfile?.name || 'Internal'} label="Internal" profilePictureUrl={assignedProfile?.profilePictureUrl} />}</div>}{activeBooking && activeBooking.paddleRentalQuantity > 0 && <div className="mt-3 flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white/65 px-3 py-2 text-[12px] font-semibold text-[#1c1c1e] shadow-sm"><span className="flex items-center gap-2"><PaddleIcon className="h-5 w-5" forceLight />Paddles rented</span><span className="grid min-w-7 place-items-center rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">{activeBooking.paddleRentalQuantity}</span></div>}</> : next ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Next session</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">{displayTime(next.startTime)}</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court is available until then</p></> : <><p className="text-[24px] font-bold tracking-[-0.035em] text-[#1c1c1e]">Available</p><p className="mt-2 text-[14px] text-[#6e6e73]">Open until 12:00 AM</p></>}
     </div>
   </section>;
 }
@@ -56,6 +86,10 @@ export default function AdminWidgetPage() {
   const { data: bookingResponse, isLoading: bookingsLoading, isError, refetch, isFetching } = useBookings();
   const { data: courtResponse, isLoading: courtsLoading } = useCourts();
   const [now, setNow] = useState(() => getManilaNow());
+  const { data: scheduleResponse, isLoading: schedulesLoading, isFetching: schedulesFetching, refetch: refetchSchedules } = useAdminSchedules(now.date);
+  const { internalCoaches, fetchInternalCoaches } = useInternalCoaches();
+
+  useEffect(() => { fetchInternalCoaches(); }, [fetchInternalCoaches]);
 
   useEffect(() => {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -64,16 +98,17 @@ export default function AdminWidgetPage() {
     if (manifest) manifest.href = '/widget-manifest.json';
     document.title = 'TDK Court Overview';
     const clockTimer = window.setInterval(() => setNow(getManilaNow()), 1_000);
-    const refreshTimer = window.setInterval(() => refetch(), 60_000);
+    const refreshTimer = window.setInterval(() => { refetch(); refetchSchedules(); }, 60_000);
     return () => {
       window.clearInterval(clockTimer);
       window.clearInterval(refreshTimer);
       if (manifest && previousManifest) manifest.href = previousManifest;
       document.title = previousTitle;
     };
-  }, [refetch]);
+  }, [refetch, refetchSchedules]);
 
   const bookings = bookingResponse?.data || [];
+  const schedules = scheduleResponse?.data || [];
   const courts = (courtResponse?.data || []).filter(court => court.isActive).slice(0, 2);
   const upcoming = useMemo(() => {
     const future = bookings.filter(booking => booking.status !== 'Cancelled' && (booking.bookingDate > now.date || (booking.bookingDate === now.date && minutesFromTime(booking.startTime) > now.minutes))).sort((a, b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
@@ -86,7 +121,7 @@ export default function AdminWidgetPage() {
   if (!isAuthenticated || (user?.role !== 'Admin' && user?.role !== 'Staff')) return <Navigate to={`${ROUTES.ADMIN.LOGIN}?widget=1`} replace />;
   if (user.mustChangePassword) return <Navigate to={ROUTES.ADMIN.WELCOME} replace />;
 
-  const loading = bookingsLoading || courtsLoading;
+  const loading = bookingsLoading || courtsLoading || schedulesLoading;
   return <main className="min-h-screen relative p-4 sm:p-6 lg:px-8 lg:py-10 text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif', backgroundImage: 'url("/assets/images/widget-bg.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-0"></div>
     <div className="mx-auto max-w-[1320px] relative z-10">
@@ -102,12 +137,12 @@ export default function AdminWidgetPage() {
             </div>
           </div>
           <Link to={ROUTES.ADMIN.DASHBOARD} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Back to Dashboard"><ArrowLeftIcon className="h-5 w-5 drop-shadow-md" /></Link>
-          <button type="button" onClick={() => refetch()} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Refresh court schedule">{isFetching ? <LoadingIndicator label="Refreshing court schedule" /> : <ArrowPathIcon className="h-5 w-5 drop-shadow-md" />}</button>
+          <button type="button" onClick={() => { refetch(); refetchSchedules(); }} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Refresh court schedule">{isFetching || schedulesFetching ? <LoadingIndicator label="Refreshing court schedule" /> : <ArrowPathIcon className="h-5 w-5 drop-shadow-md" />}</button>
         </div>
       </header>
 
       {isError ? <div className="rounded-[28px] border border-[#ff3b30]/20 bg-[#ff3b30]/8 p-6 text-center text-[#c9342c]"><p className="font-semibold tracking-[-0.02em]">Live overview is unavailable.</p><button className="mt-2 text-[13px] font-medium underline" onClick={() => refetch()}>Try again</button></div> : loading ? <div className="grid min-h-[420px] place-items-center"><img src="/assets/images/loading.png" alt="Loading overview" className="page-loading-mascot" /></div> : <>
-        <div className="grid gap-5 md:grid-cols-2">{courts.map(court => <CourtWidget key={court.id} court={court} bookings={bookings} now={now} />)}{!courts.length && <div className="rounded-3xl border bg-white p-6 text-slate-500">No active courts configured.</div>}</div>
+        <div className="grid gap-5 md:grid-cols-2">{courts.map(court => <CourtWidget key={court.id} court={court} bookings={bookings} schedules={schedules} internalCoaches={internalCoaches} now={now} />)}{!courts.length && <div className="rounded-3xl border bg-white p-6 text-slate-500">No active courts configured.</div>}</div>
 
         <section className="relative mt-4 overflow-hidden rounded-[28px] border border-white/40 bg-white/70 p-5 text-[#1c1c1e] shadow-[0_12px_35px_-24px_rgba(0,0,0,.38)] backdrop-blur-2xl sm:p-6">
           <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#88cc22] opacity-[0.15] blur-[50px]" />

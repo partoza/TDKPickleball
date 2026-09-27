@@ -24,6 +24,21 @@ public class Booking
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime? RescheduledAt { get; set; }
+    public string? RescheduledByUserId { get; set; }
+    public string? RescheduledByName { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancelledByUserId { get; set; }
+    public string? CancelledByName { get; set; }
+    public DateTime? ConfirmedAt { get; set; }
+    public string? ConfirmedByUserId { get; set; }
+    public string? ConfirmedByName { get; set; }
+    public string? ListedByUserId { get; set; }
+    public string? ListedByName { get; set; }
+    public int VoidedPaddleRentalQuantity { get; set; }
+    public decimal VoidedPaddleRentalFee { get; set; }
+    public DateTime? PaddleRentalVoidedAt { get; set; }
+    public string? PaddleRentalVoidedByUserId { get; set; }
+    public string? PaddleRentalVoidedByName { get; set; }
     public DateTime? ReminderSentAt { get; set; }
     public string? ReceiptFileName { get; set; }
     public string? ReceiptContentType { get; set; }

@@ -99,7 +99,7 @@ public class ScheduleService : IScheduleService
         return ApiResponse<ScheduleDto>.Ok(new ScheduleDto(s.Id, s.CourtId, "", s.ScheduleDate, s.TimeSlotId, new TimeOnly(), new TimeOnly(), s.Status, s.Notes));
     }
 
-    public async Task<ApiResponse<ScheduleDto>> UpdateAsync(long id, UpdateScheduleRequest request, string userId)
+    public async Task<ApiResponse<ScheduleDto>> UpdateAsync(long id, UpdateScheduleRequest request, string userId, string userName)
     {
         var s = await _scheduleRepo.GetByIdAsync(id);
         if (s == null) return ApiResponse<ScheduleDto>.Fail("Not found");
@@ -123,6 +123,7 @@ public class ScheduleService : IScheduleService
         await _scheduleRepo.SaveChangesAsync();
         if (bookingToUpdate != null)
         {
+            var wasPaid = bookingToUpdate.Status == BookingStatus.Paid;
             bookingToUpdate.CustomerName = request.BookedBy?.Trim() ?? bookingToUpdate.CustomerName;
             bookingToUpdate.Email = request.Email?.Trim() ?? "";
             bookingToUpdate.Phone = request.Phone?.Trim();
@@ -130,7 +131,13 @@ public class ScheduleService : IScheduleService
             bookingToUpdate.AmountPaid = request.PaymentStatus == BookingStatus.Paid ? bookingToUpdate.TotalAmount : request.AmountPaid;
             bookingToUpdate.Status = bookingToUpdate.AmountPaid >= bookingToUpdate.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
             bookingToUpdate.InternalCoachProfileId = request.InternalCoachProfileId;
-            bookingToUpdate.UpdatedAt = DateTime.UtcNow;
+            bookingToUpdate.UpdatedAt = _clock.ManilaNow;
+            if (!wasPaid && bookingToUpdate.Status == BookingStatus.Paid)
+            {
+                bookingToUpdate.ConfirmedAt = bookingToUpdate.UpdatedAt;
+                bookingToUpdate.ConfirmedByUserId = userId;
+                bookingToUpdate.ConfirmedByName = string.IsNullOrWhiteSpace(userName) ? "Staff" : userName.Trim();
+            }
             _bookingRepo.Update(bookingToUpdate);
             await _bookingRepo.SaveChangesAsync();
         }
@@ -143,7 +150,7 @@ public class ScheduleService : IScheduleService
                 var total = await _rateService.CalculateRateAsync(slot.StartTime, slot.EndTime, rateType);
                 var totalWithPaddles = total + (request.PaddleRentalQuantity * 100m);
                 var amountPaid = request.PaymentStatus == BookingStatus.Paid ? totalWithPaddles : request.AmountPaid;
-                var created = await _bookingService.CreateAsync(new(s.CourtId, s.ScheduleDate, slot.StartTime, slot.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity));
+                var created = await _bookingService.CreateAsync(new(s.CourtId, s.ScheduleDate, slot.StartTime, slot.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity), listedByUserId: userId, listedByName: userName);
                 if (created.Success && created.Data != null)
                 {
                     s.BookingId = created.Data.Id;
@@ -167,7 +174,7 @@ public class ScheduleService : IScheduleService
         return ApiResponse<bool>.Ok(true);
     }
 
-    public async Task<ApiResponse<bool>> BulkUpdateAsync(BulkUpdateRequest request, string userId)
+    public async Task<ApiResponse<bool>> BulkUpdateAsync(BulkUpdateRequest request, string userId, string userName)
     {
         var timeError = ValidateFutureStart(request.Date, request.StartTime);
         if (timeError is not null) return ApiResponse<bool>.Fail(timeError);
@@ -184,7 +191,7 @@ public class ScheduleService : IScheduleService
             var totalWithPaddles = total + (request.PaddleRentalQuantity * 100m);
             if (request.PaymentStatus == BookingStatus.Reserved && request.AmountPaid > totalWithPaddles && request.Status != ScheduleStatus.Internal) return ApiResponse<bool>.Fail($"Reservation amount cannot exceed the total amount of ₱{totalWithPaddles:N2}");
             var amountPaid = request.AmountPaid;
-            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity));
+            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity), listedByUserId: userId, listedByName: userName);
             if (!created.Success || created.Data is null) return ApiResponse<bool>.Fail(created.Message, created.Errors);
             if (request.Status is ScheduleStatus.Training or ScheduleStatus.Internal)
             {

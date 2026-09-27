@@ -6,5 +6,6 @@ public enum ScheduleStatus
     Training = 1,
     Booked = 2,
     Unavailable = 3,
-    Internal = 4
+    Internal = 4,
+    Requested = 5
 }

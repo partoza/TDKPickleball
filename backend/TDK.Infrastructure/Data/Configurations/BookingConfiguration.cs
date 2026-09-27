@@ -18,10 +18,21 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(x => x.Subtotal).HasPrecision(18, 2);
         builder.Property(x => x.DiscountAmount).HasPrecision(18, 2);
         builder.Property(x => x.PaddleRentalFee).HasPrecision(18, 2);
+        builder.Property(x => x.VoidedPaddleRentalFee).HasPrecision(18, 2);
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2);
         builder.Property(x => x.AmountPaid).HasPrecision(18, 2);
         builder.Property(x => x.ReceiptFileName).HasMaxLength(100);
         builder.Property(x => x.ReceiptContentType).HasMaxLength(50);
+        builder.Property(x => x.ListedByUserId).HasMaxLength(450);
+        builder.Property(x => x.ListedByName).HasMaxLength(200);
+        builder.Property(x => x.RescheduledByUserId).HasMaxLength(450);
+        builder.Property(x => x.RescheduledByName).HasMaxLength(200);
+        builder.Property(x => x.CancelledByUserId).HasMaxLength(450);
+        builder.Property(x => x.CancelledByName).HasMaxLength(200);
+        builder.Property(x => x.ConfirmedByUserId).HasMaxLength(450);
+        builder.Property(x => x.ConfirmedByName).HasMaxLength(200);
+        builder.Property(x => x.PaddleRentalVoidedByUserId).HasMaxLength(450);
+        builder.Property(x => x.PaddleRentalVoidedByName).HasMaxLength(200);
 
         builder.HasOne(x => x.Court).WithMany(c => c.Bookings).HasForeignKey(x => x.CourtId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.InternalCoachProfile).WithMany().HasForeignKey(x => x.InternalCoachProfileId).OnDelete(DeleteBehavior.SetNull);

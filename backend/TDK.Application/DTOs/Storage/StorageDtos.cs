@@ -4,6 +4,7 @@ namespace TDK.Application.DTOs.Storage;
 
 public record StorageStatusDto(
     decimal UsedMegabytes,
+    decimal AllocatedMegabytes,
     decimal LimitMegabytes,
     decimal WarningThresholdMegabytes,
     decimal UsedPercent,

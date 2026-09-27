@@ -9,8 +9,8 @@ public interface IScheduleService
     Task<ApiResponse<IEnumerable<ScheduleDto>>> GetSchedulesAsync(DateOnly date, int? courtId);
     Task<ApiResponse<ScheduleDto>> GetByIdAsync(long id);
     Task<ApiResponse<ScheduleDto>> CreateAsync(int courtId, DateOnly date, int timeSlotId);
-    Task<ApiResponse<ScheduleDto>> UpdateAsync(long id, UpdateScheduleRequest request, string userId);
+    Task<ApiResponse<ScheduleDto>> UpdateAsync(long id, UpdateScheduleRequest request, string userId, string userName);
     Task<ApiResponse<bool>> DeleteAsync(long id);
-    Task<ApiResponse<bool>> BulkUpdateAsync(BulkUpdateRequest request, string userId);
+    Task<ApiResponse<bool>> BulkUpdateAsync(BulkUpdateRequest request, string userId, string userName);
     Task<ApiResponse<bool>> CopyScheduleAsync(CopyScheduleRequest request, string userId);
 }

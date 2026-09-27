@@ -38,7 +38,7 @@ public class ScheduleController : ControllerBase
 
     [HttpPut("api/admin/schedules/{id}")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Update(long id, UpdateScheduleRequest request) => Ok(await _scheduleService.UpdateAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+    public async Task<IActionResult> Update(long id, UpdateScheduleRequest request) => Ok(await _scheduleService.UpdateAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/schedules/{id}/delete")]
     [Authorize(Roles = "Admin")]
@@ -55,7 +55,7 @@ public class ScheduleController : ControllerBase
 
     [HttpPost("api/admin/schedules/bulk-update")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> BulkUpdate(BulkUpdateRequest request) => Ok(await _scheduleService.BulkUpdateAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+    public async Task<IActionResult> BulkUpdate(BulkUpdateRequest request) => Ok(await _scheduleService.BulkUpdateAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/schedules/copy")]
     [Authorize(Roles = "Admin,Staff")]

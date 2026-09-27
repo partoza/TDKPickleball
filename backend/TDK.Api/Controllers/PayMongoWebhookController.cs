@@ -16,12 +16,14 @@ public class PayMongoWebhookController : ControllerBase
     private readonly IPayMongoService _payMongoService;
     private readonly IRepository<Booking> _bookings;
     private readonly IEmailService _emailService;
+    private readonly IBusinessClock _clock;
 
-    public PayMongoWebhookController(IPayMongoService payMongoService, IRepository<Booking> bookings, IEmailService emailService)
+    public PayMongoWebhookController(IPayMongoService payMongoService, IRepository<Booking> bookings, IEmailService emailService, IBusinessClock clock)
     {
         _payMongoService = payMongoService;
         _bookings = bookings;
         _emailService = emailService;
+        _clock = clock;
     }
 
     [HttpPost("api/webhooks/paymongo")]
@@ -63,20 +65,24 @@ public class PayMongoWebhookController : ControllerBase
                         {
                             booking.Status = BookingStatus.Paid;
                             booking.AmountPaid = booking.TotalAmount; // Just assume full payment for that booking
+                            booking.ConfirmedAt = _clock.ManilaNow;
+                            booking.ConfirmedByName = "PayMongo";
+                            booking.UpdatedAt = booking.ConfirmedAt;
                             _bookings.Update(booking);
                             
                             // Send confirmation email
                             // This would be normally sent by IBookingService, but we'll do a simple email or call the service
                         }
                     }
+                    await _bookings.SaveChangesAsync();
                 }
             }
 
             return Ok();
         }
-        catch (Exception ex)
+        catch
         {
-            return BadRequest($"Webhook error: {ex.Message}");
+            return BadRequest("Webhook payload could not be processed");
         }
     }
 }

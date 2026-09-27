@@ -40,7 +40,7 @@ public class MaintenanceHostedService : BackgroundService
         var reminderTo = localNow.AddMinutes(75);
 
         var candidates = await db.Bookings.Include(x => x.Court)
-            .Where(x => x.ReminderSentAt == null && x.Status != BookingStatus.Cancelled && x.Status != BookingStatus.Completed && x.BookingDate >= DateOnly.FromDateTime(localNow.DateTime))
+            .Where(x => x.ReminderSentAt == null && x.Status != BookingStatus.Cancelled && x.Status != BookingStatus.Completed && x.Status != BookingStatus.Requested && x.BookingDate >= DateOnly.FromDateTime(localNow.DateTime))
             .ToListAsync(token);
         foreach (var booking in candidates)
         {
@@ -52,7 +52,7 @@ public class MaintenanceHostedService : BackgroundService
 
         var utcDateTime = utcNow.UtcDateTime;
         var upcoming = await db.Bookings.Include(x => x.Court)
-            .Where(x => x.Status != BookingStatus.Cancelled && x.Status != BookingStatus.Completed && x.BookingDate >= DateOnly.FromDateTime(localNow.DateTime))
+            .Where(x => x.Status != BookingStatus.Cancelled && x.Status != BookingStatus.Completed && x.Status != BookingStatus.Requested && x.BookingDate >= DateOnly.FromDateTime(localNow.DateTime))
             .ToListAsync(token);
         foreach (var booking in upcoming)
         {

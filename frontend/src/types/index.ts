@@ -3,14 +3,16 @@ export enum ScheduleStatus {
   Training = 'Training',
   Booked = 'Booked',
   Unavailable = 'Unavailable',
-  Internal = 'Internal'
+  Internal = 'Internal',
+  Requested = 'Requested'
 }
 
 export enum BookingStatus {
   Reserved = 'Reserved',
   Paid = 'Paid',
   Cancelled = 'Cancelled',
-  Completed = 'Completed'
+  Completed = 'Completed',
+  Requested = 'Requested'
 }
 
 export enum RateType {
@@ -85,6 +87,11 @@ export interface Booking {
   discountAmount: number;
   paddleRentalQuantity: number;
   paddleRentalFee: number;
+  listedByName?: string;
+  voidedPaddleRentalQuantity: number;
+  voidedPaddleRentalFee: number;
+  paddleRentalVoidedAt?: string;
+  paddleRentalVoidedByName?: string;
   totalAmount: number;
   amountPaid: number;
   remainingBalance: number;
@@ -93,6 +100,11 @@ export interface Booking {
   notes?: string;
   createdAt: string;
   rescheduledAt?: string;
+  rescheduledByName?: string;
+  cancelledAt?: string;
+  cancelledByName?: string;
+  confirmedAt?: string;
+  confirmedByName?: string;
   receiptAvailable?: boolean;
   internalCoachProfileId?: number;
   promoId?: number;
@@ -196,6 +208,7 @@ export interface SystemUser {
 
 export interface StorageStatus {
   usedMegabytes: number;
+  allocatedMegabytes: number;
   limitMegabytes: number;
   warningThresholdMegabytes: number;
   usedPercent: number;

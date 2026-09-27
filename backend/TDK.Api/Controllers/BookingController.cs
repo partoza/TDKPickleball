@@ -42,7 +42,7 @@ public class BookingController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> Create(CreateBookingRequest request)
     {
-        return Ok(await _bookingService.CreateAsync(request));
+        return Ok(await _bookingService.CreateAsync(request, listedByUserId: User.FindFirstValue(ClaimTypes.NameIdentifier), listedByName: User.FindFirstValue(ClaimTypes.Name)));
     }
 
     [HttpPost("api/bookings/with-receipt")]
@@ -65,7 +65,7 @@ public class BookingController : ControllerBase
         var fullPath = Path.Combine(directory, fileName);
         await using (var target = System.IO.File.Create(fullPath)) await request.Receipt.CopyToAsync(target);
 
-        var result = await _bookingService.CreateAsync(new(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, request.CustomerName, request.Email, request.Phone, request.Notes, request.AmountPaid, request.RateType, PaddleRentalQuantity: request.PaddleRentalQuantity), sendConfirmation: false);
+        var result = await _bookingService.CreateAsync(new(request.CourtId, request.BookingDate, request.StartTime, request.EndTime, request.CustomerName, request.Email, request.Phone, request.Notes, request.AmountPaid, request.RateType, PaddleRentalQuantity: request.PaddleRentalQuantity), sendConfirmation: false, listedByUserId: User.FindFirstValue(ClaimTypes.NameIdentifier), listedByName: User.FindFirstValue(ClaimTypes.Name));
         if (!result.Success || result.Data is null)
         {
             System.IO.File.Delete(fullPath);
@@ -95,8 +95,8 @@ public class BookingController : ControllerBase
             return Unauthorized(new { success = false, message = "A verified customer email is required" });
         if (string.IsNullOrWhiteSpace(request.CustomerName) || request.CustomerName.Trim().Length > 150)
             return BadRequest(new { success = false, message = "Full name is required and must be 150 characters or fewer" });
-        if (request.Phone?.Length > 30)
-            return BadRequest(new { success = false, message = "Phone number is too long" });
+        if (!IsValidPublicPhone(request.Phone))
+            return BadRequest(new { success = false, message = "A valid contact number is required" });
         if (request.Notes?.Length > 2_000)
             return BadRequest(new { success = false, message = "Notes must be 2,000 characters or fewer" });
         if (request.PaddleRentalQuantity is < 0 or > 50)
@@ -128,7 +128,7 @@ public class BookingController : ControllerBase
         await using var receiptStream = new MemoryStream();
         await request.Receipt.CopyToAsync(receiptStream, cancellationToken);
         var result = await _bookingService.SubmitPublicRequestAsync(
-            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
+            new(request.CustomerName, verifiedEmail, request.Phone!.Trim(), request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
             receiptStream.ToArray(),
             $"payment-receipt{detected.Value.Extension}",
             detected.Value.ContentType,
@@ -147,8 +147,8 @@ public class BookingController : ControllerBase
             return Unauthorized(new { success = false, message = "A verified customer email is required" });
         if (string.IsNullOrWhiteSpace(request.CustomerName) || request.CustomerName.Trim().Length > 150)
             return BadRequest(new { success = false, message = "Full name is required and must be 150 characters or fewer" });
-        if (request.Phone?.Length > 30)
-            return BadRequest(new { success = false, message = "Phone number is too long" });
+        if (!IsValidPublicPhone(request.Phone))
+            return BadRequest(new { success = false, message = "A valid contact number is required" });
         if (request.Notes?.Length > 2_000)
             return BadRequest(new { success = false, message = "Notes must be 2,000 characters or fewer" });
         if (request.PaddleRentalQuantity is < 0 or > 50)
@@ -170,7 +170,7 @@ public class BookingController : ControllerBase
             return BadRequest(new { success = false, message = "Select between 1 and 20 booking schedules" });
 
         var result = await _bookingService.SubmitPayMongoRequestAsync(
-            new(request.CustomerName, verifiedEmail, request.Phone, request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
+            new(request.CustomerName, verifiedEmail, request.Phone!.Trim(), request.Notes, request.PaddleRentalQuantity, schedules, request.PromoCode),
             cancellationToken);
 
         return result.Success ? Ok(result) : BadRequest(result);
@@ -198,13 +198,13 @@ public class BookingController : ControllerBase
 
     [HttpPut("api/admin/bookings/{id}")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Update(long id, UpdateBookingRequest request) => Ok(await _bookingService.UpdateAsync(id, request));
+    public async Task<IActionResult> Update(long id, UpdateBookingRequest request) => Ok(await _bookingService.UpdateAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/bookings/{id}/reschedule")]
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> Reschedule(long id, RescheduleBookingRequest request)
     {
-        var result = await _bookingService.RescheduleAsync(id, request);
+        var result = await _bookingService.RescheduleAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff");
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
@@ -216,13 +216,24 @@ public class BookingController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    [HttpPost("api/admin/bookings/{id}/paddle-rentals/void")]
+    [Authorize(Roles = "Admin,Staff")]
+    public async Task<IActionResult> VoidPaddleRental(long id)
+    {
+        var result = await _bookingService.VoidPaddleRentalAsync(
+            id,
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "",
+            User.FindFirstValue(ClaimTypes.Name) ?? "Staff");
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
     [HttpPost("api/admin/bookings/{id}/confirm")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Confirm(long id) => Ok(await _bookingService.ConfirmAsync(id));
+    public async Task<IActionResult> Confirm(long id) => Ok(await _bookingService.ConfirmAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/bookings/{id}/cancel")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Cancel(long id) => Ok(await _bookingService.CancelAsync(id));
+    public async Task<IActionResult> Cancel(long id) => Ok(await _bookingService.CancelAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/bookings/{id}/complete")]
     [Authorize(Roles = "Admin,Staff")]
@@ -254,6 +265,15 @@ public class BookingController : ControllerBase
     }
 
     private string GetReceiptDirectory() => Path.Combine(_environment.ContentRootPath, "App_Data", "receipts");
+
+    private static bool IsValidPublicPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return false;
+        var value = phone.Trim();
+        return value.Length is >= 7 and <= 30 &&
+               value.Count(char.IsDigit) >= 7 &&
+               value.All(character => char.IsDigit(character) || character is ' ' or '+' or '-' or '(' or ')');
+    }
 
     private static async Task<(string Extension, string ContentType)?> DetectReceiptTypeAsync(IFormFile file)
     {

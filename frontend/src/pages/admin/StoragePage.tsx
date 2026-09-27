@@ -51,6 +51,7 @@ export default function StoragePage() {
   const history = historyQuery.data?.data || [];
   const paginatedHistory = history.slice(historyPage * 10, (historyPage + 1) * 10);
   const measurementAvailable = status?.storageMeasurementAvailable !== false;
+  const allocatedMegabytes = status?.allocatedMegabytes ?? status?.usedMegabytes ?? 0;
   const usedPercent = measurementAvailable ? Math.min(100, status?.usedPercent ?? 0) : 0;
   const thresholdPercent = status ? Math.min(100, status.warningThresholdMegabytes / status.limitMegabytes * 100) : 80;
 
@@ -74,8 +75,9 @@ export default function StoragePage() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Metric label="Database used" value={measurementAvailable ? `${formatMb(status.usedMegabytes)} MB` : 'Unavailable'} note={measurementAvailable ? `${status.usedPercent.toFixed(1)}% of 5 GB` : 'Cleanup is still available'} />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Live database data" value={measurementAvailable ? formatStorage(status.usedMegabytes) : 'Unavailable'} note="Current rows and indexes; updates after cleanup" />
+          <Metric label="TiDB allocated" value={measurementAvailable ? formatStorage(allocatedMegabytes) : 'Unavailable'} note={measurementAvailable ? `${status.usedPercent.toFixed(1)}% of 5 GB · reclaimed after TiDB GC` : 'Cleanup is still available'} />
           <Metric label="Warning threshold" value={`${formatMb(status.warningThresholdMegabytes)} MB`} note="Cleanup recommended at this point" />
           <Metric label="Cleanup eligible" value={status.cleanupEligibleRecordCount.toLocaleString()} note="Elapsed schedules; reservations excluded" />
         </div>
@@ -89,7 +91,7 @@ export default function StoragePage() {
         </div>
         <div className={cn('flex gap-3 rounded-xl border p-4', !measurementAvailable ? 'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100' : status.isHealthy ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100')}>
           {measurementAvailable && status.isHealthy ? <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" /> : <ShieldExclamationIcon className="mt-0.5 h-5 w-5 shrink-0" />}
-          <div><p className="font-semibold">{!measurementAvailable ? 'Storage measurement is restricted by the database host' : status.isHealthy ? 'Storage level is good' : 'Storage has reached the warning threshold'}</p><p className="text-sm opacity-80">{!measurementAvailable ? 'Cleanup, previews, Revenue removal, and deletion history remain fully available.' : status.isHealthy ? `You have ${(status.warningThresholdMegabytes - status.usedMegabytes).toFixed(2)} MB before cleanup is recommended.` : 'Delete eligible elapsed schedules now to reduce used database space.'}</p></div>
+          <div><p className="font-semibold">{!measurementAvailable ? 'Storage measurement is restricted by the database host' : status.isHealthy ? 'Storage level is good' : 'Storage has reached the warning threshold'}</p><p className="text-sm opacity-80">{!measurementAvailable ? 'Cleanup, previews, Revenue removal, and deletion history remain fully available.' : status.isHealthy ? `You have ${(status.warningThresholdMegabytes - allocatedMegabytes).toFixed(2)} MB of allocated space before cleanup is recommended.` : 'Delete eligible elapsed schedules now to reduce live data. TiDB reclaims allocated disk asynchronously.'}</p></div>
         </div>
       </CardContent>
     </Card> : <ErrorCard message={storageError(statusQuery.error, statusQuery.data?.message || 'Storage status is unavailable')} />}
@@ -132,5 +134,11 @@ function storageError(error: unknown, fallback: string) {
 }
 
 function formatMb(value: number) { return value.toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+function formatStorage(megabytes: number) {
+  if (megabytes >= 1) return `${megabytes.toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
+  const kilobytes = megabytes * 1024;
+  if (kilobytes >= 1) return `${kilobytes.toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
+  return `${Math.max(0, Math.round(kilobytes * 1024)).toLocaleString()} bytes`;
+}
 function formatDate(value: string) { return format(new Date(`${value}T00:00:00`), 'MMM d, yyyy'); }
 function formatDateTime(value: string) { return format(new Date(value), 'MMM d, yyyy · h:mm a'); }

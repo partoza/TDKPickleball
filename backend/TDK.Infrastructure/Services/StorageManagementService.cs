@@ -28,7 +28,8 @@ public sealed class StorageManagementService : IStorageManagementService
 
     public async Task<ApiResponse<StorageStatusDto>> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        var (used, measurementAvailable) = await GetUsedStorageAsync(cancellationToken);
+        var (used, allocated, measurementAvailable) = await GetStorageMeasurementsAsync(cancellationToken);
+        var quotaUsage = allocated > 0 ? allocated : used;
         var manilaNow = _clock.ToManilaTime(_clock.UtcNow);
         var today = DateOnly.FromDateTime(manilaNow.DateTime);
         var currentTime = TimeOnly.FromDateTime(manilaNow.DateTime);
@@ -36,10 +37,11 @@ public sealed class StorageManagementService : IStorageManagementService
             .CountAsync(cancellationToken);
         return ApiResponse<StorageStatusDto>.Ok(new(
             used,
+            allocated,
             LimitMegabytes,
             WarningThresholdMegabytes,
-            decimal.Round(Math.Min(100m, used / LimitMegabytes * 100m), 1),
-            used < WarningThresholdMegabytes,
+            decimal.Round(Math.Min(100m, quotaUsage / LimitMegabytes * 100m), 1),
+            quotaUsage < WarningThresholdMegabytes,
             measurementAvailable,
             eligibleScheduleCount,
             _clock.UtcNow.UtcDateTime));
@@ -170,6 +172,7 @@ public sealed class StorageManagementService : IStorageManagementService
             _context.BookingCleanupAudits.Add(audit);
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await TryFlushTiDbStatisticsAsync(cancellationToken);
 
             var auditDto = new BookingCleanupHistoryDto(
                 audit.Id, audit.SelectedFromDate, audit.DeletedThroughDate, audit.OldestBookingDate, audit.DeletedBookingCount, audit.DeletedScheduleCount,
@@ -210,45 +213,68 @@ public sealed class StorageManagementService : IStorageManagementService
         return null;
     }
 
-    private async Task<(decimal UsedMegabytes, bool Available)> GetUsedStorageAsync(CancellationToken cancellationToken)
+    private async Task<(decimal LiveMegabytes, decimal AllocatedMegabytes, bool Available)> GetStorageMeasurementsAsync(CancellationToken cancellationToken)
     {
+        decimal? live = null;
+        decimal? allocated = null;
+
         try
         {
-            // TiDB exposes physical table and index usage in MiB through this table.
-            var used = await _context.Database.SqlQueryRaw<decimal>(
-                "SELECT CAST(COALESCE(SUM(TABLE_SIZE), 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.TABLE_STORAGE_STATS WHERE TABLE_SCHEMA = DATABASE()")
+            // TiDB TABLES reports live logical rows and indexes, so deleted records
+            // disappear from this measurement as statistics are persisted.
+            live = await _context.Database.SqlQueryRaw<decimal>(
+                "SELECT CAST(COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) AS DECIMAL(20,6)) AS `Value` FROM information_schema.tables WHERE table_schema = DATABASE()")
                 .SingleAsync(cancellationToken);
-            return (decimal.Round(used, 2), true);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogDebug(exception, "TiDB storage statistics are unavailable; trying MySQL information_schema measurements");
+            _logger.LogDebug(exception, "Live database storage statistics are unavailable");
         }
 
         try
         {
-            var used = await _context.Database.SqlQueryRaw<decimal>(
-                "SELECT CAST(COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.tables WHERE table_schema = DATABASE()")
+            // TABLE_STORAGE_STATS is TiDB's physical allocation. It can remain
+            // unchanged after DELETE until MVCC garbage collection reclaims data.
+            allocated = await _context.Database.SqlQueryRaw<decimal>(
+                "SELECT CAST(COALESCE(SUM(TABLE_SIZE), 0) AS DECIMAL(20,2)) AS `Value` FROM information_schema.TABLE_STORAGE_STATS WHERE TABLE_SCHEMA = DATABASE()")
                 .SingleAsync(cancellationToken);
-            return (decimal.Round(used, 2), true);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogWarning(exception, "The database host did not expose information_schema storage measurements; cleanup remains available");
-            return (0m, false);
+            _logger.LogDebug(exception, "TiDB physical allocation statistics are unavailable; using live database size for quota display");
+        }
+
+        if (!live.HasValue && !allocated.HasValue)
+            _logger.LogWarning("The database host did not expose information_schema storage measurements; cleanup remains available");
+
+        var liveMegabytes = decimal.Round(live ?? allocated ?? 0m, 6);
+        var allocatedMegabytes = decimal.Round(allocated ?? live ?? 0m, 2);
+        return (liveMegabytes, allocatedMegabytes, live.HasValue || allocated.HasValue);
+    }
+
+    private async Task TryFlushTiDbStatisticsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync("FLUSH STATS_DELTA", cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Older TiDB and MySQL hosts may not support this optional refresh.
+            _logger.LogDebug(exception, "Immediate TiDB statistics refresh is unavailable; automatic statistics will update shortly");
         }
     }
 
     private IQueryable<Schedule> EligibleSchedules(DateOnly today, TimeOnly currentTime) =>
         _context.Schedules.Where(schedule =>
             schedule.Status != ScheduleStatus.Available &&
-            (schedule.Booking == null || schedule.Booking.Status != BookingStatus.Reserved) &&
+            (schedule.Booking == null || schedule.Booking.Status != BookingStatus.Reserved && schedule.Booking.Status != BookingStatus.Requested) &&
             (schedule.ScheduleDate < today ||
                 (schedule.ScheduleDate == today && schedule.TimeSlot.EndTime != TimeOnly.MinValue && schedule.TimeSlot.EndTime <= currentTime)));
 
     private IQueryable<Booking> EligibleBookings(DateOnly today, TimeOnly currentTime) =>
         _context.Bookings.Where(booking =>
-            booking.Status != BookingStatus.Reserved &&
+            booking.Status != BookingStatus.Reserved && booking.Status != BookingStatus.Requested &&
             (booking.Status == BookingStatus.Completed || booking.BookingDate < today ||
                 (booking.BookingDate == today && booking.EndTime != TimeOnly.MinValue && booking.EndTime <= currentTime)));
 }

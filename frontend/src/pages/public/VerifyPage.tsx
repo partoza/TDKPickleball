@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { CheckCircleIcon as CheckCircle2, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
+import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { useVerifyBooking } from '@/hooks/useBookings';
 import { Booking } from '@/types';
@@ -10,7 +11,29 @@ import { Input } from '@/components/ui/input';
 export default function VerifyPage() {
   const [reference, setReference] = useState(''); const [booking, setBooking] = useState<Booking | null>(null); const [error, setError] = useState(''); const verify = useVerifyBooking();
   const check = (value = reference) => { const normalized = value.trim().toUpperCase(); setError(''); setBooking(null); if (!/^TDK-\d{7}$/.test(normalized)) return setError('Enter a reference in TDK-1234567 format'); verify.mutate(normalized, { onSuccess: r => { if (!r.success || !r.data) { return setError(r.message || 'Could not verify this booking'); } setBooking(r.data); }, onError: () => setError('Could not verify this booking') }); };
-  const scan = async (file?: File) => { if (!file) return; try { setError(''); setBooking(null); const Detector = (window as any).BarcodeDetector; if (!Detector) throw new Error('QR image scanning is not supported by this browser'); const bitmap = await createImageBitmap(file); const codes = await new Detector({ formats: ['qr_code'] }).detect(bitmap); bitmap.close(); if (!codes[0]?.rawValue) throw new Error('No QR code found'); setReference(codes[0].rawValue); check(codes[0].rawValue); } catch (e: any) { setError(e.message); } };
+  const scan = async (file?: File) => {
+    if (!file) return;
+
+    setError('');
+    setBooking(null);
+
+    let bitmap: ImageBitmap | undefined;
+    try {
+      const Detector = (window as any).BarcodeDetector || BarcodeDetectorPonyfill;
+      bitmap = await createImageBitmap(file);
+      const codes = await new Detector({ formats: ['qr_code'] }).detect(bitmap);
+      const scannedReference = codes[0]?.rawValue;
+
+      if (!scannedReference) throw new Error('No QR code found in this image');
+
+      setReference(scannedReference.trim().toUpperCase());
+      check(scannedReference);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to read this QR image');
+    } finally {
+      bitmap?.close();
+    }
+  };
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#fafafa] relative flex flex-col items-center pt-20 sm:pt-32 px-4 pb-24">
       {/* Background Image */}

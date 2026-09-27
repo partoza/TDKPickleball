@@ -37,7 +37,8 @@ public class UpdateScheduleValidator : AbstractValidator<UpdateScheduleRequest>
 {
     public UpdateScheduleValidator()
     {
-        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.Status).Must(status => status is TDK.Domain.Enums.ScheduleStatus.Available or TDK.Domain.Enums.ScheduleStatus.Training or TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Unavailable or TDK.Domain.Enums.ScheduleStatus.Internal)
+            .WithMessage("Requested schedules can only be created from public booking requests");
         RuleFor(x => x.BookedBy).NotEmpty().MaximumLength(150).When(x => x.Status is TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Training);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.Phone).MaximumLength(30);
@@ -73,7 +74,8 @@ public class BulkUpdateValidator : AbstractValidator<BulkUpdateRequest>
     {
         RuleFor(x => x.CourtId).GreaterThan(0);
         RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
-        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.Status).Must(status => status is TDK.Domain.Enums.ScheduleStatus.Available or TDK.Domain.Enums.ScheduleStatus.Training or TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Unavailable or TDK.Domain.Enums.ScheduleStatus.Internal)
+            .WithMessage("Requested schedules can only be created from public booking requests");
         RuleFor(x => x.PaddleRentalQuantity).InclusiveBetween(0, 50);
         RuleFor(x => x.BookedBy).NotEmpty().MaximumLength(150).When(x => x.Status is TDK.Domain.Enums.ScheduleStatus.Booked or TDK.Domain.Enums.ScheduleStatus.Training);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
@@ -92,7 +94,8 @@ public class UpdateBookingValidator : AbstractValidator<UpdateBookingRequest>
         RuleFor(x => x.Email).EmailAddress().MaximumLength(254).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.Status).Must(status => status is TDK.Domain.Enums.BookingStatus.Paid or TDK.Domain.Enums.BookingStatus.Reserved)
+            .WithMessage("Use the dedicated confirm, cancel, or complete action to change booking status");
     }
 }
 

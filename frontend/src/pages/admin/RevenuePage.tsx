@@ -93,12 +93,20 @@ export default function RevenuePage() {
               {revenue.daily.length === 0 ? <EmptyRevenue /> : (
                 <div className="overflow-x-auto pb-2">
                   <div className="flex h-56 min-w-max items-end gap-2 border-b px-1 pt-6">
-                    {revenue.daily.map(day => {
+                    {revenue.daily.map((day, index) => {
                       const totalHeight = Math.max(4, (day.grossSales / maxGross) * 168);
                       const bookingHeight = day.grossSales ? (day.bookingSales / day.grossSales) * totalHeight : 0;
                       const trainingHeight = day.grossSales ? (day.trainingSales / day.grossSales) * totalHeight : 0;
                       const paddleHeight = day.grossSales ? (day.paddleRentalSales / day.grossSales) * totalHeight : 0;
-                      return <div key={day.date} className="flex w-9 shrink-0 flex-col items-center justify-end gap-1" title={`${format(new Date(`${day.date}T00:00:00`), 'MMM d')}: ${money(day.grossSales)}`}>
+                      const tooltipPosition = index === 0 ? 'left-0' : index === revenue.daily.length - 1 ? 'right-0' : 'left-1/2 -translate-x-1/2';
+                      return <div key={day.date} className="group relative flex h-full w-9 shrink-0 flex-col items-center justify-end gap-1" tabIndex={0} aria-label={`${format(new Date(`${day.date}T00:00:00`), 'MMMM d, yyyy')}: ${money(day.grossSales)} gross sales`}>
+                        <div className={cn('pointer-events-none absolute top-1 z-20 w-max min-w-44 rounded-xl bg-primary px-3 py-2 text-primary-foreground opacity-0 shadow-lg transition-all duration-200 group-hover:-translate-y-1 group-hover:opacity-100 group-focus:-translate-y-1 group-focus:opacity-100', tooltipPosition)}>
+                          <p className="text-sm font-bold leading-tight">{money(day.grossSales)} Total</p>
+                          <p className="mt-1 text-[10px] font-medium leading-tight opacity-90">{money(day.bookingSales)} Bookings · {money(day.trainingSales)} Training</p>
+                          <p className="mt-0.5 text-[10px] font-medium leading-tight opacity-90">{money(day.paddleRentalSales)} Paddle rentals</p>
+                          <p className="mt-1 text-[9px] font-medium leading-tight opacity-70">{format(new Date(`${day.date}T00:00:00`), 'MMM d, yyyy')}</p>
+                          <span className={cn('absolute -bottom-1 h-3 w-3 rotate-45 rounded-sm bg-primary', index === 0 ? 'left-3' : index === revenue.daily.length - 1 ? 'right-3' : 'left-1/2 -translate-x-1/2')} />
+                        </div>
                         <span className="text-[9px] font-semibold text-muted-foreground">{day.grossSales >= 1000 ? `${(day.grossSales / 1000).toFixed(1)}k` : day.grossSales.toFixed(0)}</span>
                         <div className="flex w-6 flex-col-reverse overflow-hidden rounded-t-md bg-muted" style={{ height: `${totalHeight}px` }}>
                           <span className="bg-primary" style={{ height: `${bookingHeight}px` }} />

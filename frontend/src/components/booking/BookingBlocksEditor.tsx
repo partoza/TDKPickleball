@@ -22,6 +22,7 @@ type Props = {
   showQuote?: boolean;
   addLabel?: string;
   discount?: number;
+  showSummary?: boolean;
 };
 
 function ErrorText({ children }: { children?: string }) {
@@ -82,7 +83,7 @@ function BookingBlockCard({ block, blocks, index, count, update, remove, courts,
   </section>;
 }
 
-export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking', discount = 0 }: Props) {
+export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking', discount = 0, showSummary = true }: Props) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -96,7 +97,7 @@ export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType,
   return <div className="space-y-4">
     {blocks.map((block, index) => <BookingBlockCard key={block.id || index} block={block} blocks={blocks} index={index} count={blocks.length} update={update} remove={remove} courts={courts} rates={rates} rateType={rateType} errors={{ ...errors[index], ...conflictErrors[index] }} showQuote={showQuote} now={now} />)}
     <Button type="button" variant="default" className="w-full font-bold" onClick={() => onChange([...blocks, createBookingBlock({ courtId: blocks.at(-1)?.courtId || '' })])}><PlusIcon className="mr-2 h-4 w-4 stroke-[2]" />{addLabel}</Button>
-    {showQuote && (
+    {showQuote && showSummary && (
       <div className="flex items-end justify-between px-1 pt-2" aria-live="polite">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total amount</p>

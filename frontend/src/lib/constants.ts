@@ -16,6 +16,7 @@ export const STATUS_COLORS: Record<ScheduleStatus, string> = {
   [ScheduleStatus.Booked]: 'bg-primary text-white border-primary dark:text-white',
   [ScheduleStatus.Unavailable]: 'bg-slate-600 text-white border-slate-700 dark:bg-slate-700 dark:text-white dark:border-slate-600',
   [ScheduleStatus.Internal]: 'bg-violet-600 text-white border-violet-700 dark:bg-violet-500 dark:text-white dark:border-violet-400',
+  [ScheduleStatus.Requested]: 'bg-blue-600 text-white border-blue-700 dark:bg-blue-600 dark:text-white dark:border-blue-500',
 };
 
 export const STATUS_LABELS: Record<ScheduleStatus, string> = {
@@ -24,6 +25,7 @@ export const STATUS_LABELS: Record<ScheduleStatus, string> = {
   [ScheduleStatus.Booked]: 'Booked',
   [ScheduleStatus.Unavailable]: 'Unavailable',
   [ScheduleStatus.Internal]: 'Internal',
+  [ScheduleStatus.Requested]: 'Requested',
 };
 
 export const ROUTES = {
