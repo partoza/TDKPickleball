@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using TDK.Application.DTOs.Bookings;
 using TDK.Application.DTOs.Common;
 using TDK.Application.DTOs.Schedules;
@@ -171,7 +171,7 @@ public class BookingService : IBookingService
                     Notes = $"[PublicRequest:{requestReference}] {request.Notes}".Trim(),
                     CreatedAt = submittedAt,
                     PromoId = promo?.Id,
-                    ListedByName = $"Public request · {request.CustomerName.Trim()}"
+                    ListedByName = $"Public request Â· {request.CustomerName.Trim()}"
                 };
                 await _bookings.AddAsync(booking);
                 await _bookings.SaveChangesAsync();
@@ -339,7 +339,7 @@ public class BookingService : IBookingService
         var total = subtotal - discount + paddleRentalFee;
         var effectiveAmountPaid = request.AmountPaid == subtotal && total <= subtotal ? total : request.AmountPaid;
         if (effectiveAmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
-        if (effectiveAmountPaid > total) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{total:N2}");
+        if (effectiveAmountPaid > total) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of â‚±{total:N2}");
         var paid = effectiveAmountPaid;
         var manilaNow = _clock.ManilaNow;
         var isPaid = paid >= total;
@@ -503,7 +503,7 @@ public class BookingService : IBookingService
         var newTotal = subtotal - discount + paddleRentalFee;
         var effectiveAmountPaid = request.AmountPaid == subtotal && newTotal <= subtotal ? newTotal : request.AmountPaid;
         if (effectiveAmountPaid < 0) return ApiResponse<BookingDto>.Fail("Amount paid cannot be negative");
-        if (effectiveAmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of ₱{newTotal:N2}");
+        if (effectiveAmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"Amount paid cannot exceed the total amount of â‚±{newTotal:N2}");
         var moved = b.CourtId != request.CourtId || b.BookingDate != request.BookingDate || b.StartTime != request.StartTime || b.EndTime != request.EndTime;
         if (moved) {
             if (b.Status is not (BookingStatus.Paid or BookingStatus.Reserved)) return ApiResponse<BookingDto>.Fail("Only paid and reservation bookings can be rescheduled");
@@ -546,7 +546,7 @@ public class BookingService : IBookingService
         if (rateType == RateType.Internal) newSubtotal = 0;
         var adjustedDiscount = Math.Min(b.DiscountAmount, newSubtotal);
         var newTotal = newSubtotal - adjustedDiscount + b.PaddleRentalFee;
-        if (b.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"The existing amount paid cannot exceed the new total amount of ₱{newTotal:N2}");
+        if (b.AmountPaid > newTotal) return ApiResponse<BookingDto>.Fail($"The existing amount paid cannot exceed the new total amount of â‚±{newTotal:N2}");
         await ReleaseScheduleAsync(id);
         var manilaNow = _clock.ManilaNow;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
@@ -643,7 +643,7 @@ public class BookingService : IBookingService
     }
     public Task<ApiResponse<bool>> CompleteAsync(long id) => SetStatusAsync(id, BookingStatus.Completed);
 
-    public async Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName)
+    public async Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName, string reason)
     {
         var booking = await _bookings.GetByIdAsync(id);
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
@@ -657,6 +657,12 @@ public class BookingService : IBookingService
         _bookings.Update(booking);
         await _bookings.SaveChangesAsync();
         await ReleaseScheduleAsync(id);
+        if (_email.IsConfigured && !string.IsNullOrWhiteSpace(booking.Email))
+        {
+            var courtName = (await _courts.GetByIdAsync(booking.CourtId))?.Name ?? "Court";
+            try { await _email.SendCancellationAsync(booking, courtName, reason); }
+            catch { /* email failure is non-critical; booking is already cancelled */ }
+        }
         return ApiResponse<bool>.Ok(true, "Booking cancelled");
     }
 
@@ -837,3 +843,4 @@ public class BookingService : IBookingService
         return Math.Clamp(discount, 0, subtotal);
     }
 }
+

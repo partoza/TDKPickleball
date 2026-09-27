@@ -19,7 +19,7 @@ public interface IBookingService
     Task<ApiResponse<BookingDto>> AddPaddleRentalAsync(long id, int quantity);
     Task<ApiResponse<BookingDto>> VoidPaddleRentalAsync(long id, string userId, string userName);
     Task<ApiResponse<bool>> ConfirmAsync(long id, string userId, string userName);
-    Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName);
+    Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName, string reason);
     Task<ApiResponse<bool>> CompleteAsync(long id);
     Task<ApiResponse<bool>> DeleteAsync(long id);
     Task<ApiResponse<bool>> AttachReceiptAsync(long id, string fileName, string contentType);

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,6 +53,7 @@ export default function BookingsPage() {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [voidPaddleTarget, setVoidPaddleTarget] = useState<Booking | null>(null);
   const [qrBooking, setQrBooking] = useState<Booking | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
@@ -206,12 +208,13 @@ export default function BookingsPage() {
     });
   };
   const cancelBooking = () => {
-    if (!cancelTarget) return;
-    cancel.mutate(cancelTarget.id, {
+    if (!cancelTarget || !cancelReason.trim()) return;
+    cancel.mutate({ id: cancelTarget.id, reason: cancelReason.trim() }, {
       onSuccess: response => {
         if (!response.success) { toast.error(response.message || 'Booking could not be cancelled'); return; }
         toast.success('Booking cancelled');
         setCancelTarget(null);
+        setCancelReason('');
       },
       onError: error => toast.error(getApiErrorMessage(error, 'Booking could not be cancelled')),
     });
@@ -456,20 +459,41 @@ export default function BookingsPage() {
     <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} />}</DialogContent></Dialog>
     <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoadingIndicator label="Verifying QR code" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
     <ConfirmDeleteDialog open={!!deleteTarget} title={`Delete ${deleteTarget?.bookingReference || 'booking'}?`} description="This permanently removes the cancelled booking and cannot be undone." pending={remove.isPending} onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={deleteCancelled} />
-    <AlertDialog open={!!cancelTarget} onOpenChange={open => { if (!open && !cancel.isPending) setCancelTarget(null); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Cancel {cancelTarget?.bookingReference || 'this booking'}?</AlertDialogTitle>
-          <AlertDialogDescription>This will cancel the reservation and release its scheduled court time. Confirm that you want to continue.</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={cancel.isPending}>Keep booking</AlertDialogCancel>
-          <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={cancel.isPending} onClick={event => { event.preventDefault(); cancelBooking(); }}>
-            {cancel.isPending ? <><LoadingIndicator className="mr-2" label="Cancelling booking" />Cancelling</> : 'Cancel booking'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Dialog open={!!cancelTarget} onOpenChange={open => { if (!open && !cancel.isPending) { setCancelTarget(null); setCancelReason(''); } }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cancel {cancelTarget?.bookingReference || 'this booking'}?</DialogTitle>
+          <DialogDescription>This will cancel the reservation and release its scheduled court time. The player will be emailed the reason you provide below.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor="cancel-reason" className="text-sm font-semibold">
+            Cancellation reason <span className="text-destructive">*</span>
+          </Label>
+          <Textarea
+            id="cancel-reason"
+            placeholder="e.g. Court maintenance, double booking, etc."
+            value={cancelReason}
+            onChange={e => setCancelReason(e.target.value)}
+            disabled={cancel.isPending}
+            rows={3}
+            className="resize-none"
+          />
+          {cancelReason.trim().length === 0 && cancelReason.length > 0 && (
+            <p className="text-xs text-destructive">A reason is required to notify the player.</p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" disabled={cancel.isPending} onClick={() => { setCancelTarget(null); setCancelReason(''); }}>Keep booking</Button>
+          <Button
+            variant="destructive"
+            disabled={cancel.isPending || !cancelReason.trim()}
+            onClick={cancelBooking}
+          >
+            {cancel.isPending ? <><LoadingIndicator className="mr-2" label="Cancelling booking" />Cancelling…</> : 'Cancel booking'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <AlertDialog open={!!voidPaddleTarget} onOpenChange={open => { if (!open && !voidPaddleRental.isPending) setVoidPaddleTarget(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>

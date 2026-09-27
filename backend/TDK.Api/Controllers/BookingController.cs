@@ -233,7 +233,12 @@ public class BookingController : ControllerBase
 
     [HttpPost("api/admin/bookings/{id}/cancel")]
     [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> Cancel(long id) => Ok(await _bookingService.CancelAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
+    public async Task<IActionResult> Cancel(long id, [FromBody] CancelBookingRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Reason))
+            return BadRequest(new { success = false, message = "Cancellation reason is required" });
+        return Ok(await _bookingService.CancelAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff", request.Reason));
+    }
 
     [HttpPost("api/admin/bookings/{id}/complete")]
     [Authorize(Roles = "Admin,Staff")]

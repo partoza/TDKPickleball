@@ -1,4 +1,4 @@
-﻿using TDK.Domain.Enums;
+using TDK.Domain.Enums;
 using TDK.Application.DTOs.Schedules;
 
 namespace TDK.Application.DTOs.Bookings;
@@ -7,6 +7,7 @@ public record BookingDto(long Id, string BookingReference, int CourtId, string C
 public record CreateBookingRequest(int CourtId, DateOnly BookingDate, TimeOnly StartTime, TimeOnly EndTime, string CustomerName, string? Email, string? Phone, string? Notes, decimal AmountPaid = 0, RateType RateType = RateType.Booking, int? InternalCoachProfileId = null, int? PromoId = null, int PaddleRentalQuantity = 0);
 public record UpdateBookingRequest(int CourtId, DateOnly BookingDate, TimeOnly StartTime, TimeOnly EndTime, string CustomerName, string? Email, string? Phone, string? Notes, decimal AmountPaid, BookingStatus Status, int? InternalCoachProfileId = null, int? PromoId = null, int? PaddleRentalQuantity = null);
 public record RescheduleBookingRequest(int CourtId, DateOnly BookingDate, TimeOnly StartTime, TimeOnly EndTime);
+public record CancelBookingRequest(string Reason);
 public record VerifyBookingRequest(string BookingReference);
 public record AddPaddleRentalRequest(int Quantity);
 public record BookingAvailabilityDto(DateOnly Date, int CourtId, List<TimeSlotDto> AvailableSlots, List<TimeSlotDto> OccupiedSlots);

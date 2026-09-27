@@ -166,6 +166,25 @@ public class SmtpEmailService : IEmailService
         return SendMessageAsync(email, $"Welcome to TDK - {profileType}", plainText, html, null, cancellationToken, true);
     }
 
+    public Task SendCancellationAsync(Booking booking, string courtName, string reason, CancellationToken cancellationToken = default)
+    {
+        var plainText = $"Hello {booking.CustomerName},\n\nYour booking {booking.BookingReference} has been cancelled.\n\nCancellation reason: {reason}\n\nCourt: {courtName}\nDate: {booking.BookingDate:MMMM d, yyyy}\nTime: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}\n\nIf you have any questions, please contact The Dirty Kitchen directly.";
+        var html = WrapEmail($"""
+            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Booking cancelled</div>
+            <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">Your booking has been cancelled.</h1>
+            <p style="margin:0 0 24px;color:#666666;font-size:15px;line-height:1.7;">Hello {Encode(booking.CustomerName)}, your booking has been cancelled by the store.</p>
+            <div style="margin:0 0 24px;">
+              {DetailRow("Reference", booking.BookingReference)}
+              {DetailRow("Court", courtName)}
+              {DetailRow("Date", booking.BookingDate.ToString("MMMM d, yyyy"))}
+              {DetailRow("Time", $"{booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}", true)}
+            </div>
+            <div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid {BrandRed};background:#fafafa;color:#555555;font-size:13px;line-height:1.6;"><strong style="color:#111111;">Cancellation reason:</strong><br>{Encode(reason)}</div>
+            <p style="margin:0;color:#777777;font-size:13px;line-height:1.6;">If you have any questions, please contact The Dirty Kitchen directly.</p>
+            """, booking.BookingReference);
+        return SendMessageAsync(booking.Email, $"Your booking has been cancelled - {booking.BookingReference}", plainText, html, null, cancellationToken, true);
+    }
+
     public Task SendStorageCleanupSummaryAsync(string deletedByName, string deletedByEmail, DateOnly fromDate, DateOnly throughDate, int scheduleCount, int bookingCount, int receiptCount, CancellationToken cancellationToken = default)
     {
         var storeEmail = GetStoreEmail();

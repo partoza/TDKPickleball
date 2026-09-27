@@ -96,8 +96,8 @@ export const bookingsService = {
     const { data } = await api.post(`/api/admin/bookings/${id}/paddle-rentals/void`);
     return data;
   },
-  cancelBooking: async (id: number): Promise<ApiResponse<Booking>> => {
-    const { data } = await api.post(`/api/admin/bookings/${id}/cancel`);
+  cancelBooking: async ({ id, reason }: { id: number; reason: string }): Promise<ApiResponse<Booking>> => {
+    const { data } = await api.post(`/api/admin/bookings/${id}/cancel`, { reason });
     return data;
   },
   completeBooking: async (id: number): Promise<ApiResponse<Booking>> => {
