@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Booking, ApiResponse, PublicPromo, RateType } from '@/types';
+import { Booking, ApiResponse, PublicBookingRequestStatus, PublicPromo, RateType } from '@/types';
 import { withSeconds } from '@/lib/time-range';
 
 export const bookingsService = {
@@ -66,6 +66,10 @@ export const bookingsService = {
   },
   verifyBooking: async (bookingReference: string): Promise<ApiResponse<Booking>> => {
     const { data } = await api.post('/api/bookings/verify', { bookingReference });
+    return data;
+  },
+  verifyBookingRequest: async (requestReference: string): Promise<ApiResponse<PublicBookingRequestStatus>> => {
+    const { data } = await api.post('/api/booking-requests/verify', { requestReference });
     return data;
   },
   getBookings: async (): Promise<ApiResponse<Booking[]>> => {

@@ -14,6 +14,7 @@ public interface IBookingService
     Task<ApiResponse<IEnumerable<BookingDto>>> GetAllAsync();
     Task<ApiResponse<BookingDto>> GetByIdAsync(long id);
     Task<ApiResponse<BookingDto>> VerifyAsync(string bookingReference);
+    Task<ApiResponse<PublicBookingRequestStatusDto>> VerifyRequestAsync(string requestReference);
     Task<ApiResponse<BookingDto>> UpdateAsync(long id, UpdateBookingRequest request, string userId, string userName);
     Task<ApiResponse<BookingDto>> RescheduleAsync(long id, RescheduleBookingRequest request, string userId, string userName);
     Task<ApiResponse<BookingDto>> AddPaddleRentalAsync(long id, int quantity);

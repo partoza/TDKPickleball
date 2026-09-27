@@ -1,21 +1,59 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { CheckCircleIcon as CheckCircle2, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
 import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
-import { useVerifyBooking } from '@/hooks/useBookings';
-import { Booking } from '@/types';
+import { useVerifyBooking, useVerifyBookingRequest } from '@/hooks/useBookings';
+import { Booking, PublicBookingRequestStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export default function VerifyPage() {
-  const [reference, setReference] = useState(''); const [booking, setBooking] = useState<Booking | null>(null); const [error, setError] = useState(''); const verify = useVerifyBooking();
-  const check = (value = reference) => { const normalized = value.trim().toUpperCase(); setError(''); setBooking(null); if (!/^TDK-\d{7}$/.test(normalized)) return setError('Enter a reference in TDK-1234567 format'); verify.mutate(normalized, { onSuccess: r => { if (!r.success || !r.data) { return setError(r.message || 'Could not verify this booking'); } setBooking(r.data); }, onError: () => setError('Could not verify this booking') }); };
+  const [searchParams] = useSearchParams();
+  const initialLookupStarted = useRef(false);
+  const [reference, setReference] = useState('');
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [request, setRequest] = useState<PublicBookingRequestStatus | null>(null);
+  const [error, setError] = useState('');
+  const verify = useVerifyBooking();
+  const verifyRequest = useVerifyBookingRequest();
+  const isPending = verify.isPending || verifyRequest.isPending;
+  const check = (value = reference) => {
+    const normalized = value.trim().toUpperCase();
+    setReference(normalized);
+    setError('');
+    setBooking(null);
+    setRequest(null);
+    if (/^REQ-\d{8}-\d{6}$/.test(normalized)) {
+      verifyRequest.mutate(normalized, {
+        onSuccess: response => response.success && response.data ? setRequest(response.data) : setError(response.message || 'Could not find this booking request'),
+        onError: (requestError: any) => setError(requestError?.response?.data?.message || 'Could not find this booking request'),
+      });
+      return;
+    }
+    if (!/^TDK-\d{7}$/.test(normalized)) {
+      setError('Enter a booking reference (TDK-1234567) or request reference (REQ-YYYYMMDD-123456)');
+      return;
+    }
+    verify.mutate(normalized, {
+      onSuccess: response => response.success && response.data ? setBooking(response.data) : setError(response.message || 'Could not verify this booking'),
+      onError: () => setError('Could not verify this booking'),
+    });
+  };
+
+  useEffect(() => {
+    const queryReference = searchParams.get('reference');
+    if (!queryReference || initialLookupStarted.current) return;
+    initialLookupStarted.current = true;
+    check(queryReference);
+  }, [searchParams]);
   const scan = async (file?: File) => {
     if (!file) return;
 
     setError('');
     setBooking(null);
+    setRequest(null);
 
     let bitmap: ImageBitmap | undefined;
     try {
@@ -47,27 +85,27 @@ export default function VerifyPage() {
       <div className="w-full max-w-[500px] relative z-10">
         <div className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-md">Verify Booking</h1>
-          <p className="mt-3 text-white/90 text-sm sm:text-base font-medium drop-shadow-sm">Upload the QR from your confirmation email or enter your booking reference.</p>
+          <p className="mt-3 text-white/90 text-sm sm:text-base font-medium drop-shadow-sm">Track a booking request, upload a booking QR, or enter a reference.</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xl shadow-black/5">
           <div className="space-y-1.5 mb-4 text-left">
-            <label className="text-sm font-semibold text-slate-700">Booking Reference</label>
+            <label className="text-sm font-semibold text-slate-700">Booking or request reference</label>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <Input 
               value={reference} 
               onChange={e => setReference(e.target.value.toUpperCase())} 
-              placeholder="e.g. TDK-1234567" 
+              placeholder="TDK-1234567 or REQ-…"
               className={`h-11 flex-1 font-mono text-sm rounded-lg border-slate-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm ${error ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`} 
             />
             <Button 
               className="h-11 px-8 font-bold text-sm bg-primary hover:bg-primary/90 text-white transition-all shadow-sm hover:scale-105 duration-200" 
               onClick={() => check()} 
-              disabled={verify.isPending}
+              disabled={isPending}
             >
               Verify
-              {verify.isPending && <LoadingIndicator className="ml-2" label="Verifying booking" />}
+              {isPending && <LoadingIndicator className="ml-2" label="Checking reference" />}
             </Button>
           </div>
           {error && <p className="mt-2 text-sm font-medium text-red-500">{error}</p>}
@@ -118,6 +156,33 @@ export default function VerifyPage() {
                 <Detail k="Schedule" v={`${format(new Date(`${booking.bookingDate}T00:00:00`), 'MMM d, yyyy')} · ${format(new Date(`2000-01-01T${booking.startTime}`), 'h:mm a')}`} />
                 <Detail k="Status" v={booking.status} />
                 <Detail k="Balance" v={`₱${booking.remainingBalance.toLocaleString()}`} />
+              </div>
+            </div>
+          )}
+
+          {request && (
+            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm animate-in fade-in duration-300">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
+                <div className="flex items-center gap-2 font-medium text-slate-900 text-sm">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  Booking request found
+                </div>
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary ring-1 ring-inset ring-primary/20">{request.status}</span>
+              </div>
+              <div className="grid gap-y-3 text-sm">
+                <Detail k="Request reference" v={request.requestReference} />
+                <Detail k="Submitted" v={format(new Date(request.submittedAt), 'MMM d, yyyy · h:mm a')} />
+                <Detail k="Schedules" v={String(request.schedules.length)} />
+                <Detail k="Total" v={`₱${request.totalAmount.toLocaleString()}`} />
+              </div>
+              <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+                {request.schedules.map((schedule, index) => (
+                  <div key={schedule.bookingReference} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-3"><strong className="text-slate-900">Schedule {index + 1}</strong><span className="text-xs font-semibold text-primary">{schedule.status}</span></div>
+                    <p className="mt-1 text-slate-600">{schedule.courtName} · {format(new Date(`${schedule.bookingDate}T00:00:00`), 'MMM d, yyyy')}</p>
+                    <p className="mt-0.5 text-slate-600">{format(new Date(`2000-01-01T${schedule.startTime}`), 'h:mm a')}–{format(new Date(`2000-01-01T${schedule.endTime}`), 'h:mm a')}</p>
+                  </div>
+                ))}
               </div>
             </div>
           )}

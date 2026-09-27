@@ -75,6 +75,7 @@ export interface Schedule {
 export interface Booking {
   id: number;
   bookingReference: string;
+  requestReference?: string;
   customerName: string;
   email: string;
   phone?: string;
@@ -108,6 +109,24 @@ export interface Booking {
   receiptAvailable?: boolean;
   internalCoachProfileId?: number;
   promoId?: number;
+}
+
+export interface PublicBookingRequestStatusSchedule {
+  bookingReference: string;
+  courtName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  amount: number;
+  status: BookingStatus;
+}
+
+export interface PublicBookingRequestStatus {
+  requestReference: string;
+  status: string;
+  submittedAt: string;
+  totalAmount: number;
+  schedules: PublicBookingRequestStatusSchedule[];
 }
 
 export enum DiscountType {

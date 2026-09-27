@@ -100,7 +100,8 @@ public class SmtpEmailService : IEmailService
 
         await SendMessageAsync(storeEmail, $"Booking request awaiting review - {request.RequestReference}", plainText, html, null, cancellationToken, true, receipt);
 
-        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
+        var requestUrl = $"{GetFrontendUrl()}/verify?reference={Uri.EscapeDataString(request.RequestReference)}";
+        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nView request status: {requestUrl}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
         var customerHtml = WrapEmail($"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Request received</div>
             <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">We received your booking request.</h1>
@@ -113,6 +114,7 @@ public class SmtpEmailService : IEmailService
               {DetailRow("Total expected payment", $"PHP {request.TotalAmount:N2}", true)}
             </div>
             <div style="padding:16px 18px;border:1px solid #f0d59a;border-radius:12px;background:#fff8e8;color:#6d4b00;font-size:13px;line-height:1.6;"><strong>This is not a confirmed booking.</strong><br>Please wait for the store to verify the receipt and reply before considering the court reserved.</div>
+            <div style="margin-top:24px;">{Button(requestUrl, "View request", true)}</div>
             <p style="margin:20px 0 0;color:#777777;font-size:13px;line-height:1.6;">Your submitted payment receipt is attached for your records.</p>
             """, request.RequestReference);
 
@@ -166,23 +168,27 @@ public class SmtpEmailService : IEmailService
         return SendMessageAsync(email, $"Welcome to TDK - {profileType}", plainText, html, null, cancellationToken, true);
     }
 
-    public Task SendCancellationAsync(Booking booking, string courtName, string reason, CancellationToken cancellationToken = default)
+    public Task SendCancellationAsync(Booking booking, string courtName, string reason, bool isDeclinedRequest = false, CancellationToken cancellationToken = default)
     {
-        var plainText = $"Hello {booking.CustomerName},\n\nYour booking {booking.BookingReference} has been cancelled.\n\nCancellation reason: {reason}\n\nCourt: {courtName}\nDate: {booking.BookingDate:MMMM d, yyyy}\nTime: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}\n\nIf you have any questions, please contact The Dirty Kitchen directly.";
+        var action = isDeclinedRequest ? "declined" : "cancelled";
+        var eyebrow = isDeclinedRequest ? "Booking request declined" : "Booking cancelled";
+        var reasonLabel = isDeclinedRequest ? "Reason for declining" : "Cancellation reason";
+        var bookingLabel = isDeclinedRequest ? "booking request" : "booking";
+        var plainText = $"Hello {booking.CustomerName},\n\nYour {bookingLabel} {booking.BookingReference} has been {action}.\n\n{reasonLabel}: {reason}\n\nCourt: {courtName}\nDate: {booking.BookingDate:MMMM d, yyyy}\nTime: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}\n\nIf you have any questions, please contact The Dirty Kitchen directly.";
         var html = WrapEmail($"""
-            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Booking cancelled</div>
-            <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">Your booking has been cancelled.</h1>
-            <p style="margin:0 0 24px;color:#666666;font-size:15px;line-height:1.7;">Hello {Encode(booking.CustomerName)}, your booking has been cancelled by the store.</p>
+            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">{eyebrow}</div>
+            <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">Your {bookingLabel} has been {action}.</h1>
+            <p style="margin:0 0 24px;color:#666666;font-size:15px;line-height:1.7;">Hello {Encode(booking.CustomerName)}, your {bookingLabel} has been {action} by the store.</p>
             <div style="margin:0 0 24px;">
               {DetailRow("Reference", booking.BookingReference)}
               {DetailRow("Court", courtName)}
               {DetailRow("Date", booking.BookingDate.ToString("MMMM d, yyyy"))}
               {DetailRow("Time", $"{booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}", true)}
             </div>
-            <div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid {BrandRed};background:#fafafa;color:#555555;font-size:13px;line-height:1.6;"><strong style="color:#111111;">Cancellation reason:</strong><br>{Encode(reason)}</div>
+            <div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid {BrandRed};background:#fafafa;color:#555555;font-size:13px;line-height:1.6;"><strong style="color:#111111;">{reasonLabel}:</strong><br>{Encode(reason)}</div>
             <p style="margin:0;color:#777777;font-size:13px;line-height:1.6;">If you have any questions, please contact The Dirty Kitchen directly.</p>
             """, booking.BookingReference);
-        return SendMessageAsync(booking.Email, $"Your booking has been cancelled - {booking.BookingReference}", plainText, html, null, cancellationToken, true);
+        return SendMessageAsync(booking.Email, $"Your {bookingLabel} has been {action} - {booking.BookingReference}", plainText, html, null, cancellationToken, true);
     }
 
     public Task SendStorageCleanupSummaryAsync(string deletedByName, string deletedByEmail, DateOnly fromDate, DateOnly throughDate, int scheduleCount, int bookingCount, int receiptCount, CancellationToken cancellationToken = default)

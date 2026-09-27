@@ -18,6 +18,7 @@ export const useBookings = () => {
 };
 
 export const useVerifyBooking = () => useMutation({ mutationFn: bookingsService.verifyBooking });
+export const useVerifyBookingRequest = () => useMutation({ mutationFn: bookingsService.verifyBookingRequest });
 
 export const useUpdateBooking = () => {
   const queryClient = useQueryClient();

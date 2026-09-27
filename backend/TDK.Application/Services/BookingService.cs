@@ -460,6 +460,42 @@ public class BookingService : IBookingService
         return ApiResponse<BookingDto>.Ok(publicDto, "Valid booking");
     }
 
+    public async Task<ApiResponse<PublicBookingRequestStatusDto>> VerifyRequestAsync(string requestReference)
+    {
+        var normalized = requestReference.Trim().ToUpperInvariant();
+        if (!IsValidPublicRequestReference(normalized))
+            return ApiResponse<PublicBookingRequestStatusDto>.Fail("Booking request reference is invalid");
+
+        var marker = $"[PublicRequest:{normalized}]";
+        var bookings = (await _bookings.FindAsync(booking => booking.Notes != null && booking.Notes.Contains(marker)))
+            .OrderBy(booking => booking.BookingDate)
+            .ThenBy(booking => booking.StartTime)
+            .ToList();
+        if (bookings.Count == 0)
+            return ApiResponse<PublicBookingRequestStatusDto>.Fail("Booking request was not found");
+
+        var courts = (await _courts.GetAllAsync()).ToDictionary(court => court.Id, court => court.Name);
+        var schedules = bookings.Select(booking => new PublicBookingRequestStatusScheduleDto(
+            booking.BookingReference,
+            courts.GetValueOrDefault(booking.CourtId, "Court"),
+            booking.BookingDate,
+            booking.StartTime,
+            booking.EndTime,
+            booking.TotalAmount,
+            booking.Status)).ToList();
+        var status = bookings.All(booking => booking.Status == BookingStatus.Requested)
+            ? "Pending review"
+            : bookings.All(booking => booking.Status == BookingStatus.Cancelled)
+                ? "Declined"
+                : bookings.All(booking => booking.Status is BookingStatus.Paid or BookingStatus.Reserved or BookingStatus.Completed)
+                    ? "Confirmed"
+                    : "Partially processed";
+
+        return ApiResponse<PublicBookingRequestStatusDto>.Ok(
+            new(normalized, status, bookings.Min(booking => booking.CreatedAt), bookings.Sum(booking => booking.TotalAmount), schedules),
+            "Booking request found");
+    }
+
     public async Task<ApiResponse<BookingDto>> UpdateAsync(long id, UpdateBookingRequest request, string userId, string userName)
     {
         var b = await _bookings.GetByIdAsync(id);
@@ -645,9 +681,14 @@ public class BookingService : IBookingService
 
     public async Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName, string reason)
     {
+        var normalizedReason = reason?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedReason)) return ApiResponse<bool>.Fail("Cancellation reason is required");
+        if (normalizedReason.Length > 500) return ApiResponse<bool>.Fail("Cancellation reason must be 500 characters or fewer");
+
         var booking = await _bookings.GetByIdAsync(id);
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
         if (booking.Status is not (BookingStatus.Reserved or BookingStatus.Requested)) return ApiResponse<bool>.Fail("Only reservations and booking requests can be cancelled");
+        var wasRequested = booking.Status == BookingStatus.Requested;
         var manilaNow = _clock.ManilaNow;
         booking.Status = BookingStatus.Cancelled;
         booking.CancelledAt = manilaNow;
@@ -660,10 +701,10 @@ public class BookingService : IBookingService
         if (_email.IsConfigured && !string.IsNullOrWhiteSpace(booking.Email))
         {
             var courtName = (await _courts.GetByIdAsync(booking.CourtId))?.Name ?? "Court";
-            try { await _email.SendCancellationAsync(booking, courtName, reason); }
+            try { await _email.SendCancellationAsync(booking, courtName, normalizedReason, wasRequested); }
             catch { /* email failure is non-critical; booking is already cancelled */ }
         }
-        return ApiResponse<bool>.Ok(true, "Booking cancelled");
+        return ApiResponse<bool>.Ok(true, wasRequested ? "Booking request declined" : "Booking cancelled");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(long id)
@@ -805,7 +846,25 @@ public class BookingService : IBookingService
     }
     private static string NormalizeActorName(string? userName, string fallback = "Staff") => string.IsNullOrWhiteSpace(userName) ? fallback : userName.Trim();
     private static int Minutes(TimeOnly value, bool midnightAsEnd) => value == TimeOnly.MinValue && midnightAsEnd ? 1440 : value.Hour * 60 + value.Minute;
-    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee, b.ListedByName, b.VoidedPaddleRentalQuantity, b.VoidedPaddleRentalFee, b.PaddleRentalVoidedAt, b.PaddleRentalVoidedByName, b.RescheduledByName, b.CancelledAt, b.CancelledByName, b.ConfirmedAt, b.ConfirmedByName);
+    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee, b.ListedByName, b.VoidedPaddleRentalQuantity, b.VoidedPaddleRentalFee, b.PaddleRentalVoidedAt, b.PaddleRentalVoidedByName, b.RescheduledByName, b.CancelledAt, b.CancelledByName, b.ConfirmedAt, b.ConfirmedByName, ExtractPublicRequestReference(b.Notes));
+
+    private static string? ExtractPublicRequestReference(string? notes)
+    {
+        const string prefix = "[PublicRequest:";
+        if (string.IsNullOrWhiteSpace(notes)) return null;
+        var start = notes.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+        if (start < 0) return null;
+        var valueStart = start + prefix.Length;
+        var end = notes.IndexOf(']', valueStart);
+        if (end <= valueStart) return null;
+        var value = notes[valueStart..end].ToUpperInvariant();
+        return IsValidPublicRequestReference(value) ? value : null;
+    }
+
+    private static bool IsValidPublicRequestReference(string value) =>
+        value.Length == 19 && value.StartsWith("REQ-", StringComparison.Ordinal) &&
+        value.AsSpan(4, 8).ToString().All(char.IsDigit) && value[12] == '-' &&
+        value.AsSpan(13, 6).ToString().All(char.IsDigit);
 
     private string? ValidatePromoAvailability(Promo promo, RateType rateType)
     {
@@ -843,4 +902,3 @@ public class BookingService : IBookingService
         return Math.Clamp(discount, 0, subtotal);
     }
 }
-

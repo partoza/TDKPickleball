@@ -180,6 +180,17 @@ public class BookingController : ControllerBase
     [EnableRateLimiting("PublicRead")]
     public async Task<IActionResult> Verify(VerifyBookingRequest request) => Ok(await _bookingService.VerifyAsync(request.BookingReference));
 
+    [HttpPost("api/booking-requests/verify")]
+    [EnableRateLimiting("PublicRead")]
+    public async Task<IActionResult> VerifyRequest([FromBody] VerifyPublicBookingRequest request)
+    {
+        var reference = request.RequestReference?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(reference) || !System.Text.RegularExpressions.Regex.IsMatch(reference, "^REQ-[0-9]{8}-[0-9]{6}$"))
+            return BadRequest(new { success = false, message = "Enter a request reference in REQ-YYYYMMDD-123456 format" });
+        var result = await _bookingService.VerifyRequestAsync(reference);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
     [HttpGet("api/admin/bookings")]
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> GetAll() => Ok(await _bookingService.GetAllAsync());
@@ -237,7 +248,11 @@ public class BookingController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request?.Reason))
             return BadRequest(new { success = false, message = "Cancellation reason is required" });
-        return Ok(await _bookingService.CancelAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff", request.Reason));
+        var reason = request.Reason.Trim();
+        if (reason.Length > 500)
+            return BadRequest(new { success = false, message = "Cancellation reason must be 500 characters or fewer" });
+        var result = await _bookingService.CancelAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", User.FindFirstValue(ClaimTypes.Name) ?? "Staff", reason);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpPost("api/admin/bookings/{id}/complete")]
