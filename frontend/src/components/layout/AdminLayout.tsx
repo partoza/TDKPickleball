@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar, MegaphoneIcon as Megaphone } from '@heroicons/react/24/solid';
+import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar, MegaphoneIcon as Megaphone, ArrowPathIcon as Refresh } from '@heroicons/react/24/solid';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
 import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
 
 function notificationHref(title: string) {
@@ -31,6 +32,15 @@ export default function AdminLayout() {
   const canReceiveNotifications = isAuthenticated && (user?.role === 'Admin' || user?.role === 'Staff');
   const notificationsQuery = useNotifications(canReceiveNotifications);
   const [seenNotificationIds, setSeenNotificationIds] = useState<number[]>([]);
+
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(
     (localStorage.getItem('tdk-theme') as 'light' | 'dark' | 'system') || 'system'
@@ -130,9 +140,12 @@ export default function AdminLayout() {
             <Button variant="ghost" size="icon" className="mac-toolbar-button text-muted-foreground hover:text-foreground md:hidden" onClick={toggleTheme} aria-label="Toggle theme">
               <Sun className="h-5 w-5 hidden dark:block" />
               <Moon className="h-5 w-5 block dark:hidden" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleRefresh} className="mac-toolbar-button text-muted-foreground hover:text-foreground relative hover:scale-[1.03] active:scale-[0.85] active:opacity-75 transition-all duration-200" aria-label="Refresh data">
+                <Refresh className={cn("h-5 w-5", isRefreshing && "animate-spin")} />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="mac-toolbar-button text-muted-foreground hover:text-foreground relative" aria-label={`${unreadNotifications.length} unread notifications`}>
                   <Bell className="h-5 w-5" />
                   {unreadNotifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[#252527]">{unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}</span>}
@@ -145,7 +158,7 @@ export default function AdminLayout() {
                 </div>
                 <DropdownMenuSeparator />
                 <div className="max-h-[360px] overflow-y-auto">
-                  {notificationsQuery.isLoading && <p className="px-3 py-6 text-center text-xs text-muted-foreground">Loading notifications…</p>}
+                  {notificationsQuery.isLoading && <p className="px-3 py-6 text-center text-xs text-muted-foreground">Loading notificationsÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦</p>}
                   {notificationsQuery.isError && <button type="button" className="w-full rounded-lg px-3 py-6 text-center text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => notificationsQuery.refetch()}>Notifications could not be loaded. Tap to retry.</button>}
                   {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.map(notification => {
                     const unread = !seenNotificationIds.includes(notification.id);
