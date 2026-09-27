@@ -93,7 +93,7 @@ public class MaintenanceHostedService : BackgroundService
             (x.BookingId.HasValue && !db.Bookings.Any(booking => booking.Id == x.BookingId && booking.Status != BookingStatus.Cancelled && booking.Status != BookingStatus.Completed)))
             .ExecuteDeleteAsync(token);
         var overflowIds = await db.Notifications.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
-            .Skip(10).Select(x => x.Id).ToListAsync(token);
+            .Skip(20).Select(x => x.Id).ToListAsync(token);
         if (overflowIds.Count > 0)
             await db.Notifications.Where(x => overflowIds.Contains(x.Id)).ExecuteDeleteAsync(token);
         await db.SaveChangesAsync(token);

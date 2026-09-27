@@ -6,6 +6,6 @@ export const useNotifications = (enabled = true) => useQuery({
   queryKey: [QUERY_KEYS.NOTIFICATIONS],
   queryFn: notificationsService.getNotifications,
   enabled,
-  refetchInterval: 60_000,
+  refetchInterval: 15_000,
   refetchOnWindowFocus: true,
 });

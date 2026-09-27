@@ -198,6 +198,9 @@ public class BookingService : IBookingService
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("The booking request could not be recorded. Please try again.");
         }
 
+        await TryAddNotificationAsync(
+            "New booking request",
+            $"{request.CustomerName.Trim()} submitted {requestReference} with {createdBookings.Count} requested schedule{(createdBookings.Count == 1 ? "" : "s")}.");
         return ApiResponse<PublicBookingRequestReceiptDto>.Ok(
             new(requestReference, submittedAt),
             "Booking request recorded and awaiting admin confirmation.");
@@ -306,6 +309,9 @@ public class BookingService : IBookingService
             }
         }
 
+        await TryAddNotificationAsync(
+            "New PayMongo booking request",
+            $"{request.CustomerName.Trim()} started {requestReference} with {createdRefs.Count} booking schedule{(createdRefs.Count == 1 ? "" : "s")}.");
         return ApiResponse<PublicPayMongoRequestResponseDto>.Ok(new(requestReference, checkoutUrl, submittedAt, createdRefs));
     }
 
@@ -865,6 +871,27 @@ public class BookingService : IBookingService
         value.Length == 19 && value.StartsWith("REQ-", StringComparison.Ordinal) &&
         value.AsSpan(4, 8).ToString().All(char.IsDigit) && value[12] == '-' &&
         value.AsSpan(13, 6).ToString().All(char.IsDigit);
+
+    private async Task TryAddNotificationAsync(string title, string message, long? bookingId = null)
+    {
+        try
+        {
+            var nowUtc = _clock.UtcNow.UtcDateTime;
+            await _notifications.AddAsync(new Notification
+            {
+                BookingId = bookingId,
+                Title = title.Length <= 100 ? title : title[..100],
+                Message = message.Length <= 500 ? message : message[..500],
+                CreatedAt = nowUtc,
+                ExpiresAt = nowUtc.AddDays(30)
+            });
+            await _notifications.SaveChangesAsync();
+        }
+        catch
+        {
+            // The booking request is already recorded; notification delivery is non-critical.
+        }
+    }
 
     private string? ValidatePromoAvailability(Promo promo, RateType rateType)
     {

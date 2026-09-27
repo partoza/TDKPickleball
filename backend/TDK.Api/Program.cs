@@ -6,6 +6,7 @@ using TDK.Infrastructure.Data;
 using TDK.Infrastructure.Identity;
 using System.Threading.RateLimiting;
 using TDK.Api.Serialization;
+using TDK.Api.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +18,8 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-builder.Services.AddControllers().AddJsonOptions(options => {
+builder.Services.AddScoped<AdminActionNotificationFilter>();
+builder.Services.AddControllers(options => options.Filters.AddService<AdminActionNotificationFilter>()).AddJsonOptions(options => {
     options.JsonSerializerOptions.Converters.Add(new FlexibleTimeOnlyJsonConverter());
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });

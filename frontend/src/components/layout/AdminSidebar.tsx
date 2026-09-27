@@ -20,7 +20,7 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ unreadNotificationCount = 0 }: { unreadNotificationCount?: number }) {
   const location = useLocation();
   const { logout, user } = useAuth();
   
@@ -85,7 +85,9 @@ export default function AdminSidebar() {
                 <item.icon className="h-[15px] w-[15px]" strokeWidth={1.8} />
               </span>
               <span className="truncate">{item.label}</span>
-              {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
+              {item.label === 'Bookings' && unreadNotificationCount > 0
+                ? <span className="ml-auto grid min-h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold leading-none text-primary-foreground shadow-sm" aria-label={`${unreadNotificationCount} unread notifications`}>{unreadNotificationCount}</span>
+                : isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
             </Link>
           );
         })}

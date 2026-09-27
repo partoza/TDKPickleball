@@ -58,5 +58,5 @@ export const ROUTES = {
 
 export const EXTERNAL_LINKS = {
   FACEBOOK_PAGE: 'https://www.facebook.com/profile.php?id=61592414877242',
-  FACEBOOK_MESSAGE: 'https://m.me/61592414877242',
+  FACEBOOK_MESSAGE: 'https://www.facebook.com/profile.php?id=61592414877242',
 } as const;

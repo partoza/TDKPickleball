@@ -9,6 +9,7 @@ namespace TDK.Application.Services;
 
 public sealed class NotificationService : INotificationService
 {
+    private const int MaximumNotificationCount = 20;
     private readonly IRepository<Notification> _notifications;
     private readonly IRepository<Booking> _bookings;
     private readonly IBusinessClock _clock;
@@ -28,10 +29,24 @@ public sealed class NotificationService : INotificationService
             .Select(booking => booking.Id)
             .ToHashSet();
 
-        var items = (await _notifications.FindAsync(notification => notification.ExpiresAt > nowUtc))
-            .Where(notification => !notification.BookingId.HasValue || activeBookingIds.Contains(notification.BookingId.Value))
+        var allNotifications = (await _notifications.GetAllAsync())
             .OrderByDescending(notification => notification.CreatedAt)
-            .Take(10)
+            .ThenByDescending(notification => notification.Id)
+            .ToList();
+        var retainedNotifications = allNotifications
+            .Where(notification => notification.ExpiresAt > nowUtc)
+            .Where(notification => !notification.BookingId.HasValue || activeBookingIds.Contains(notification.BookingId.Value))
+            .Take(MaximumNotificationCount)
+            .ToList();
+        var retainedIds = retainedNotifications.Select(notification => notification.Id).ToHashSet();
+        var notificationsToDelete = allNotifications.Where(notification => !retainedIds.Contains(notification.Id)).ToList();
+        if (notificationsToDelete.Count > 0)
+        {
+            foreach (var notification in notificationsToDelete) _notifications.Delete(notification);
+            await _notifications.SaveChangesAsync();
+        }
+
+        var items = retainedNotifications
             .Select(notification => new NotificationDto(
                 notification.Id,
                 notification.BookingId,

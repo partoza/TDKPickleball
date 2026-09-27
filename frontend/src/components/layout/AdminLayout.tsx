@@ -13,6 +13,18 @@ import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
 
+function notificationHref(title: string) {
+  const normalized = title.toLowerCase();
+  if (normalized.includes('schedule')) return ROUTES.ADMIN.SCHEDULE;
+  if (normalized.includes('rate')) return ROUTES.ADMIN.RATES;
+  if (normalized.includes('court')) return ROUTES.ADMIN.COURTS;
+  if (normalized.includes('promo')) return ROUTES.ADMIN.PROMOS;
+  if (normalized.includes('coach')) return ROUTES.ADMIN.INTERNAL_COACHES;
+  if (normalized.includes('storage') || normalized.includes('cleanup')) return ROUTES.ADMIN.STORAGE;
+  if (normalized.includes('user') || normalized.includes('staff') || normalized.includes('admin')) return ROUTES.ADMIN.ADMINS;
+  return ROUTES.ADMIN.BOOKINGS;
+}
+
 export default function AdminLayout() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const location = useLocation();
@@ -107,7 +119,7 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-shell flex min-h-screen">
-      <AdminSidebar />
+      <AdminSidebar unreadNotificationCount={unreadNotifications.length} />
       <div className="admin-workspace flex-1 flex flex-col min-w-0 md:pl-72 pb-16 md:pb-0">
         <header className="admin-topbar sticky top-0 z-30 flex h-16 items-center justify-between px-4 md:px-5 lg:px-7">
           <div className="flex items-center gap-3 min-w-0">
@@ -138,13 +150,13 @@ export default function AdminLayout() {
                   {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.map(notification => {
                     const unread = !seenNotificationIds.includes(notification.id);
                     return <DropdownMenuItem key={notification.id} asChild className="mb-0.5 cursor-pointer items-start rounded-lg p-0 focus:bg-accent">
-                      <Link to={ROUTES.ADMIN.BOOKINGS} className="flex w-full items-start gap-3 px-3 py-3" onClick={() => markNotificationsSeen([notification.id])}>
+                      <Link to={notificationHref(notification.title)} className="flex w-full items-start gap-3 px-3 py-3" onClick={() => markNotificationsSeen([notification.id])}>
                         <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} />
                         <span className="min-w-0 flex-1"><span className={cn('block truncate text-xs', unread ? 'font-bold' : 'font-semibold')}>{notification.title}</span><span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{notification.message}</span><span className="mt-1.5 block text-[10px] text-muted-foreground/70">{formatDistanceToNow(new Date(notification.createdAtUtc), { addSuffix: true })}</span></span>
                       </Link>
                     </DropdownMenuItem>;
                   })}
-                  {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.length === 0 && <div className="px-4 py-8 text-center"><Bell className="mx-auto h-6 w-6 text-muted-foreground/50" /><p className="mt-2 text-xs font-semibold">No notifications</p><p className="mt-1 text-[11px] text-muted-foreground">Schedule and balance reminders will appear here.</p></div>}
+                  {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.length === 0 && <div className="px-4 py-8 text-center"><Bell className="mx-auto h-6 w-6 text-muted-foreground/50" /><p className="mt-2 text-xs font-semibold">No notifications</p><p className="mt-1 text-[11px] text-muted-foreground">Admin activity, booking requests, and reminders will appear here.</p></div>}
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
