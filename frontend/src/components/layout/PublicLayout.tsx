@@ -10,18 +10,13 @@ export default function PublicLayout() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const saved = localStorage.getItem('tdk-theme');
-    const updateTheme = () => {
-      if (saved === 'light' || saved === 'dark') { root.classList.remove('light', 'dark'); root.classList.add(saved); return; }
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.remove('light', 'dark');
-      root.classList.add(isDark ? 'dark' : 'light');
+    const prev = root.classList.contains('dark') ? 'dark' : 'light';
+    root.classList.remove('dark');
+    root.classList.add('light');
+    return () => {
+      root.classList.remove('light');
+      root.classList.add(prev);
     };
-    updateTheme();
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => { if (!localStorage.getItem('tdk-theme')) updateTheme(); };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
   }, []);
 
   return (
