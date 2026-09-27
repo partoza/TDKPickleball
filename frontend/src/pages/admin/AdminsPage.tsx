@@ -153,7 +153,7 @@ export default function AdminsPage() {
           <div className="sm:col-span-2"><Field label="Email" placeholder="e.g. juan@example.com" type="email" value={form.email} error={errors.email} onChange={value => setForm({ ...form, email: value })} /></div>
           <div className="sm:col-span-2"><Label>Role</Label><Select value={form.role} onValueChange={role => setForm({ ...form, role })}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent><SelectItem value="Staff">Staff</SelectItem><SelectItem value="Admin">Admin</SelectItem></SelectContent></Select></div>
         </div>
-        <DialogFooter><Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button><Button onClick={save} disabled={create.isPending}>Send Invitation{create.isPending && <LoadingIndicator label="Sending invitation" />}</Button></DialogFooter>
+        <DialogFooter><Button data-modal-action="cancel" type="button" variant="outline" onClick={closeDialog}>Cancel</Button><Button data-modal-action="confirm" onClick={save} disabled={create.isPending}>Send Invitation{create.isPending && <LoadingIndicator label="Sending invitation" />}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
     <AdminCredentialDeleteDialog open={!!deleteTarget} title={`Delete ${deleteTarget?.firstName || 'user'} ${deleteTarget?.lastName || ''}?`} description="This permanently removes the inactive user and their Cloudinary profile image. This cannot be undone." pending={remove.isPending} onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={credentials => { if (deleteTarget) remove.mutate({ userId: deleteTarget.id, credentials }); }} />

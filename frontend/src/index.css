@@ -234,28 +234,6 @@
   letter-spacing: .01em;
 }
 
-[data-slot="dialog-footer"] [data-slot="button"]:first-of-type {
-  border-color: rgb(220 38 38) !important;
-  background: rgb(220 38 38) !important;
-  color: white !important;
-}
-
-[data-slot="dialog-footer"] [data-slot="button"]:first-of-type:hover {
-  border-color: rgb(185 28 28) !important;
-  background: rgb(185 28 28) !important;
-}
-
-[data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]) {
-  border-color: rgb(5 150 105) !important;
-  background: rgb(5 150 105) !important;
-  color: white !important;
-}
-
-[data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]):hover {
-  border-color: rgb(4 120 87) !important;
-  background: rgb(4 120 87) !important;
-}
-
 [data-slot="dialog-footer"] [data-slot="button"][data-variant="destructive"],
 [data-slot="dialog-footer"] [data-modal-action="danger"],
 [data-slot="dialog-footer"] [data-modal-action="cancel"],
@@ -278,18 +256,6 @@
   padding: 0;
 }
 
-.schedule-form-modal > div.border-t:last-of-type button:not(:last-of-type) {
-  border-color: rgb(220 38 38) !important;
-  background: rgb(220 38 38) !important;
-  color: white !important;
-}
-
-.schedule-form-modal > div.border-t:last-of-type button:last-of-type {
-  border-color: rgb(5 150 105) !important;
-  background: rgb(5 150 105) !important;
-  color: white !important;
-}
-
 .schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="cancel"],
 .schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="danger"] {
   border-color: rgb(220 38 38) !important;
@@ -303,8 +269,8 @@
   color: white !important;
 }
 
-.dark [data-slot="dialog-footer"] [data-slot="button"]:last-of-type:not(:only-of-type):not([data-variant="destructive"]),
-.dark .schedule-form-modal > div.border-t:last-of-type button:last-of-type {
+.dark [data-slot="dialog-footer"] [data-modal-action="confirm"]:not([class~="bg-destructive"]),
+.dark .schedule-form-modal > [data-slot="dialog-footer"] [data-modal-action="confirm"] {
   border-color: rgb(22 163 74) !important;
   background: rgb(22 163 74) !important;
 }

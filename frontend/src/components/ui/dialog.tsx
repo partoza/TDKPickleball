@@ -70,7 +70,7 @@ const DialogContent = React.forwardRef<
         {footer}
       </> : children}
       {!hasFooter && <DialogFooter>
-        <DialogPrimitive.Close asChild><Button type="button" variant="destructive">Close</Button></DialogPrimitive.Close>
+        <DialogPrimitive.Close asChild><Button type="button" variant="outline">Close</Button></DialogPrimitive.Close>
       </DialogFooter>}
       <DialogPrimitive.Close data-slot="dialog-close" className="absolute right-4 top-4 z-30 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-[color,background-color,transform,box-shadow] duration-150 hover:bg-muted hover:text-foreground active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed">
         <X className="h-4 w-4" />
