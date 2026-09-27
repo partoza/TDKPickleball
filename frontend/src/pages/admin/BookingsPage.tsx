@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
@@ -151,7 +151,7 @@ export default function BookingsPage() {
     if (includeContact && !form.customerName.trim()) errors.customerName = 'Booked by is required.';
     if (includeContact && form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address.';
     if (includeContact && Number(form.amountPaid) < 0) errors.amountPaid = 'Amount paid cannot be negative.';
-    else if (includeContact && selectedQuote.covered && Number(form.amountPaid) > selectedQuote.total) errors.amountPaid = `Amount paid cannot exceed the total of ₱${selectedQuote.total.toLocaleString()}.`;
+    else if (includeContact && selectedQuote.covered && Number(form.amountPaid) > selectedQuote.total) errors.amountPaid = `Amount paid cannot exceed the total of ?${selectedQuote.total.toLocaleString()}.`;
     if (includeContact && form.startTime && form.endTime && !calculateRateQuote(rates, form.startTime, form.endTime, form.rateType).covered) errors.rate = 'No active rate covers the complete selected time.';
     return errors;
   };
@@ -160,7 +160,7 @@ export default function BookingsPage() {
     if (!form.customerName.trim()) errors.customerName = 'Booked by is required.';
     if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address.';
     if (form.paymentStatus === BookingStatus.Reserved && Number(form.amountPaid) < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
-    else if (form.paymentStatus === BookingStatus.Reserved && Number(form.amountPaid) > addGrandTotal) errors.amountPaid = `Reservation amount cannot exceed the total of ₱${addGrandTotal.toLocaleString()}.`;
+    else if (form.paymentStatus === BookingStatus.Reserved && Number(form.amountPaid) > addGrandTotal) errors.amountPaid = `Reservation amount cannot exceed the total of ?${addGrandTotal.toLocaleString()}.`;
     const nextBlockErrors = validateBookingBlocks(addBlocks, rates, form.rateType);
     setFormErrors(errors);
     setBlockErrors(nextBlockErrors);
@@ -272,15 +272,15 @@ export default function BookingsPage() {
   };
 
 
-  if (isLoading) return <AdminPageSkeleton label="Loading bookings" />;
+  if (isLoading) return <AdminPageSkeleton layout="table" label="Loading bookings" />;
 
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Bookings</h1><p className="text-slate-500 mt-1">Reservations, payments, rescheduling, and QR verification in one place.</p></div><div className="flex gap-2"><Button variant="outline" className="h-10 gap-2 bg-background font-semibold shadow-sm hover:bg-accent" onClick={() => setShowScanner(true)}><ScanLine className="h-4 w-4" />Scan QR</Button><Button onClick={() => { setForm(emptyForm); setAddBlocks([createBookingBlock()]); setFormErrors({}); setBlockErrors([]); setShowAdd(true); }}><Plus className="h-4 w-4" />Add Booking</Button></div></div>
     <Card className="rounded-2xl overflow-hidden"><CardContent className="p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Filter className="h-4 w-4" /></span><div><p className="font-semibold">Find a booking</p><p className="text-xs text-muted-foreground">Search and combine filters to narrow the records.</p></div></div>{hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Clear filters</Button>}</div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><div className="relative xl:col-span-2"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Reference or booked by" /></div><Select value={courtFilter} onValueChange={v => { setCourtFilter(v); setPage(0); }}><SelectTrigger><SelectValue placeholder="All courts" /></SelectTrigger><SelectContent><SelectItem value="all">All courts</SelectItem>{courts.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(0); }}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="Requested">Booking Requested</SelectItem><SelectItem value="Reserved">Reservation</SelectItem><SelectItem value="Paid">Paid</SelectItem><SelectItem value="Cancelled">Cancelled</SelectItem><SelectItem value="Completed">Completed</SelectItem></SelectContent></Select><Select value={paymentFilter} onValueChange={v => { setPaymentFilter(v); setPage(0); }}><SelectTrigger><SelectValue placeholder="All payments" /></SelectTrigger><SelectContent><SelectItem value="all">All payments</SelectItem><SelectItem value="paid">Fully paid</SelectItem><SelectItem value="balance">Remaining balance</SelectItem></SelectContent></Select><div className="md:col-span-2 xl:col-span-2"><AdminDatePicker value={scheduleDate} onChange={v => { setScheduleDate(v); setPage(0); }} placeholder="Any schedule date" /></div></div></CardContent></Card>
-    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Matching bookings" value={filteredBookings.length.toString()} /><Metric label="Paid" value={filteredBookings.filter(b => b.status === 'Paid').length.toString()} /><Metric label="Remaining balance" value={`₱${totalRemaining.toLocaleString()}`} /></div>
+    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Matching bookings" value={filteredBookings.length.toString()} /><Metric label="Paid" value={filteredBookings.filter(b => b.status === 'Paid').length.toString()} /><Metric label="Remaining balance" value={`?${totalRemaining.toLocaleString()}`} /></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>Booking records</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-3">{[1,2,3,4].map(x => <Skeleton key={x} className="h-14 w-full rounded-xl" />)}</div> : <div className="space-y-4">
       <div className="overflow-x-auto rounded-xl border hidden md:block"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Booked by</TableHead><TableHead>Schedule</TableHead><TableHead>Payment</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
-      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell><div className="font-mono text-xs font-semibold">{b.bookingReference}</div>{b.status === BookingStatus.Requested && getRequestReference(b) && <div className="mt-1 font-mono text-[10px] font-semibold text-primary">{getRequestReference(b)}</div>}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` · ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}–{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={bookingStatusClass(b.status)}>{bookingStatusLabel(b.status)}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== BookingStatus.Cancelled && b.status !== BookingStatus.Requested && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity < 50 && <IconButton label="Add paddle rental" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity > 0 && <IconButton label="Void paddle rental" onClick={() => setVoidPaddleTarget(b)}><VoidIcon /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label={b.status === BookingStatus.Requested ? 'Confirm booking request' : 'Mark paid'} onClick={() => setPaymentActionTarget(b)}><Check /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label="Cancel" onClick={() => setCancelTarget(b)}><X /></IconButton>}{b.status === BookingStatus.Cancelled && <IconButton label="Delete" onClick={() => setDeleteTarget(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
+      {paginatedBookings.map(b => <TableRow key={b.id}><TableCell><div className="font-mono text-xs font-semibold">{b.bookingReference}</div>{b.status === BookingStatus.Requested && getRequestReference(b) && <div className="mt-1 font-mono text-[10px] font-semibold text-primary">{getRequestReference(b)}</div>}</TableCell><TableCell><div className="font-medium">{b.customerName}</div><div className="text-xs text-slate-500">{b.email || 'No email'}{b.phone ? ` � ${b.phone}` : ''}</div></TableCell><TableCell><div className="flex flex-wrap items-center gap-2"><span>{b.courtName} � {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')}</span><BookingTypeBadge type={b.bookingType} /></div><div className="text-xs text-slate-500">{time(b.startTime)}�{time(b.endTime)}</div></TableCell><TableCell><div className="font-medium">?{b.amountPaid.toLocaleString()} / ?{b.totalAmount.toLocaleString()}</div><BalanceStatus booking={b} /></TableCell><TableCell><Badge className={bookingStatusClass(b.status)}>{bookingStatusLabel(b.status)}</Badge></TableCell><TableCell><div className="flex justify-end gap-1"><IconButton label="View" onClick={() => setSelected(b)}><Eye /></IconButton>{b.status !== BookingStatus.Cancelled && b.status !== BookingStatus.Requested && <IconButton label="QR" onClick={() => setQrBooking(b)}><QrCode /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity < 50 && <IconButton label="Add paddle rental" onClick={() => { setPaddleRentalTarget(b); setPaddleRentalQuantity(1); }}><Plus /></IconButton>}{(b.status === BookingStatus.Paid || b.status === BookingStatus.Reserved) && b.paddleRentalQuantity > 0 && <IconButton label="Void paddle rental" onClick={() => setVoidPaddleTarget(b)}><VoidIcon /></IconButton>}{canReschedule(b) && <IconButton label="Reschedule" onClick={() => { setForm({ ...emptyForm, courtId: String(b.courtId), bookingDate: b.bookingDate, startTime: b.startTime.slice(0,5), endTime: b.endTime.slice(0,5), rateType: b.bookingType || RateType.Booking }); setReschedule(b); }}><CalendarClock /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label={b.status === BookingStatus.Requested ? 'Confirm booking request' : 'Mark paid'} onClick={() => setPaymentActionTarget(b)}><Check /></IconButton>}{(b.status === BookingStatus.Reserved || b.status === BookingStatus.Requested) && <IconButton label="Cancel" onClick={() => setCancelTarget(b)}><X /></IconButton>}{b.status === BookingStatus.Cancelled && <IconButton label="Delete" onClick={() => setDeleteTarget(b)}><Trash /></IconButton>}</div></TableCell></TableRow>)}
       {!filteredBookings.length && <TableRow><TableCell colSpan={6} className="py-12 text-center text-slate-500">No bookings match these filters.</TableCell></TableRow>}
     </TableBody></Table></div>
     <div className="grid md:hidden gap-4">
@@ -296,11 +296,11 @@ export default function BookingsPage() {
           </div>
           <div className="text-sm text-muted-foreground flex justify-between">
             <div>
-              <div>{b.courtName} · {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d')}</div>
-              <div className="text-xs">{time(b.startTime)}–{time(b.endTime)}</div>
+              <div>{b.courtName} � {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d')}</div>
+              <div className="text-xs">{time(b.startTime)}�{time(b.endTime)}</div>
             </div>
             <div className="text-right">
-              <div className="font-medium text-foreground">₱{b.amountPaid.toLocaleString()} / ₱{b.totalAmount.toLocaleString()}</div>
+              <div className="font-medium text-foreground">?{b.amountPaid.toLocaleString()} / ?{b.totalAmount.toLocaleString()}</div>
               <BalanceStatus booking={b} />
             </div>
           </div>
@@ -373,7 +373,7 @@ export default function BookingsPage() {
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {promos.filter((p) => isPromoAvailable(p, form.rateType)).map((p) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `?${p.value}`} off</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -388,7 +388,7 @@ export default function BookingsPage() {
                 <div className="mt-1.5 flex items-center justify-between rounded-xl border bg-white p-3 dark:bg-[#3a3a3c]">
                   <div className="flex items-center gap-3">
                     <PaddleIcon className="h-9 w-9" />
-                    <div><p className="text-sm font-semibold">Selkirk Paddle – ₱100 each</p>
+                    <div><p className="text-sm font-semibold">Selkirk Paddle � ?100 each</p>
                     <p className="text-xs text-muted-foreground">Charged once for the complete session.</p></div>
                   </div>
                   <div className="flex items-center rounded-lg border p-1">
@@ -397,16 +397,16 @@ export default function BookingsPage() {
                     <button type="button" className="grid h-8 w-8 place-items-center rounded-md transition-colors hover:bg-accent disabled:opacity-40" disabled={form.paddleRentalQuantity === 50} onClick={() => setForm({...form, paddleRentalQuantity: Math.min(50, form.paddleRentalQuantity + 1)})}><Plus className="h-4 w-4" /></button>
                   </div>
                 </div>
-                {form.paddleRentalQuantity > 0 && <p className="mt-2 text-right text-sm font-semibold text-primary">Paddle rental: ₱{paddleRentalFee.toLocaleString()}</p>}
+                {form.paddleRentalQuantity > 0 && <p className="mt-2 text-right text-sm font-semibold text-primary">Paddle rental: ?{paddleRentalFee.toLocaleString()}</p>}
               </div>
               <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={event => setForm({...form, notes: event.target.value})} placeholder="Optional notes applied to every booking" /></div>
               <div className="sm:col-span-2 mt-1 rounded-xl border border-primary/25 bg-primary/5 p-4" aria-live="polite">
                 <div className="space-y-2 border-b border-primary/15 pb-3 text-sm">
-                  <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Court booking ({addBlocks.length} {addBlocks.length === 1 ? 'block' : 'blocks'})</span><span className="font-semibold">₱{rawGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  {batchDiscount > 0 && <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400"><span>Promo discount</span><span className="font-semibold">−₱{batchDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
-                  <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Paddle rentals × {form.paddleRentalQuantity}</span><span className="font-semibold">₱{paddleRentalFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Court booking ({addBlocks.length} {addBlocks.length === 1 ? 'block' : 'blocks'})</span><span className="font-semibold">?{rawGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  {batchDiscount > 0 && <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400"><span>Promo discount</span><span className="font-semibold">-?{batchDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                  <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Paddle rentals � {form.paddleRentalQuantity}</span><span className="font-semibold">?{paddleRentalFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
-                <div className="flex items-end justify-between gap-4 pt-3"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total amount</p><p className="text-xs text-muted-foreground">Booking and add-ons included</p></div><p className="text-xl font-bold text-primary">₱{addGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
+                <div className="flex items-end justify-between gap-4 pt-3"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total amount</p><p className="text-xs text-muted-foreground">Booking and add-ons included</p></div><p className="text-xl font-bold text-primary">?{addGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
               </div>
             </section>
           </div>
@@ -475,7 +475,7 @@ export default function BookingsPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <Dialog open={!!paddleRentalTarget} onOpenChange={open => { if (!open) { setPaddleRentalTarget(null); setPaddleRentalQuantity(1); } }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Add paddle rental</DialogTitle><DialogDescription>Add paid Selkirk paddle rentals to {paddleRentalTarget?.bookingReference}. The fee is charged once for the remaining session.</DialogDescription></DialogHeader><div className="rounded-2xl border bg-muted/20 p-4"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/15"><PaddleIcon className="h-8 w-8" /></div><div><p className="font-semibold">Selkirk Paddle</p><p className="text-sm text-muted-foreground">₱100 per paddle</p></div></div><div className="flex items-center rounded-xl border bg-background p-1"><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={paddleRentalQuantity === 1} onClick={() => setPaddleRentalQuantity(quantity => Math.max(1, quantity - 1))}><Minus className="h-4 w-4" /></Button><span className="w-10 text-center font-bold">{paddleRentalQuantity}</span><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!paddleRentalTarget || paddleRentalTarget.paddleRentalQuantity + paddleRentalQuantity >= 50} onClick={() => setPaddleRentalQuantity(quantity => Math.min(50 - (paddleRentalTarget?.paddleRentalQuantity || 0), quantity + 1))}><Plus className="h-4 w-4" /></Button></div></div><div className="mt-4 flex items-center justify-between border-t pt-4"><span className="text-sm font-medium">Paid rental fee</span><strong className="text-primary">₱{(paddleRentalQuantity * 100).toLocaleString()}</strong></div></div><DialogFooter><Button variant="outline" onClick={() => setPaddleRentalTarget(null)} disabled={addPaddleRental.isPending}>Cancel</Button><Button onClick={savePaddleRental} disabled={addPaddleRental.isPending}>{addPaddleRental.isPending && <LoadingIndicator className="mr-2" label="Adding paddle rental" />}Add paid rental</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={!!paddleRentalTarget} onOpenChange={open => { if (!open) { setPaddleRentalTarget(null); setPaddleRentalQuantity(1); } }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Add paddle rental</DialogTitle><DialogDescription>Add paid Selkirk paddle rentals to {paddleRentalTarget?.bookingReference}. The fee is charged once for the remaining session.</DialogDescription></DialogHeader><div className="rounded-2xl border bg-muted/20 p-4"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/15"><PaddleIcon className="h-8 w-8" /></div><div><p className="font-semibold">Selkirk Paddle</p><p className="text-sm text-muted-foreground">?100 per paddle</p></div></div><div className="flex items-center rounded-xl border bg-background p-1"><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={paddleRentalQuantity === 1} onClick={() => setPaddleRentalQuantity(quantity => Math.max(1, quantity - 1))}><Minus className="h-4 w-4" /></Button><span className="w-10 text-center font-bold">{paddleRentalQuantity}</span><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!paddleRentalTarget || paddleRentalTarget.paddleRentalQuantity + paddleRentalQuantity >= 50} onClick={() => setPaddleRentalQuantity(quantity => Math.min(50 - (paddleRentalTarget?.paddleRentalQuantity || 0), quantity + 1))}><Plus className="h-4 w-4" /></Button></div></div><div className="mt-4 flex items-center justify-between border-t pt-4"><span className="text-sm font-medium">Paid rental fee</span><strong className="text-primary">?{(paddleRentalQuantity * 100).toLocaleString()}</strong></div></div><DialogFooter><Button variant="outline" onClick={() => setPaddleRentalTarget(null)} disabled={addPaddleRental.isPending}>Cancel</Button><Button onClick={savePaddleRental} disabled={addPaddleRental.isPending}>{addPaddleRental.isPending && <LoadingIndicator className="mr-2" label="Adding paddle rental" />}Add paid rental</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-3 object-contain" /><p className="mb-6 font-bold text-center uppercase tracking-wider" style={{ color: '#861721', fontSize: '12px' }}>Scan this to verify your booking</p><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] w-[56px] h-[56px]" style={{ backgroundColor: '#ffffff' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="w-[38px] h-[38px] object-contain" /></div></div><p className="mt-6 text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoadingIndicator className="mr-2" label="Downloading ticket" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
     <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} />}</DialogContent></Dialog>
     <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoadingIndicator label="Verifying QR code" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
@@ -512,7 +512,7 @@ export default function BookingsPage() {
             disabled={cancel.isPending || !cancelReason.trim()}
             onClick={cancelBooking}
           >
-            {cancel.isPending ? <><LoadingIndicator className="mr-2" label="Updating booking" />Updating…</> : cancelTarget?.status === BookingStatus.Requested ? 'Decline request' : 'Cancel booking'}
+            {cancel.isPending ? <><LoadingIndicator className="mr-2" label="Updating booking" />Updating�</> : cancelTarget?.status === BookingStatus.Requested ? 'Decline request' : 'Cancel booking'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -530,7 +530,7 @@ export default function BookingsPage() {
         {paymentActionTarget && (
           <div className="rounded-xl border bg-muted/25 px-4 py-3 text-sm">
             <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">Booked by</span><span className="font-semibold text-foreground">{paymentActionTarget.customerName}</span></div>
-            <div className="mt-2 flex items-center justify-between gap-4"><span className="text-muted-foreground">Total amount</span><span className="font-semibold text-foreground">₱{paymentActionTarget.totalAmount.toLocaleString()}</span></div>
+            <div className="mt-2 flex items-center justify-between gap-4"><span className="text-muted-foreground">Total amount</span><span className="font-semibold text-foreground">?{paymentActionTarget.totalAmount.toLocaleString()}</span></div>
           </div>
         )}
         <AlertDialogFooter>
@@ -547,7 +547,7 @@ export default function BookingsPage() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Void paddle rental?</AlertDialogTitle>
-          <AlertDialogDescription>This will remove {voidPaddleTarget?.paddleRentalQuantity || 0} active paddle rental{voidPaddleTarget?.paddleRentalQuantity === 1 ? '' : 's'} and reverse ₱{(voidPaddleTarget?.paddleRentalFee || 0).toLocaleString()} from the booking. The voided quantity, staff member, and Manila time will remain in the audit history.</AlertDialogDescription>
+          <AlertDialogDescription>This will remove {voidPaddleTarget?.paddleRentalQuantity || 0} active paddle rental{voidPaddleTarget?.paddleRentalQuantity === 1 ? '' : 's'} and reverse ?{(voidPaddleTarget?.paddleRentalFee || 0).toLocaleString()} from the booking. The voided quantity, staff member, and Manila time will remain in the audit history.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={voidPaddleRental.isPending}>Keep rental</AlertDialogCancel>
@@ -587,8 +587,8 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
         </div>
         <div className="p-4 grid gap-3">
           <Detail k="Name" v={b.customerName} />
-          <Detail k="Email" v={b.email || '—'} />
-          <Detail k="Phone" v={b.phone || '—'} />
+          <Detail k="Email" v={b.email || '�'} />
+          <Detail k="Phone" v={b.phone || '�'} />
         </div>
       </div>
 
@@ -598,7 +598,7 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
         </div>
         <div className="p-4 grid gap-3">
           <Detail k="Court" v={b.courtName} />
-          <Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} />
+          <Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} � ${time(b.startTime)}�${time(b.endTime)}`} />
           <Detail k="Type" v={b.bookingType || RateType.Booking} />
           <Detail k="Status" v={bookingStatusLabel(b.status)} />
           {b.status === BookingStatus.Requested && requestReference && <Detail k="Request reference" v={requestReference} valueClass="font-mono text-primary" />}
@@ -620,22 +620,22 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
           Payment
         </div>
         <div className="p-4 grid gap-3">
-          <Detail k="Court Booking" v={`₱${b.subtotal.toLocaleString()}`} />
-          {b.discountAmount > 0 && <Detail k="Discount" v={`-₱${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />}
-          {b.paddleRentalQuantity > 0 && <Detail k={`Selkirk Paddle Rental × ${b.paddleRentalQuantity}`} v={`₱${b.paddleRentalFee.toLocaleString()}`} />}
-          {b.voidedPaddleRentalQuantity > 0 && <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 dark:border-red-900/60 dark:bg-red-950/20"><div className="grid gap-2"><Detail k={`Voided Paddle Rental × ${b.voidedPaddleRentalQuantity}`} v={`₱${b.voidedPaddleRentalFee.toLocaleString()}`} valueClass="font-semibold text-red-600 dark:text-red-400" /><Detail k="Voided by" v={b.paddleRentalVoidedByName || 'Staff'} /><Detail k="Voided on" v={formatManilaDatabaseTime(b.paddleRentalVoidedAt)} /></div></div>}
-          <div className="border-t dark:border-white/10 pt-3 mt-1"><Detail k="Total" v={`₱${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" /></div>
+          <Detail k="Court Booking" v={`?${b.subtotal.toLocaleString()}`} />
+          {b.discountAmount > 0 && <Detail k="Discount" v={`-?${b.discountAmount.toLocaleString()}`} valueClass="text-emerald-600 dark:text-emerald-400 font-bold" />}
+          {b.paddleRentalQuantity > 0 && <Detail k={`Selkirk Paddle Rental � ${b.paddleRentalQuantity}`} v={`?${b.paddleRentalFee.toLocaleString()}`} />}
+          {b.voidedPaddleRentalQuantity > 0 && <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 dark:border-red-900/60 dark:bg-red-950/20"><div className="grid gap-2"><Detail k={`Voided Paddle Rental � ${b.voidedPaddleRentalQuantity}`} v={`?${b.voidedPaddleRentalFee.toLocaleString()}`} valueClass="font-semibold text-red-600 dark:text-red-400" /><Detail k="Voided by" v={b.paddleRentalVoidedByName || 'Staff'} /><Detail k="Voided on" v={formatManilaDatabaseTime(b.paddleRentalVoidedAt)} /></div></div>}
+          <div className="border-t dark:border-white/10 pt-3 mt-1"><Detail k="Total" v={`?${b.totalAmount.toLocaleString()}`} valueClass="text-lg font-bold" /></div>
           
           <div className="border-t dark:border-white/10 pt-3 mt-1 space-y-3">
             <Detail 
               k="Amount Paid" 
-              v={`₱${b.amountPaid.toLocaleString()}`} 
+              v={`?${b.amountPaid.toLocaleString()}`} 
               valueClass="text-emerald-600 dark:text-emerald-400 font-semibold"
             />
             {!isCancelled && (
               <Detail 
                 k="Balance" 
-                v={b.remainingBalance > 0 ? `₱${b.remainingBalance.toLocaleString()}` : 'Fully Paid'} 
+                v={b.remainingBalance > 0 ? `?${b.remainingBalance.toLocaleString()}` : 'Fully Paid'} 
                 valueClass={b.remainingBalance > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}
               />
             )}
@@ -648,7 +648,7 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
     </div>
   );
 }
-function BalanceStatus({ booking }: { booking: Booking }) { return booking.status === BookingStatus.Cancelled ? <div className="text-xs font-medium text-slate-500">Cancelled · no remaining balance</div> : booking.status === BookingStatus.Requested ? <div className="text-xs font-medium text-blue-600">Awaiting admin confirmation</div> : <div className={booking.remainingBalance ? 'text-xs text-amber-600' : 'text-xs text-emerald-600'}>{booking.remainingBalance ? `₱${booking.remainingBalance.toLocaleString()} remaining` : 'Fully paid'}</div>; }
+function BalanceStatus({ booking }: { booking: Booking }) { return booking.status === BookingStatus.Cancelled ? <div className="text-xs font-medium text-slate-500">Cancelled � no remaining balance</div> : booking.status === BookingStatus.Requested ? <div className="text-xs font-medium text-blue-600">Awaiting admin confirmation</div> : <div className={booking.remainingBalance ? 'text-xs text-amber-600' : 'text-xs text-emerald-600'}>{booking.remainingBalance ? `?${booking.remainingBalance.toLocaleString()} remaining` : 'Fully paid'}</div>; }
 function BookingTypeBadge({ type }: { type?: RateType }) { const value = type || RateType.Booking; return <Badge variant="outline" className={value === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : 'border-primary bg-primary text-primary-foreground'}>{value}</Badge>; }
 function Detail({ k, v, valueClass }: { k: string; v: string; valueClass?: string }) { return <div className="flex justify-between gap-4 items-center"><span className="text-slate-500 dark:text-slate-400">{k}</span><span className={cn("text-right font-medium text-slate-900 dark:text-slate-100", valueClass)}>{v}</span></div>; }
 function FieldError({ message }: { message?: string }) { return message ? <p className="field-error" role="alert">{message}</p> : null; }
@@ -683,9 +683,9 @@ function BookingFields({ form, setForm, courts, rates = [], promos = [], include
 
   return <div className="grid gap-4 py-2">
     <div><Label>Court *</Label><Select value={form.courtId} onValueChange={v => { set('courtId', v); set('startTime', ''); set('endTime', ''); }}><SelectTrigger aria-invalid={!!errors.courtId} className={cn(errors.courtId && 'field-invalid')}><SelectValue placeholder="Select court" /></SelectTrigger><SelectContent>{courts.filter((c: any) => c.isActive).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent></Select><FieldError message={errors.courtId} /></div>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><div><Label>Date *</Label><AdminDatePicker invalid={!!errors.bookingDate} minDate={getManilaDateAsLocalDate(new Date(now))} value={form.bookingDate} onChange={value => { set('bookingDate', value); set('startTime', ''); set('endTime', ''); }} /><FieldError message={errors.bookingDate} /></div><div><Label>Start *</Label><AdminTimeSelect invalid={!!errors.startTime} value={form.startTime} onChange={value => { set('startTime', value); set('endTime', ''); }} options={startOptions} disabled={timeDisabled} placeholder={availabilityLoading ? 'Checking…' : 'Select start'} /><FieldError message={errors.startTime} /></div><div><Label>End *</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} onChange={value => set('endTime', value)} options={endOptions} disabled={timeDisabled || !form.startTime} placeholder="Select end" /><FieldError message={errors.endTime} /></div></div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><div><Label>Date *</Label><AdminDatePicker invalid={!!errors.bookingDate} minDate={getManilaDateAsLocalDate(new Date(now))} value={form.bookingDate} onChange={value => { set('bookingDate', value); set('startTime', ''); set('endTime', ''); }} /><FieldError message={errors.bookingDate} /></div><div><Label>Start *</Label><AdminTimeSelect invalid={!!errors.startTime} value={form.startTime} onChange={value => { set('startTime', value); set('endTime', ''); }} options={startOptions} disabled={timeDisabled} placeholder={availabilityLoading ? 'Checking�' : 'Select start'} /><FieldError message={errors.startTime} /></div><div><Label>End *</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} onChange={value => set('endTime', value)} options={endOptions} disabled={timeDisabled || !form.startTime} placeholder="Select end" /><FieldError message={errors.endTime} /></div></div>
     {form.courtId && form.bookingDate && !availabilityLoading && !slots.length && <p className="rounded-lg bg-primary/5 px-3 py-2 text-xs font-medium text-primary">No configured time slots are available for this court and date.</p>}
-    {!!form.startTime && !!form.endTime && <div><div className={cn('rounded-xl border p-3.5', quote.covered ? 'border-primary/20 bg-primary/5' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20')}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{quote.covered ? quote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${form.rateType || RateType.Booking} rate covers the complete time range.`}</p></div><div className="text-right"><p className="shrink-0 text-base font-bold text-primary">{quote.covered ? (discount > 0 ? <><span className="line-through text-muted-foreground font-normal text-sm mr-2">₱{quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>₱{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</> : `₱${quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) : '—'}</p></div></div></div><FieldError message={errors.rate} /></div>}
+    {!!form.startTime && !!form.endTime && <div><div className={cn('rounded-xl border p-3.5', quote.covered ? 'border-primary/20 bg-primary/5' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20')}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{quote.covered ? quote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr � ?${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${form.rateType || RateType.Booking} rate covers the complete time range.`}</p></div><div className="text-right"><p className="shrink-0 text-base font-bold text-primary">{quote.covered ? (discount > 0 ? <><span className="line-through text-muted-foreground font-normal text-sm mr-2">?{quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>?{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</> : `?${quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) : '�'}</p></div></div></div><FieldError message={errors.rate} /></div>}
     {includeContact && <>
       <div>
         <Label>Promo Code (Optional)</Label>
@@ -694,7 +694,7 @@ function BookingFields({ form, setForm, courts, rates = [], promos = [], include
           <SelectContent>
             <SelectItem value="none">None</SelectItem>
             {promos.filter((p: Promo) => isPromoAvailable(p, form.rateType)).map((p: Promo) => (
-              <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
+              <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `?${p.value}`} off</SelectItem>
             ))}
           </SelectContent>
         </Select>

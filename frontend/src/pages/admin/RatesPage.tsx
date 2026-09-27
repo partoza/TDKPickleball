@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { PencilSquareIcon as Edit2, PlusIcon as Plus, PowerIcon, NoSymbolIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
@@ -82,7 +82,7 @@ export default function RatesPage() {
     disabled: !isValidTimeRange(form.startTime, option.value),
   }));
 
-  if (isLoading) return <AdminPageSkeleton label="Loading rates" />;
+  if (isLoading) return <AdminPageSkeleton layout="table" label="Loading rates" />;
 
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex items-end justify-between">
@@ -99,7 +99,7 @@ export default function RatesPage() {
             <TableCell className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</TableCell>
             <TableCell><RateTypeBadge type={rate.rateType || RateType.Booking} /></TableCell>
             <TableCell>{time(rate.startTime)}</TableCell><TableCell>{time(rate.endTime)}</TableCell>
-            <TableCell className="font-semibold">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</TableCell>
+            <TableCell className="font-semibold">{rate.rateType === RateType.Internal ? 'Free' : `?${rate.pricePerHour.toLocaleString()}`}</TableCell>
             <TableCell><Badge className={rate.isActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''} variant={rate.isActive ? 'default' : 'secondary'}>{rate.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
             <TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4 text-red-600" /> : <PowerIcon className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{rate.isActive ? 'Disable' : 'Enable'}</TooltipContent></Tooltip></TooltipProvider>{!rate.isActive && <Button size="icon" variant="ghost" aria-label="Delete inactive rate" className="text-red-600" onClick={() => setDeleteTarget(rate)}><TrashIcon className="h-4 w-4" /></Button>}</div></TableCell>
           </TableRow>)}</TableBody></Table></div>
@@ -109,7 +109,7 @@ export default function RatesPage() {
               <div key={rate.id} className="rounded-xl border dark:border-white/10 p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</span><RateTypeBadge type={rate.rateType || RateType.Booking} /></div>
-                  <span className="font-semibold text-lg">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</span>
+                  <span className="font-semibold text-lg">{rate.rateType === RateType.Internal ? 'Free' : `?${rate.pricePerHour.toLocaleString()}`}</span>
                 </div>
                 <div className="text-sm text-muted-foreground flex justify-between">
                   <span>{time(rate.startTime)} - {time(rate.endTime)}</span>
@@ -143,7 +143,7 @@ export default function RatesPage() {
           <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value, pricePerHour: value === RateType.Internal ? 0 : form.pricePerHour })}><SelectTrigger><SelectValue placeholder="Select rate type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
           <div><Label>Start time</Label><AdminTimeSelect value={form.startTime} options={hourlyOptions(0, 23)} onChange={value => { setForm({ ...form, startTime: value, endTime: isValidTimeRange(value, form.endTime) ? form.endTime : minimumEndTime(value) }); setErrors(e => ({...e, endTime: ''})); }} /></div>
           <div><Label>End time</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} options={endTimeOptions} onChange={value => { setForm({ ...form, endTime: value }); setErrors(e => ({...e, endTime: ''})); }} />{errors.endTime && <p className="field-error" role="alert">{errors.endTime}</p>}</div>
-          <div className="sm:col-span-2"><Label>Hourly rate (₱)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="0" step="0.01" value={form.rateType === RateType.Internal ? 0 : form.pricePerHour} disabled={form.rateType === RateType.Internal} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder={form.rateType === RateType.Internal ? 'Free' : 'Enter hourly rate'} />{form.rateType === RateType.Internal && <p className="mt-1 text-xs text-muted-foreground">Internal schedules are always free.</p>}{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
+          <div className="sm:col-span-2"><Label>Hourly rate (?)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="0" step="0.01" value={form.rateType === RateType.Internal ? 0 : form.pricePerHour} disabled={form.rateType === RateType.Internal} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder={form.rateType === RateType.Internal ? 'Free' : 'Enter hourly rate'} />{form.rateType === RateType.Internal && <p className="mt-1 text-xs text-muted-foreground">Internal schedules are always free.</p>}{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
         </div>
         <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(undefined)}>Cancel</Button><Button disabled={pending} onClick={save}>Save Rate{pending && <LoadingIndicator label="Saving rate" />}</Button></DialogFooter>
       </DialogContent>

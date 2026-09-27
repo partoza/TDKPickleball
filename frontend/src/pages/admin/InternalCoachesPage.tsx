@@ -151,7 +151,7 @@ export default function InternalCoachesPage() {
     await updateInternalCoach(profile.id, { name: profile.name, email: profile.email, phone: profile.phone, type: profile.type, isActive: !profile.isActive });
   };
 
-  if (loading && !internalCoaches.length) return <AdminPageSkeleton label="Loading internal profiles" />;
+  if (loading && !internalCoaches.length) return <AdminPageSkeleton layout="table" label="Loading internal profiles" />;
 
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">

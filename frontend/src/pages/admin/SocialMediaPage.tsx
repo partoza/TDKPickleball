@@ -136,7 +136,7 @@ function ScheduleGenerator() {
     }
   };
 
-  if (isLoading || isFetching) return <AdminPageSkeleton className="px-0 pb-0" label="Loading social media schedules" />;
+  if (isLoading || isFetching) return <AdminPageSkeleton layout="table" className="px-0 pb-0" label="Loading social media schedules" />;
 
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">

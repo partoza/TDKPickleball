@@ -99,7 +99,7 @@ export default function PromosPage() {
     }
   };
 
-  if (loading && !promos.length) return <AdminPageSkeleton label="Loading promos" />;
+  if (loading && !promos.length) return <AdminPageSkeleton layout="table" label="Loading promos" />;
 
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
