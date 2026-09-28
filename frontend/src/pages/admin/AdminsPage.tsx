@@ -146,7 +146,7 @@ export default function AdminsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2 flex items-center gap-4 rounded-xl border dark:border-white/10 p-3">
             <Avatar className="h-16 w-16 border"><AvatarImage src={imagePreview} alt="Selected profile" /><AvatarFallback><PhotoIcon className="h-6 w-6 text-muted-foreground" /></AvatarFallback></Avatar>
-            <div className="min-w-0 flex-1"><Label htmlFor="profile-image">Profile picture</Label><Input id="profile-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => chooseImage(event.target.files?.[0])} /><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP · maximum 5 MB</p>{errors.profileImage && <p className="field-error">{errors.profileImage}</p>}</div>
+            <div className="min-w-0 flex-1"><Label htmlFor="profile-image">Profile picture</Label><Input id="profile-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => chooseImage(event.target.files?.[0])} /><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP Â· maximum 5 MB</p>{errors.profileImage && <p className="field-error">{errors.profileImage}</p>}</div>
           </div>
           <Field label="First name" placeholder="e.g. Juan" value={form.firstName} error={errors.firstName} onChange={value => setForm({ ...form, firstName: value })} />
           <Field label="Last name" placeholder="e.g. Dela Cruz" value={form.lastName} error={errors.lastName} onChange={value => setForm({ ...form, lastName: value })} />

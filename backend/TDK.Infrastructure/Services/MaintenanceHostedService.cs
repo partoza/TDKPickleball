@@ -70,7 +70,7 @@ public class MaintenanceHostedService : BackgroundService
                 {
                     BookingId = booking.Id,
                     Title = "Schedule starts in 10 minutes",
-                    Message = $"{booking.CustomerName} Ã‚Â· {booking.Court.Name} Ã‚Â· {booking.StartTime:h:mm tt}",
+                    Message = $"{booking.CustomerName} · {booking.Court.Name} · {booking.StartTime:h:mm tt}",
                     CreatedAt = utcDateTime,
                     ExpiresAt = expiresAtUtc
                 });
@@ -84,7 +84,7 @@ public class MaintenanceHostedService : BackgroundService
                 {
                     BookingId = booking.Id,
                     Title = "Balance due before schedule",
-                    Message = $"{booking.CustomerName} has Ã¢â€šÂ±{remainingBalance:N2} remaining Ã‚Â· starts in 1 hour",
+                    Message = $"{booking.CustomerName} has ₱{remainingBalance:N2} remaining · starts in 1 hour",
                     CreatedAt = utcDateTime,
                     ExpiresAt = expiresAtUtc
                 });
