@@ -333,7 +333,7 @@ public class SmtpEmailService : IEmailService
 
         using var message = new MailMessage
         {
-            From = new MailAddress(_configuration["Smtp:From"] ?? "noreply@thedirtykitchen.ph", "The Dirty Kitchen"),
+            From = new MailAddress(_configuration["Smtp:From"] ?? "thedirtykitchendavao@gmail.com", "The Dirty Kitchen"),
             Subject = subject,
             Body = plainText,
             IsBodyHtml = false

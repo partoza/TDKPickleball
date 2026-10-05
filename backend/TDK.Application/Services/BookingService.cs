@@ -425,6 +425,7 @@ public class BookingService : IBookingService
         var normalized = bookingReference.Trim().ToUpperInvariant();
         var b = (await _bookings.FindAsync(x => x.BookingReference == normalized)).FirstOrDefault();
         if (b is null || b.Status is BookingStatus.Cancelled or BookingStatus.Requested) return ApiResponse<BookingDto>.Fail("Booking reference is invalid or not yet confirmed");
+        var promoCode = b.PromoId.HasValue ? (await _promos.GetByIdAsync(b.PromoId.Value))?.Code : null;
         var publicDto = ToDto(b, (await _courts.GetByIdAsync(b.CourtId))?.Name ?? "Court", await GetRateTypeAsync(b.Id)) with
         {
             ListedByName = null,
@@ -434,7 +435,8 @@ public class BookingService : IBookingService
             PaddleRentalVoidedByName = null,
             RescheduledByName = null,
             CancelledByName = null,
-            ConfirmedByName = null
+            ConfirmedByName = null,
+            PromoCode = promoCode
         };
         return ApiResponse<BookingDto>.Ok(publicDto, "Valid booking");
     }

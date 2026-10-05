@@ -117,6 +117,7 @@ export interface Booking {
   receiptAvailable?: boolean;
   internalCoachProfileId?: number;
   promoId?: number;
+  promoCode?: string;
   customerId?: number;
 }
 
@@ -159,7 +160,7 @@ export interface CustomerCard {
   pending: Booking[];
   past: Booking[];
   cancelled: Booking[];
-  eligiblePromos: { code: string; description: string; discountType: string; value: number; remainingUsesThisMonth?: number; resetsOn?: string }[];
+  eligiblePromos: { code: string; description: string; discountType: string; value: number; remainingUsesThisMonth?: number; resetsOn?: string; monthlyUsageLimitPerCustomer?: number }[];
 }
 
 export enum PromoAudience {

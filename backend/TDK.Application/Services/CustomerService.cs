@@ -294,8 +294,9 @@ public sealed partial class CustomerService : ICustomerService
                 remaining = Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - used);
                 resetsOn = DateOnly.FromDateTime(nextMonth);
             }
-            return new CustomerPromoDto(promo.Code, promo.Description, promo.Type.ToString(), promo.Value, remaining, resetsOn);
-        }).Where(promo => !promo.RemainingUsesThisMonth.HasValue || promo.RemainingUsesThisMonth.Value > 0).ToList();
+            return new CustomerPromoDto(promo.Code, promo.Description, promo.Type.ToString(), promo.Value, remaining, resetsOn,
+                promo.MonthlyUsageLimitPerCustomer);
+        }).ToList();
         return ApiResponse<CustomerCardDto>.Ok(new(customer.FullName, customer.Username, CustomerNumber(customer.Id), customer.CreatedAt, customer.CardValidFrom, customer.CardValidThrough,
             groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled, eligiblePromos, customer.ProfilePictureUrl));
     }
@@ -313,6 +314,8 @@ public sealed partial class CustomerService : ICustomerService
     {
         var bookings = (await _bookings.FindAsync(booking => booking.CustomerId == customerId)).ToList();
         var courts = (await _courts.GetAllAsync()).ToDictionary(court => court.Id, court => court.Name);
+        var promoIds = bookings.Where(booking => booking.PromoId.HasValue).Select(booking => booking.PromoId!.Value).ToHashSet();
+        var promoCodes = (await _promos.GetAllAsync()).Where(promo => promoIds.Contains(promo.Id)).ToDictionary(promo => promo.Id, promo => promo.Code);
         var ids = bookings.Select(booking => booking.Id).ToHashSet();
         var trainingIds = (await _schedules.GetAllAsync()).Where(schedule => schedule.BookingId.HasValue && ids.Contains(schedule.BookingId.Value) && schedule.Status == ScheduleStatus.Training).Select(schedule => schedule.BookingId!.Value).ToHashSet();
         var now = _clock.ToManilaTime(_clock.UtcNow).DateTime;
@@ -320,7 +323,8 @@ public sealed partial class CustomerService : ICustomerService
             booking.Email, booking.Phone, booking.BookingDate, booking.StartTime, booking.EndTime, booking.Subtotal, booking.DiscountAmount, booking.TotalAmount,
             booking.AmountPaid, booking.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, booking.TotalAmount - booking.AmountPaid), booking.Status, null,
             booking.CreatedAt, trainingIds.Contains(booking.Id) ? RateType.Training : RateType.Booking, false, booking.RescheduledAt, booking.InternalCoachProfileId,
-            booking.PromoId, booking.PaddleRentalQuantity, booking.PaddleRentalFee);
+            booking.PromoId, booking.PaddleRentalQuantity, booking.PaddleRentalFee,
+            PromoCode: booking.PromoId.HasValue ? promoCodes.GetValueOrDefault(booking.PromoId.Value) : null);
         bool HasEnded(Booking booking) => booking.BookingDate.ToDateTime(booking.EndTime == TimeOnly.MinValue ? new TimeOnly(23, 59, 59) : booking.EndTime) < now;
         return (
             bookings.Where(b => b.Status is BookingStatus.Reserved or BookingStatus.Paid && !HasEnded(b)).OrderBy(b => b.BookingDate).ThenBy(b => b.StartTime).Select(Map).ToList(),

@@ -26,11 +26,11 @@ export default function PublicFooter() {
             </li>
             <li className="flex items-center gap-3">
               <Phone className="h-5 w-5 text-primary shrink-0" />
-              <span className="text-slate-600">+63 917 123 4567</span>
+              <a href="tel:+639340045098" className="text-slate-600 transition-colors hover:text-primary">0934 004 5098</a>
             </li>
             <li className="flex items-center gap-3">
               <Mail className="h-5 w-5 text-primary shrink-0" />
-              <span className="text-slate-600">hello@thedirtykitchen.com</span>
+              <a href="mailto:thedirtykitchendavao@gmail.com" className="text-slate-600 transition-colors hover:text-primary">thedirtykitchendavao@gmail.com</a>
             </li>
           </ul>
         </div>

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import { formatManilaDatabaseTime } from '@/lib/manila-time';
+import { CustomerBookingCard } from '@/components/customer/CustomerBookingCard';
 
 const MAX_QR_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_QR_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -143,38 +144,8 @@ export default function VerifyPage() {
           </label>
           
           {booking && (
-            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm animate-in fade-in duration-300">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-                <div className="flex items-center gap-2 font-medium text-slate-900 text-sm">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  Valid booking confirmed
-                </div>
-                {(() => {
-                  const start = new Date(`${booking.bookingDate}T${booking.startTime}`);
-                  const end = new Date(`${booking.bookingDate}T${booking.endTime}`);
-                  if (end <= start) end.setDate(end.getDate() + 1);
-                  const now = new Date();
-                  const phase = now >= end ? 'Completed' : now >= start ? 'Ongoing' : 'Upcoming';
-                  const colorMap = {
-                    'Completed': 'bg-slate-100 text-slate-600',
-                    'Ongoing': 'bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-500/20',
-                    'Upcoming': 'bg-primary/10 text-primary ring-1 ring-inset ring-primary/20'
-                  };
-                  return (
-                    <span className={`px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-md ${colorMap[phase]}`}>
-                      {phase}
-                    </span>
-                  );
-                })()}
-              </div>
-              <div className="grid gap-y-3 text-sm">
-                <Detail k="Reference" v={booking.bookingReference} />
-                <Detail k="Booked by" v={booking.customerName} />
-                <Detail k="Court" v={booking.courtName} />
-                <Detail k="Schedule" v={`${formatAppDate(booking.bookingDate)} · ${formatAppTime(booking.startTime)}`} />
-                <Detail k="Status" v={booking.status} />
-                <Detail k="Balance" v={`₱${booking.remainingBalance.toLocaleString()}`} />
-              </div>
+            <div className="mt-8 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <CustomerBookingCard booking={booking} />
             </div>
           )}
 

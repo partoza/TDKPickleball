@@ -149,7 +149,7 @@ export default function AdminSidebar({ unreadNotificationCounts = {} }: { unread
           <div className="flex items-center gap-3">
             <a href="#" className="hover:text-foreground">Terms</a>
             <a href="#" className="hover:text-foreground">Privacy</a>
-            <a href="mailto:support@tdk.com" className="hover:text-foreground">Support</a>
+            <a href="mailto:thedirtykitchendavao@gmail.com" className="hover:text-foreground">Support</a>
           </div>
         </div>
       </div>

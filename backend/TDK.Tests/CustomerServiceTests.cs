@@ -143,6 +143,36 @@ public sealed class CustomerServiceTests
         Assert.Empty(card.Data.Cancelled);
     }
 
+    [Fact]
+    public async Task Used_promo_remains_visible_with_monthly_balance_and_labels_the_booking()
+    {
+        var fixture = new Fixture();
+        var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
+        var customerId = created.Data!.Customer.Id;
+        var token = created.Data.Card.Url.Split('/').Last();
+        fixture.Promos.Items.Add(new Promo
+        {
+            Id = 7, Code = "CARD10", Description = "Customer card discount", IsActive = true,
+            Audience = TDK.Domain.Enums.PromoAudience.NfcCustomersOnly,
+            Type = TDK.Domain.Enums.DiscountType.FixedAmount, Value = 40,
+            MonthlyUsageLimitPerCustomer = 1, CurrentUses = 1
+        });
+        fixture.Bookings.Items.Add(new Booking
+        {
+            Id = 1, CustomerId = customerId, PromoId = 7, BookingReference = "TDK-PROMO", CourtId = 1,
+            CustomerName = "Juan Dela Cruz", Email = "juan@example.com", BookingDate = new DateOnly(2026, 10, 5),
+            StartTime = new(10, 0), EndTime = new(12, 0), Status = TDK.Domain.Enums.BookingStatus.Completed,
+            CreatedAt = new DateTime(2026, 10, 5), Subtotal = 800, DiscountAmount = 40, TotalAmount = 760, AmountPaid = 760
+        });
+
+        var card = await fixture.Service.ValidateCardAsync("juan-delacruz", token);
+
+        var promo = Assert.Single(card.Data!.EligiblePromos);
+        Assert.Equal(0, promo.RemainingUsesThisMonth);
+        Assert.Equal(1, promo.MonthlyUsageLimitPerCustomer);
+        Assert.Equal("CARD10", Assert.Single(card.Data.Past).PromoCode);
+    }
+
     private static CreateCustomerRequest NewCustomer(string username = "juan-delacruz", string email = "juan@example.com") =>
         new("Juan Dela Cruz", username, email, "09123456789", null);
 
@@ -150,13 +180,14 @@ public sealed class CustomerServiceTests
     {
         public MemoryRepository<Customer> Customers { get; } = new();
         public MemoryRepository<Booking> Bookings { get; } = new();
+        public MemoryRepository<Promo> Promos { get; } = new();
         public MemoryRepository<CustomerCardTransaction> CardTransactions { get; } = new();
         public CustomerService Service { get; }
         public Fixture()
         {
             var rates = new MemoryRepository<Rate>();
             rates.Items.Add(new Rate { Id = 1, RateType = TDK.Domain.Enums.RateType.CustomerCard, PricePerHour = 1200, ValidityDuration = 3, ValidityUnit = TDK.Domain.Enums.RateValidityUnit.Month, IsActive = true });
-            Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), new MemoryRepository<Promo>(), rates, CardTransactions, new FixedClock(), new TestTokenProtector(), new NullEmailService(), new TestProfileImageService());
+            Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), Promos, rates, CardTransactions, new FixedClock(), new TestTokenProtector(), new NullEmailService(), new TestProfileImageService());
         }
     }
 }

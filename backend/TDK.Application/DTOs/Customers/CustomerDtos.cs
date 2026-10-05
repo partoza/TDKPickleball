@@ -21,7 +21,7 @@ public record NfcIssueDto(string Url, DateTime IssuedAt);
 public record CreateCustomerDto(CustomerSummaryDto Customer, NfcIssueDto Card);
 public record CustomerCardRenewalDto(CustomerSummaryDto Customer, decimal Amount, DateOnly ValidFrom, DateOnly ValidThrough);
 public record CustomerPromoDto(string Code, string Description, string DiscountType, decimal Value,
-    int? RemainingUsesThisMonth = null, DateOnly? ResetsOn = null);
+    int? RemainingUsesThisMonth = null, DateOnly? ResetsOn = null, int? MonthlyUsageLimitPerCustomer = null);
 public record CustomerCardDto(
     string FullName, string Username, string CustomerNumber, DateTime MemberSince, DateOnly? CardValidFrom, DateOnly? CardValidThrough,
     IReadOnlyList<BookingDto> Upcoming, IReadOnlyList<BookingDto> Pending,
