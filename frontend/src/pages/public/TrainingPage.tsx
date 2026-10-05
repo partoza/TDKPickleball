@@ -1,19 +1,18 @@
 import { Link } from 'react-router-dom';
 import {
-  AcademicCapIcon,
   ArrowRightIcon,
-  CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   SparklesIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { EXTERNAL_LINKS, ROUTES } from '@/lib/constants';
 
 const benefits = [
   {
-    icon: AcademicCapIcon,
+    icon: PaddleIcon,
     title: 'Learn the fundamentals',
     description: 'Build dependable technique, court awareness, and confidence from the first session.',
   },
@@ -50,7 +49,7 @@ export default function TrainingPage() {
         <div className="relative mx-auto flex min-h-[620px] max-w-7xl items-center px-4 py-20 md:px-6">
           <div className="max-w-2xl">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md">
-              <AcademicCapIcon className="h-4 w-4" /> Pickleball training
+              <PaddleIcon className="h-4 w-4" white /> Pickleball training
             </div>
             <h1 className="text-5xl font-bold tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl">
               Grow your game, one rally at a time.
@@ -139,17 +138,6 @@ export default function TrainingPage() {
               </Button>
             </div>
           </aside>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 md:px-6 md:py-24">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-12 text-center text-white shadow-xl sm:px-10 md:py-16">
-          <CalendarDaysIcon className="mx-auto h-10 w-10 text-primary" />
-          <h2 className="mt-5 text-3xl font-bold tracking-tight md:text-4xl">Ready to become a trainee?</h2>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/70">Tell us what you want to improve and when you would like to train. We will help you take the next step.</p>
-          <Button size="lg" className="mt-7 h-12 rounded-xl px-7 font-bold" asChild>
-            <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">Start Your Training Journey</a>
-          </Button>
         </div>
       </section>
     </div>

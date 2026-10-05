@@ -2,7 +2,7 @@
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 import { usePublicBookingWindow, usePublicWeeklySchedules } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon, AcademicCapIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import { Schedule, ScheduleStatus } from '@/types';
 import AvailabilityChecker from '@/components/public/AvailabilityChecker';
 import { Link } from 'react-router-dom';
 import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 
 function getWeekRangeString(start: Date, end: Date) {
   if (start.getFullYear() !== end.getFullYear()) {
@@ -209,7 +210,7 @@ export default function SchedulePage() {
           to={ROUTES.TRAINING}
           className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg sm:w-auto"
         >
-          <AcademicCapIcon className="h-5 w-5" />
+          <PaddleIcon className="h-5 w-5" white />
           Become a Trainee
           <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </Link>
@@ -304,8 +305,8 @@ export default function SchedulePage() {
                       onClick={() => setSelectedCourt(c.id.toString())}
                       className={cn(
                         "h-8 flex-1 sm:flex-none sm:min-w-[88px] whitespace-nowrap rounded-md px-2 sm:px-4 text-[13px] font-bold transition-all sm:h-7",
-                        selectedCourt === c.id.toString() 
-                          ? "bg-white text-primary shadow-sm ring-1 ring-black/5" 
+                        selectedCourt === c.id.toString()
+                          ? "bg-primary text-white shadow-sm ring-1 ring-primary"
                           : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                       )}
                     >
