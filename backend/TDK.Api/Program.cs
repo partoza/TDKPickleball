@@ -7,6 +7,7 @@ using TDK.Infrastructure.Identity;
 using System.Threading.RateLimiting;
 using TDK.Api.Serialization;
 using TDK.Api.Filters;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,12 @@ builder.Services.AddSwaggerWithJwt();
 
 builder.Services.AddDbContext<TdkDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), ServerVersion.Parse("8.0.32-mysql")));
+
+var dataProtectionPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtection-Keys");
+Directory.CreateDirectory(dataProtectionPath);
+builder.Services.AddDataProtection()
+    .SetApplicationName("TheDirtyKitchen")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath));
 
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddMemoryCache();

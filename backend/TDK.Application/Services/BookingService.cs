@@ -49,8 +49,7 @@ public class BookingService : IBookingService
 
     public async Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode, string authenticatedEmail)
     {
-        var customer = await FindActiveCustomerByEmailAsync(authenticatedEmail);
-        var (promo, error) = await ResolvePublicPromoAsync(promoCode, customer);
+        var (promo, error) = await ResolvePublicPromoAsync(promoCode, null);
         if (promo is null)
             return ApiResponse<PublicPromoDto>.Fail(error ?? "Promo name is invalid or unavailable");
 
@@ -76,8 +75,7 @@ public class BookingService : IBookingService
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail($"Paddle rental quantity must be between 0 and {MaximumPaddleRentalQuantity}");
 
-        var publicCustomer = await FindActiveCustomerByEmailAsync(request.Email);
-        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode, publicCustomer);
+        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode, null);
         if (promoError is not null)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail(promoError);
         if (promo?.MaxUses is int manualMaxUses && promo.CurrentUses + request.Schedules.Count > manualMaxUses)
@@ -178,7 +176,7 @@ public class BookingService : IBookingService
                     CreatedAt = submittedAt,
                     PromoId = promo?.Id,
                     ListedByName = $"Public request · {request.CustomerName.Trim()}"
-                    ,CustomerId = publicCustomer?.Id
+                    ,CustomerId = null
                 };
                 await _bookings.AddAsync(booking);
                 await _bookings.SaveChangesAsync();
@@ -851,13 +849,6 @@ public class BookingService : IBookingService
 
         var availabilityError = ValidatePromoAvailability(promo, RateType.Booking);
         return availabilityError is null ? (promo, null) : (null, availabilityError);
-    }
-
-    private async Task<Customer?> FindActiveCustomerByEmailAsync(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email)) return null;
-        var normalized = email.Trim().ToUpperInvariant();
-        return (await _customers.FindAsync(customer => customer.NormalizedEmail == normalized && customer.IsActive)).SingleOrDefault();
     }
 
     private static decimal CalculatePromoDiscount(decimal subtotal, Promo? promo)

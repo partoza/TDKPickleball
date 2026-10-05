@@ -60,26 +60,6 @@ namespace TDK.Infrastructure.Migrations
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
-            // Preserve existing booking snapshots and only create/link a legacy customer when
-            // a normalized email maps to exactly one normalized name. Ambiguous identities stay unlinked.
-            migrationBuilder.Sql(@"
-                INSERT INTO Customers
-                    (FullName, Username, NormalizedUsername, Email, NormalizedEmail, Phone, IsActive,
-                     NfcTokenHash, NfcIssuedAt, NfcLastTappedAt, CreatedAt, UpdatedAt, AdminNotes)
-                SELECT
-                    MIN(TRIM(b.CustomerName)),
-                    CONCAT('legacy-', MIN(b.Id)),
-                    UPPER(CONCAT('legacy-', MIN(b.Id))),
-                    MIN(TRIM(b.Email)),
-                    UPPER(TRIM(b.Email)),
-                    NULLIF(MIN(TRIM(COALESCE(b.Phone, ''))), ''),
-                    TRUE, NULL, NULL, NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6),
-                    'Created automatically from unambiguous historical booking records.'
-                FROM Bookings b
-                WHERE TRIM(COALESCE(b.Email, '')) <> ''
-                GROUP BY UPPER(TRIM(b.Email))
-                HAVING COUNT(DISTINCT UPPER(TRIM(b.CustomerName))) = 1;");
-
             migrationBuilder.CreateIndex(
                 name: "IX_Bookings_CustomerId",
                 table: "Bookings",
@@ -90,18 +70,6 @@ namespace TDK.Infrastructure.Migrations
                 table: "Customers",
                 column: "NormalizedEmail",
                 unique: true);
-
-            migrationBuilder.Sql(@"
-                UPDATE Bookings b
-                INNER JOIN Customers c ON c.NormalizedEmail = UPPER(TRIM(b.Email))
-                INNER JOIN (
-                    SELECT NormalizedEmail
-                    FROM Customers
-                    GROUP BY NormalizedEmail
-                    HAVING COUNT(*) = 1
-                ) unique_customer ON unique_customer.NormalizedEmail = c.NormalizedEmail
-                SET b.CustomerId = c.Id
-                WHERE b.CustomerId IS NULL;");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Customers_NormalizedUsername",

@@ -19,6 +19,7 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .UseCollation("utf8mb4_bin");
         builder.Property(customer => customer.Phone).HasMaxLength(30);
         builder.Property(customer => customer.NfcTokenHash).HasMaxLength(32);
+        builder.Property(customer => customer.NfcTokenProtected).HasMaxLength(1000);
         builder.Property(customer => customer.AdminNotes).HasMaxLength(1000);
         builder.HasIndex(customer => customer.NormalizedUsername).IsUnique();
         builder.HasIndex(customer => customer.NormalizedEmail).IsUnique();

@@ -43,7 +43,7 @@ public sealed class BookingCustomerIntegrationTests
     }
 
     [Fact]
-    public async Task Public_booking_links_active_customer_by_verified_email_without_browser_customer_id()
+    public async Task Public_booking_does_not_create_or_auto_link_customer_by_email()
     {
         var fixture = new BookingFixture();
         var customer = fixture.AddCustomer(active: true, issued: false);
@@ -52,7 +52,8 @@ public sealed class BookingCustomerIntegrationTests
             new[] { new PublicBookingRequestBlockDto(1, new DateOnly(2026, 10, 9), new TimeOnly(10, 0), new TimeOnly(11, 0)) }, null),
             new byte[] { 1, 2, 3 }, "receipt.png", "image/png");
         Assert.True(result.Success);
-        Assert.Equal(customer.Id, fixture.Bookings.Items.Single().CustomerId);
+        Assert.Null(fixture.Bookings.Items.Single().CustomerId);
+        Assert.Single(fixture.Customers.Items);
     }
 }
 

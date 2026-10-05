@@ -17,6 +17,7 @@ public record CustomerDetailsDto(
 public record CreateCustomerRequest(string FullName, string Username, string Email, string? Phone, string? AdminNotes);
 public record UpdateCustomerRequest(string FullName, string Username, string Email, string? Phone, string? AdminNotes);
 public record NfcIssueDto(string Url, DateTime IssuedAt);
+public record CreateCustomerDto(CustomerSummaryDto Customer, NfcIssueDto Card);
 public record CustomerPromoDto(string Code, string Description, string DiscountType, decimal Value);
 public record CustomerCardDto(
     string FullName, string Username, string CustomerNumber, DateTime MemberSince,

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Security.Claims;
 using TDK.Application.DTOs.Customers;
 using TDK.Application.Interfaces;
 
@@ -40,8 +39,8 @@ public sealed class CustomersController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(CreateCustomerRequest request)
     {
-        var result = await _customers.CreateAsync(request);
-        return result.Success ? CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result) : BadRequest(result);
+        var result = await _customers.CreateAsync(request, FrontendBaseUrl());
+        return result.Success ? CreatedAtAction(nameof(GetById), new { id = result.Data!.Customer.Id }, result) : BadRequest(result);
     }
 
     [HttpPut("api/admin/customers/{id:long}")]
@@ -60,16 +59,16 @@ public sealed class CustomersController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Deactivate(long id) => Result(await _customers.SetActiveAsync(id, false));
 
-    [HttpPost("api/admin/customers/{id:long}/nfc/issue")]
+    [HttpGet("api/admin/customers/{id:long}/nfc")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Issue(long id) => Result(await _customers.IssueNfcAsync(id, FrontendBaseUrl()));
+    public async Task<IActionResult> GetNfc(long id) => Result(await _customers.GetNfcAsync(id, FrontendBaseUrl()));
 
-    [HttpPost("api/admin/customers/{id:long}/nfc/replace")]
+    [HttpDelete("api/admin/customers/{id:long}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Replace(long id) => Result(await _customers.IssueNfcAsync(id, FrontendBaseUrl()));
+    public async Task<IActionResult> Delete(long id) => Result(await _customers.DeleteAsync(id));
 
     [HttpGet("api/customer/card/{username}/{token}")]
-    [Authorize(Roles = "Customer")]
+    [AllowAnonymous]
     [EnableRateLimiting("NfcValidation")]
     public async Task<IActionResult> Card(string username, string token)
     {
@@ -77,8 +76,7 @@ public sealed class CustomersController : ControllerBase
         Response.Headers.Pragma = "no-cache";
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
-        var email = User.FindFirstValue(ClaimTypes.Email) ?? "";
-        var result = await _customers.ValidateCardAsync(username, token, email);
+        var result = await _customers.ValidateCardAsync(username, token);
         return result.Success ? Ok(result) : NotFound(result);
     }
 

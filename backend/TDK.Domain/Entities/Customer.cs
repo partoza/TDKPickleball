@@ -11,6 +11,7 @@ public class Customer
     public string? Phone { get; set; }
     public bool IsActive { get; set; } = true;
     public byte[]? NfcTokenHash { get; set; }
+    public string? NfcTokenProtected { get; set; }
     public DateTime? NfcIssuedAt { get; set; }
     public DateTime? NfcLastTappedAt { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 import { useAdminWeeklySchedules, useBulkUpdate, useDeleteSchedule, usePublicBookingWindow, useUpdatePublicBookingWindow, useUpdateSchedule } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MinusIcon as Minus, MapPinIcon as MapPin, TrashIcon as Trash } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MinusIcon as Minus, TrashIcon as Trash } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -421,21 +421,9 @@ export default function SchedulePage() {
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-3">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Court</label>
               {courts.length > 0 && (
-                <Select value={selectedCourt} onValueChange={setSelectedCourt}>
-                  <SelectTrigger className="w-full sm:w-[150px] h-10 sm:h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-semibold text-slate-700 shadow-sm focus:ring-0 focus:ring-offset-0 data-[state=open]:border-primary data-[state=open]:text-primary transition-colors">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      <SelectValue placeholder="Select Court" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-lg">
-                    {courts.map(c => (
-                      <SelectItem key={c.id} value={c.id.toString()} className="text-[13px] font-semibold rounded-lg cursor-pointer py-2">
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex h-10 w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-100/80 p-1 shadow-sm sm:h-9 sm:w-auto">
+                  {courts.map(c => <button key={c.id} type="button" onClick={() => setSelectedCourt(c.id.toString())} className={cn("h-8 min-w-[88px] flex-1 whitespace-nowrap rounded-md px-4 text-[13px] font-bold transition-all sm:h-7 sm:flex-none", selectedCourt === c.id.toString() ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700")}>{c.name}</button>)}
+                </div>
               )}
             </div>
           </div>

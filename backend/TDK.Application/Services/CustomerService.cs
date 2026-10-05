@@ -24,9 +24,11 @@ public sealed partial class CustomerService : ICustomerService
     private readonly IRepository<Schedule> _schedules;
     private readonly IRepository<Promo> _promos;
     private readonly IBusinessClock _clock;
+    private readonly INfcTokenProtector _tokenProtector;
 
     public CustomerService(IRepository<Customer> customers, IRepository<Booking> bookings,
-        IRepository<Court> courts, IRepository<Schedule> schedules, IRepository<Promo> promos, IBusinessClock clock)
+        IRepository<Court> courts, IRepository<Schedule> schedules, IRepository<Promo> promos, IBusinessClock clock,
+        INfcTokenProtector tokenProtector)
     {
         _customers = customers;
         _bookings = bookings;
@@ -34,6 +36,7 @@ public sealed partial class CustomerService : ICustomerService
         _schedules = schedules;
         _promos = promos;
         _clock = clock;
+        _tokenProtector = tokenProtector;
     }
 
     public async Task<ApiResponse<IEnumerable<CustomerSummaryDto>>> GetAllAsync(string? query, bool includeInactive)
@@ -63,15 +66,15 @@ public sealed partial class CustomerService : ICustomerService
         return ApiResponse<CustomerDetailsDto>.Ok(new(ToSummary(customer, true), groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled));
     }
 
-    public async Task<ApiResponse<CustomerSummaryDto>> CreateAsync(CreateCustomerRequest request)
+    public async Task<ApiResponse<CreateCustomerDto>> CreateAsync(CreateCustomerRequest request, string frontendBaseUrl)
     {
         var validation = Validate(request.FullName, request.Username, request.Email, request.Phone, request.AdminNotes);
-        if (validation is not null) return ApiResponse<CustomerSummaryDto>.Fail(validation);
+        if (validation is not null) return ApiResponse<CreateCustomerDto>.Fail(validation);
         var normalizedUsername = NormalizeUsername(request.Username);
         var normalizedEmail = NormalizeEmail(request.Email);
         var existing = await _customers.GetAllAsync();
-        if (existing.Any(customer => customer.NormalizedUsername == normalizedUsername)) return ApiResponse<CustomerSummaryDto>.Fail("Username is already in use");
-        if (existing.Any(customer => customer.NormalizedEmail == normalizedEmail)) return ApiResponse<CustomerSummaryDto>.Fail("Email is already in use");
+        if (existing.Any(customer => customer.NormalizedUsername == normalizedUsername)) return ApiResponse<CreateCustomerDto>.Fail("Username is already in use");
+        if (existing.Any(customer => customer.NormalizedEmail == normalizedEmail)) return ApiResponse<CreateCustomerDto>.Fail("Email is already in use");
         var now = _clock.UtcNow.UtcDateTime;
         var customer = new Customer
         {
@@ -79,10 +82,11 @@ public sealed partial class CustomerService : ICustomerService
             Email = request.Email.Trim(), NormalizedEmail = normalizedEmail, Phone = NullIfWhiteSpace(request.Phone),
             AdminNotes = NullIfWhiteSpace(request.AdminNotes), IsActive = true, CreatedAt = now, UpdatedAt = now
         };
+        var card = CreateCredential(customer, frontendBaseUrl);
         await _customers.AddAsync(customer);
         try { await _customers.SaveChangesAsync(); }
-        catch { return ApiResponse<CustomerSummaryDto>.Fail("Username or email is already in use"); }
-        return ApiResponse<CustomerSummaryDto>.Ok(ToSummary(customer, true), "Customer created");
+        catch { return ApiResponse<CreateCustomerDto>.Fail("Username or email is already in use"); }
+        return ApiResponse<CreateCustomerDto>.Ok(new(ToSummary(customer, true), card), "Customer and NFC card created");
     }
 
     public async Task<ApiResponse<CustomerSummaryDto>> UpdateAsync(long id, UpdateCustomerRequest request)
@@ -114,30 +118,50 @@ public sealed partial class CustomerService : ICustomerService
         return ApiResponse<CustomerSummaryDto>.Ok(ToSummary(customer, true), active ? "Customer activated" : "Customer deactivated");
     }
 
-    public async Task<ApiResponse<NfcIssueDto>> IssueNfcAsync(long id, string frontendBaseUrl)
+    public async Task<ApiResponse<NfcIssueDto>> GetNfcAsync(long id, string frontendBaseUrl)
     {
         var customer = await _customers.GetByIdAsync(id);
         if (customer is null) return ApiResponse<NfcIssueDto>.Fail("Customer not found");
+        if (customer.NfcTokenHash is { Length: 32 } && !string.IsNullOrWhiteSpace(customer.NfcTokenProtected) &&
+            _tokenProtector.TryUnprotect(customer.NfcTokenProtected, out var existingToken) && TokenMatches(customer, existingToken))
+            return ApiResponse<NfcIssueDto>.Ok(new(CardUrl(frontendBaseUrl, customer.Username, existingToken), customer.NfcIssuedAt ?? customer.CreatedAt));
+
+        var card = CreateCredential(customer, frontendBaseUrl);
+        _customers.Update(customer);
+        await _customers.SaveChangesAsync();
+        return ApiResponse<NfcIssueDto>.Ok(card, "NFC card created");
+    }
+
+    public async Task<ApiResponse<bool>> DeleteAsync(long id)
+    {
+        var customer = await _customers.GetByIdAsync(id);
+        if (customer is null) return ApiResponse<bool>.Fail("Customer not found");
+        if (customer.IsActive) return ApiResponse<bool>.Fail("Deactivate the customer before deleting them");
+        _customers.Delete(customer);
+        await _customers.SaveChangesAsync();
+        return ApiResponse<bool>.Ok(true, "Inactive customer deleted");
+    }
+
+    private NfcIssueDto CreateCredential(Customer customer, string frontendBaseUrl)
+    {
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var token = Convert.ToBase64String(tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var now = _clock.UtcNow.UtcDateTime;
         customer.NfcTokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        customer.NfcTokenProtected = _tokenProtector.Protect(token);
         customer.NfcIssuedAt = now; customer.NfcLastTappedAt = null; customer.UpdatedAt = now;
-        _customers.Update(customer); await _customers.SaveChangesAsync();
-        var url = $"{frontendBaseUrl.TrimEnd('/')}/card/{Uri.EscapeDataString(customer.Username)}/{Uri.EscapeDataString(token)}";
-        return ApiResponse<NfcIssueDto>.Ok(new(url, now), "NFC credential issued");
+        return new(CardUrl(frontendBaseUrl, customer.Username, token), now);
     }
 
-    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token, string authenticatedEmail)
+    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token)
     {
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200 || string.IsNullOrWhiteSpace(authenticatedEmail))
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200)
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         var normalizedUsername = NormalizeUsername(username);
         var customer = (await _customers.FindAsync(item => item.NormalizedUsername == normalizedUsername)).SingleOrDefault();
-        if (customer is null || !customer.IsActive || customer.NfcTokenHash is not { Length: 32 } || customer.NormalizedEmail != NormalizeEmail(authenticatedEmail))
+        if (customer is null || !customer.IsActive || customer.NfcTokenHash is not { Length: 32 })
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
-        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        if (!CryptographicOperations.FixedTimeEquals(customer.NfcTokenHash, suppliedHash))
+        if (!TokenMatches(customer, token))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         customer.NfcLastTappedAt = _clock.UtcNow.UtcDateTime; customer.UpdatedAt = customer.NfcLastTappedAt.Value;
         _customers.Update(customer); await _customers.SaveChangesAsync();
@@ -153,6 +177,15 @@ public sealed partial class CustomerService : ICustomerService
         return ApiResponse<CustomerCardDto>.Ok(new(customer.FullName, customer.Username, CustomerNumber(customer.Id), customer.CreatedAt,
             groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled, eligiblePromos));
     }
+
+    private static bool TokenMatches(Customer customer, string token)
+    {
+        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return customer.NfcTokenHash is { Length: 32 } && CryptographicOperations.FixedTimeEquals(customer.NfcTokenHash, suppliedHash);
+    }
+
+    private static string CardUrl(string frontendBaseUrl, string username, string token) =>
+        $"{frontendBaseUrl.TrimEnd('/')}/card/{Uri.EscapeDataString(username)}/{Uri.EscapeDataString(token)}";
 
     private async Task<(List<BookingDto> Upcoming, List<BookingDto> Pending, List<BookingDto> Past, List<BookingDto> Cancelled)> GetBookingGroupsAsync(long customerId)
     {

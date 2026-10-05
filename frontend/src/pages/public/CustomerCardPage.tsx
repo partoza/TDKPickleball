@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { customerService } from '@/services/customers';
 import type { Booking, CustomerCard } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ROUTES } from '@/lib/constants';
-
-const unavailable = 'This loyalty card is currently unavailable. Please contact The Dirty Kitchen for assistance.';
+import NotFoundPage from '@/pages/public/NotFoundPage';
 
 export default function CustomerCardPage() {
   const { username = '', token = '' } = useParams();
-  const location = useLocation();
-  const { isAuthenticated, isLoading, user } = useAuth();
   const [profile, setProfile] = useState<CustomerCard | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -30,15 +25,13 @@ export default function CustomerCardPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'Customer' || !username || !token) return;
+    if (!username || !token) { setFailed(true); return; }
     let active = true;
     customerService.card(username, token).then(value => active && setProfile(value)).catch(() => active && setFailed(true));
     return () => { active = false; };
-  }, [isAuthenticated, user?.role, username, token]);
+  }, [username, token]);
 
-  if (isLoading) return <CardLoading />;
-  if (!isAuthenticated || user?.role !== 'Customer') return <Navigate to={`${ROUTES.LOGIN}?returnTo=${encodeURIComponent(location.pathname)}`} replace />;
-  if (failed) return <Unavailable />;
+  if (failed) return <NotFoundPage />;
   if (!profile) return <CardLoading />;
 
   const groups = [{ key: 'upcoming', label: 'Upcoming', data: profile.upcoming }, { key: 'pending', label: 'Pending', data: profile.pending }, { key: 'past', label: 'Past', data: profile.past }, { key: 'cancelled', label: 'Cancelled', data: profile.cancelled }] as const;
@@ -53,4 +46,3 @@ function BookingCard({ booking }: { booking: Booking }) {
 }
 
 function CardLoading() { return <main className="min-h-screen bg-slate-50 px-4 py-8"><div className="mx-auto max-w-4xl space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-12 w-full" /><div className="grid gap-3 sm:grid-cols-2"><Skeleton className="h-40" /><Skeleton className="h-40" /></div></div></main>; }
-function Unavailable() { return <main className="grid min-h-screen place-items-center bg-slate-50 px-4"><Card className="max-w-lg"><CardContent className="p-10 text-center"><ShieldCheckIcon className="mx-auto mb-4 h-10 w-10 text-muted-foreground" /><h1 className="text-xl font-semibold">Loyalty card unavailable</h1><p className="mt-3 text-muted-foreground">{unavailable}</p></CardContent></Card></main>; }

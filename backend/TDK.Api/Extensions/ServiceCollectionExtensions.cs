@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInternalCoachService, InternalCoachService>();
         services.AddScoped<IPromoService, PromoService>();
         services.AddScoped<ICustomerService, CustomerService>();
+        services.AddSingleton<INfcTokenProtector, NfcTokenProtector>();
         services.AddScoped<IStorageManagementService, StorageManagementService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IEmailService, SmtpEmailService>();
