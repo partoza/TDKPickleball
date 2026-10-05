@@ -17,10 +17,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICourtService, CourtService>();
         services.AddScoped<IScheduleService, ScheduleService>();
+        services.AddScoped<IPublicBookingWindowService, PublicBookingWindowService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IRateService, RateService>();
         services.AddScoped<IInternalCoachService, InternalCoachService>();
         services.AddScoped<IPromoService, PromoService>();
+        services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IStorageManagementService, StorageManagementService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IEmailService, SmtpEmailService>();

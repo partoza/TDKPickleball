@@ -1,13 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
-import { usePublicWeeklySchedules } from '@/hooks/useSchedule';
+import { usePublicBookingWindow, usePublicWeeklySchedules } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon, AcademicCapIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
-import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
+import { ROUTES, STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Schedule, ScheduleStatus } from '@/types';
 import AvailabilityChecker from '@/components/public/AvailabilityChecker';
@@ -36,7 +36,7 @@ function getTimedStatus(slot: Schedule) {
   return { label: base, phase: 'scheduled' as const };
 }
 
-const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: (d: Date) => void }) => {
+const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDate: Date, onSelect: (d: Date) => void, bookingThroughDate?: string | null }) => {
   const [viewDate, setViewDate] = useState(currentDate);
   const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
   const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
@@ -90,19 +90,20 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
           const isSelected = format(day, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
           const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
           const isPast = day < todayStart;
+          const isAfterBookingWindow = !!bookingThroughDate && format(day, 'yyyy-MM-dd') > bookingThroughDate;
           
           return (
             <button
               key={day.toISOString()}
-              onClick={() => !isPast && onSelect(day)}
-              disabled={isPast}
+              onClick={() => !isPast && !isAfterBookingWindow && onSelect(day)}
+              disabled={isPast || isAfterBookingWindow}
               className={cn(
                 "h-8 w-8 rounded-full flex items-center justify-center text-[12px] font-medium transition-colors",
-                isPast && "text-slate-200 cursor-not-allowed",
-                !isPast && !isCurrentMonth && "text-slate-300",
-                !isPast && isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
-                !isPast && isToday && !isSelected && "bg-slate-100 text-primary font-bold",
-                isSelected && !isPast && "bg-primary text-primary-foreground font-bold shadow-sm"
+                (isPast || isAfterBookingWindow) && "text-slate-200 cursor-not-allowed",
+                !isPast && !isAfterBookingWindow && !isCurrentMonth && "text-slate-300",
+                !isPast && !isAfterBookingWindow && isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
+                !isPast && !isAfterBookingWindow && isToday && !isSelected && "bg-slate-100 text-primary font-bold",
+                isSelected && !isPast && !isAfterBookingWindow && "bg-primary text-primary-foreground font-bold shadow-sm"
               )}
             >
               {format(day, 'd')}
@@ -121,6 +122,8 @@ export default function SchedulePage() {
   
   const { data: courtsRes, isLoading: courtsLoading, isError: courtsError } = useCourts();
   const courts = courtsRes?.data || [];
+  const { data: publicBookingWindowResponse } = usePublicBookingWindow();
+  const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
   
   const [selectedCourt, setSelectedCourt] = useState<string>('');
 
@@ -148,8 +151,8 @@ export default function SchedulePage() {
   const activeCourtId = selectedCourt;
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
 
-  // Reset picks when court or week changes
-  useEffect(() => { setPickedSlots([]); }, [activeCourtId, weekStart.getTime()]);
+  // Keep selections from every court while browsing the same week.
+  useEffect(() => { setPickedSlots([]); }, [weekStart.getTime()]);
 
   const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   const isCurrentWeek = weekStart <= thisWeekStart;
@@ -177,7 +180,8 @@ export default function SchedulePage() {
   }
 
   const toggleSlot = (date: string, startTime: string, endTime: string) => {
-    const key = `${date}-${startTime}`;
+    if (bookingThroughDate && date > bookingThroughDate) return;
+    const key = `${activeCourtId}-${date}-${startTime}`;
     setPickedSlots(prev =>
       prev.find(s => s.key === key)
         ? prev.filter(s => s.key !== key)
@@ -193,13 +197,29 @@ export default function SchedulePage() {
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pt-12 md:pt-16 pb-12">
       
       {/* Header */}
-      <div className="mb-6 pl-1">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p>
-        <h1 className="text-[28px] font-bold tracking-tight text-slate-900 mt-2">Court Schedule</h1>
-        <p className="text-[14px] text-slate-500 mt-2 leading-relaxed max-w-[600px]">
-          A clear, real-time view of every court and session for the entire week.
-        </p>
+      <div className="mb-6 flex flex-col gap-5 pl-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-tight text-slate-900">Court Schedule</h1>
+          <p className="mt-2 max-w-[600px] text-[14px] leading-relaxed text-slate-500">
+            A clear, real-time view of every court and session for the entire week.
+          </p>
+        </div>
+        <Link
+          to={ROUTES.TRAINING}
+          className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg sm:w-auto"
+        >
+          <AcademicCapIcon className="h-5 w-5" />
+          Become a Trainee
+          <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
       </div>
+
+      {bookingThroughDate && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
         
@@ -250,6 +270,7 @@ export default function SchedulePage() {
                     <PopoverContent className="w-auto p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="center" sideOffset={8}>
                       <MiniCalendar 
                         currentDate={currentDate} 
+                        bookingThroughDate={bookingThroughDate}
                         onSelect={(d) => { setCurrentDate(d); setIsCalendarOpen(false); }}
                       />
                     </PopoverContent>
@@ -408,6 +429,7 @@ export default function SchedulePage() {
                         const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
                         const isToday = dStr === getManilaDate(new Date(clock));
                         const isPastStart = isPastManilaStart(dStr, timeStr, new Date(clock));
+                        const isAfterBookingWindow = !!bookingThroughDate && dStr > bookingThroughDate;
                         
                         return (
                           <div 
@@ -415,8 +437,9 @@ export default function SchedulePage() {
                             className={cn(
                               "border-l border-slate-300 p-1.5 h-[90px] relative transition-colors",
                               isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
-                              !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04]",
+                              !slot && !isPastStart && !isAfterBookingWindow && "hover:bg-slate-50 dark:hover:bg-white/[0.04]",
                               !slot && isPastStart && "bg-slate-100/70 dark:bg-white/[0.03]",
+                              !slot && isAfterBookingWindow && "bg-amber-50/50 dark:bg-white/[0.03]",
                               isSelectedDay ? "block" : "hidden md:block"
                             )}
                           >
@@ -436,7 +459,7 @@ export default function SchedulePage() {
                               </div>
                               );
                             })() : (() => {
-                              const key = `${dStr}-${timeStr}`;
+                              const key = `${activeCourtId}-${dStr}-${timeStr}`;
                               const isSelected = !!pickedSlots.find(s => s.key === key);
                               const isMaxed = pickedSlots.length >= MAX_SLOTS && !isSelected;
                               // Calculate endTime directly (1 hour duration)
@@ -444,11 +467,11 @@ export default function SchedulePage() {
                               const endTime = startHour + 1 === 24 ? '00:00:00' : `${(startHour + 1).toString().padStart(2, '0')}:00:00`;
                               return (
                                 <button
-                                  disabled={isMaxed || isPastStart}
-                                  onClick={() => !isMaxed && !isPastStart && toggleSlot(dStr, timeStr, endTime)}
+                                  disabled={isMaxed || isPastStart || isAfterBookingWindow}
+                                  onClick={() => !isMaxed && !isPastStart && !isAfterBookingWindow && toggleSlot(dStr, timeStr, endTime)}
                                   className={cn(
                                     "w-full h-full flex flex-col items-center justify-center rounded-xl border transition-all",
-                                    isPastStart
+                                    isPastStart || isAfterBookingWindow
                                       ? "cursor-not-allowed border-slate-200 border-dashed bg-slate-100/80 text-slate-400"
                                       : isSelected
                                       ? "bg-[#e8fbf4] border-[#00c881] shadow-sm"
@@ -457,8 +480,10 @@ export default function SchedulePage() {
                                         : "border-dashed border-slate-200 hover:border-[#00c881]/50 hover:bg-[#e8fbf4]/40 group/cell"
                                   )}
                                 >
-                                  {isPastStart ? (
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Past</span>
+                                  {isPastStart || isAfterBookingWindow ? (
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-center">
+                                      {isPastStart ? 'Past' : 'Booking closed'}
+                                    </span>
                                   ) : isSelected ? (
                                     <div className="h-8 w-8 rounded-full bg-[#00c881] flex items-center justify-center shadow-sm">
                                       <CheckIcon className="h-4 w-4 text-white stroke-[2.5]" />

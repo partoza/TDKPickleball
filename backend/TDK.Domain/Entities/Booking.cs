@@ -45,9 +45,11 @@ public class Booking
     
     public int? InternalCoachProfileId { get; set; }
     public int? PromoId { get; set; }
+    public long? CustomerId { get; set; }
     
     public Court Court { get; set; } = null!;
     public InternalCoachProfile? InternalCoachProfile { get; set; }
     public Promo? Promo { get; set; }
+    public Customer? Customer { get; set; }
     public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }

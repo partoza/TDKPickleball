@@ -18,7 +18,10 @@ export const bookingsService = {
       customerName: payload.customerName, email: payload.email || payload.customerEmail,
       phone: payload.phone || payload.customerPhone, notes: payload.notes, amountPaid: payload.amountPaid || 0,
       rateType: payload.rateType || RateType.Booking,
-      paddleRentalQuantity: Number(payload.paddleRentalQuantity || 0)
+      internalCoachProfileId: payload.internalCoachProfileId || null,
+      promoId: payload.promoId || null,
+      paddleRentalQuantity: Number(payload.paddleRentalQuantity || 0),
+      customerId: payload.customerId || null
     };
     if (payload.receipt instanceof File) {
       const form = new FormData();
@@ -45,23 +48,6 @@ export const bookingsService = {
     }))));
     form.append('receipt', payload.receipt);
     const { data } = await api.post('/api/booking-requests/with-receipt', form);
-    return data;
-  },
-  submitPublicPayMongoRequest: async (payload: any): Promise<ApiResponse<{ requestReference: string; checkoutUrl: string; submittedAt: string; bookingReferences?: string[] }>> => {
-    const request = {
-      customerName: payload.customerName,
-      phone: payload.phone || '',
-      notes: payload.notes || '',
-      paddleRentalQuantity: Number(payload.paddleRentalQuantity || 0),
-      promoCode: payload.promoCode || null,
-      schedulesJson: JSON.stringify(payload.schedules.map((schedule: any) => ({
-        courtId: Number(schedule.courtId),
-        bookingDate: schedule.bookingDate || schedule.date,
-        startTime: withSeconds(schedule.startTime),
-        endTime: withSeconds(schedule.endTime),
-      })))
-    };
-    const { data } = await api.post('/api/booking-requests/paymongo', request);
     return data;
   },
   verifyBooking: async (bookingReference: string): Promise<ApiResponse<Booking>> => {

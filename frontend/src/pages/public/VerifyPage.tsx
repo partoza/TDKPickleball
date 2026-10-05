@@ -2,12 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { CheckCircleIcon as CheckCircle2, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
-import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
+import { BarcodeDetector as BarcodeDetectorPonyfill, prepareZXingModule } from 'barcode-detector/ponyfill';
+import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { useVerifyBooking, useVerifyBookingRequest } from '@/hooks/useBookings';
 import { Booking, PublicBookingRequestStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+const MAX_QR_IMAGE_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_QR_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+prepareZXingModule({
+  overrides: {
+    locateFile: (path, prefix) => path.endsWith('.wasm') ? zxingReaderWasmUrl : `${prefix}${path}`,
+  },
+});
 
 export default function VerifyPage() {
   const [searchParams] = useSearchParams();
@@ -16,6 +26,7 @@ export default function VerifyPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [request, setRequest] = useState<PublicBookingRequestStatus | null>(null);
   const [error, setError] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
   const verify = useVerifyBooking();
   const verifyRequest = useVerifyBookingRequest();
   const isPending = verify.isPending || verifyRequest.isPending;
@@ -50,16 +61,22 @@ export default function VerifyPage() {
   }, [searchParams]);
   const scan = async (file?: File) => {
     if (!file) return;
+    if (!SUPPORTED_QR_IMAGE_TYPES.has(file.type)) {
+      setError('Upload a JPG, PNG, or WebP QR code image');
+      return;
+    }
+    if (file.size > MAX_QR_IMAGE_BYTES) {
+      setError('QR code image must be 10 MB or smaller');
+      return;
+    }
 
     setError('');
     setBooking(null);
     setRequest(null);
+    setIsScanning(true);
 
-    let bitmap: ImageBitmap | undefined;
     try {
-      const Detector = (window as any).BarcodeDetector || BarcodeDetectorPonyfill;
-      bitmap = await createImageBitmap(file);
-      const codes = await new Detector({ formats: ['qr_code'] }).detect(bitmap);
+      const codes = await new BarcodeDetectorPonyfill({ formats: ['qr_code'] }).detect(file);
       const scannedReference = codes[0]?.rawValue;
 
       if (!scannedReference) throw new Error('No QR code found in this image');
@@ -69,7 +86,7 @@ export default function VerifyPage() {
     } catch (e: any) {
       setError(e?.message || 'Unable to read this QR image');
     } finally {
-      bitmap?.close();
+      setIsScanning(false);
     }
   };
   return (
@@ -116,12 +133,12 @@ export default function VerifyPage() {
             <div className="flex-grow border-t border-slate-100"></div>
           </div>
           
-          <label className="group flex h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-600 hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all">
+          <label className={`group flex h-36 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-600 transition-all ${isScanning ? 'cursor-wait opacity-70' : 'cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:text-primary'}`}>
             <div className="rounded-full bg-white p-3 shadow-sm ring-1 ring-slate-200/50 group-hover:ring-primary/20 group-hover:scale-110 transition-all duration-300">
-              <ScanLine className="h-6 w-6 text-slate-400 group-hover:text-primary transition-colors" />
+              {isScanning ? <LoadingIndicator label="Reading QR code" /> : <ScanLine className="h-6 w-6 text-slate-400 group-hover:text-primary transition-colors" />}
             </div>
-            Upload QR Code Image
-            <input type="file" accept="image/*" className="hidden" onChange={e => scan(e.target.files?.[0])} />
+            {isScanning ? 'Reading QR Code…' : 'Upload QR Code Image'}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={isScanning} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void scan(file); }} />
           </label>
           
           {booking && (

@@ -70,6 +70,7 @@ export interface Schedule {
   amountPaid?: number;
   totalAmount?: number;
   internalCoachProfileId?: number;
+  customerId?: number;
 }
 
 export interface Booking {
@@ -109,6 +110,48 @@ export interface Booking {
   receiptAvailable?: boolean;
   internalCoachProfileId?: number;
   promoId?: number;
+  customerId?: number;
+}
+
+export interface Customer {
+  id: number;
+  customerNumber: string;
+  fullName: string;
+  username: string;
+  email: string;
+  phone?: string;
+  isActive: boolean;
+  hasNfcCard: boolean;
+  nfcIssuedAt?: string;
+  nfcLastTappedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  adminNotes?: string;
+}
+
+export interface CustomerDetails {
+  customer: Customer;
+  upcoming: Booking[];
+  pending: Booking[];
+  past: Booking[];
+  cancelled: Booking[];
+}
+
+export interface CustomerCard {
+  fullName: string;
+  username: string;
+  customerNumber: string;
+  memberSince: string;
+  upcoming: Booking[];
+  pending: Booking[];
+  past: Booking[];
+  cancelled: Booking[];
+  eligiblePromos: { code: string; description: string; discountType: string; value: number }[];
+}
+
+export enum PromoAudience {
+  Everyone = 'Everyone',
+  NfcCustomersOnly = 'NfcCustomersOnly'
 }
 
 export interface PublicBookingRequestStatusSchedule {
@@ -145,6 +188,7 @@ export interface Promo {
   maxUses?: number;
   currentUses: number;
   appliesTo?: RateType;
+  audience: PromoAudience;
   isActive: boolean;
 }
 
@@ -188,6 +232,10 @@ export interface ScheduleBoardResponse {
   courts: CourtScheduleDto[];
   timeSlots: TimeSlotDto[];
   rates: Rate[];
+}
+
+export interface PublicBookingWindow {
+  bookingThroughDate?: string | null;
 }
 
 export interface ApiResponse<T> {

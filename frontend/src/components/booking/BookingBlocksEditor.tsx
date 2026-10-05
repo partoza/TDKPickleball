@@ -23,6 +23,7 @@ type Props = {
   addLabel?: string;
   discount?: number;
   showSummary?: boolean;
+  maxBookingDate?: string | null;
 };
 
 function ErrorText({ children }: { children?: string }) {
@@ -34,7 +35,7 @@ const timeMinutes = (value: string, midnightAsEnd = false) => {
   return midnightAsEnd && hour === 0 ? 1440 + minute : hour * 60 + minute;
 };
 
-function BookingBlockCard({ block, blocks, index, count, update, remove, courts, rates, rateType, errors = {}, showQuote, now }: any) {
+function BookingBlockCard({ block, blocks, index, count, update, remove, courts, rates, rateType, errors = {}, showQuote, now, maxBookingDate }: any) {
   const { data: availabilityResponse, isFetching } = useAvailability(block.date, block.courtId);
   const available = availabilityResponse?.data?.availableSlots || [];
   const occupied = availabilityResponse?.data?.occupiedSlots || [];
@@ -73,7 +74,7 @@ function BookingBlockCard({ block, blocks, index, count, update, remove, courts,
     <div className="grid gap-4">
       <div><Label>Court *</Label><Select value={block.courtId} onValueChange={courtId => set({ courtId, startTime: '', endTime: '' })}><SelectTrigger aria-invalid={!!errors.courtId} className={cn(errors.courtId && 'field-invalid')}><SelectValue placeholder="Select court" /></SelectTrigger><SelectContent>{courts.filter((court: any) => court.isActive).map((court: any) => <SelectItem key={court.id} value={String(court.id)}>{court.name}</SelectItem>)}</SelectContent></Select><ErrorText>{errors.courtId}</ErrorText></div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div><Label>Date *</Label><AdminDatePicker value={block.date} minDate={getManilaDateAsLocalDate(new Date(now))} invalid={!!errors.date} onChange={date => set({ date, startTime: '', endTime: '' })} /><ErrorText>{errors.date}</ErrorText></div>
+        <div><Label>Date *</Label><AdminDatePicker value={block.date} minDate={getManilaDateAsLocalDate(new Date(now))} maxDate={maxBookingDate ? new Date(`${maxBookingDate}T00:00:00`) : undefined} invalid={!!errors.date} onChange={date => set({ date, startTime: '', endTime: '' })} /><ErrorText>{errors.date}</ErrorText></div>
         <div><Label>Start *</Label><AdminTimeSelect value={block.startTime} invalid={!!errors.startTime} disabled={!block.courtId || !block.date || isFetching} placeholder={isFetching ? 'Checking…' : 'Select start'} options={startOptions} onChange={startTime => set({ startTime, endTime: '' })} /><ErrorText>{errors.startTime}</ErrorText></div>
         <div><Label>End *</Label><AdminTimeSelect value={block.endTime} invalid={!!errors.endTime} disabled={!block.startTime || isFetching} placeholder="Select end" options={endOptions} onChange={endTime => set({ endTime })} /><ErrorText>{errors.endTime}</ErrorText></div>
       </div>
@@ -83,7 +84,7 @@ function BookingBlockCard({ block, blocks, index, count, update, remove, courts,
   </section>;
 }
 
-export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking', discount = 0, showSummary = true }: Props) {
+export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType, errors = [], showQuote = true, addLabel = 'Add Another Booking', discount = 0, showSummary = true, maxBookingDate }: Props) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -95,7 +96,7 @@ export function BookingBlocksEditor({ blocks, onChange, courts, rates, rateType,
   const finalTotal = Math.max(0, grandTotal - discount);
   const conflictErrors = getBookingBlockConflictErrors(blocks);
   return <div className="space-y-4">
-    {blocks.map((block, index) => <BookingBlockCard key={block.id || index} block={block} blocks={blocks} index={index} count={blocks.length} update={update} remove={remove} courts={courts} rates={rates} rateType={rateType} errors={{ ...errors[index], ...conflictErrors[index] }} showQuote={showQuote} now={now} />)}
+    {blocks.map((block, index) => <BookingBlockCard key={block.id || index} block={block} blocks={blocks} index={index} count={blocks.length} update={update} remove={remove} courts={courts} rates={rates} rateType={rateType} errors={{ ...errors[index], ...conflictErrors[index] }} showQuote={showQuote} now={now} maxBookingDate={maxBookingDate} />)}
     <Button type="button" variant="default" className="w-full font-bold" onClick={() => onChange([...blocks, createBookingBlock({ courtId: blocks.at(-1)?.courtId || '' })])}><PlusIcon className="mr-2 h-4 w-4 stroke-[2]" />{addLabel}</Button>
     {showQuote && showSummary && (
       <div className="flex items-end justify-between px-1 pt-2" aria-live="polite">

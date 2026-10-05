@@ -77,10 +77,6 @@ export const useValidatePublicPromo = () => useMutation({
   mutationFn: bookingsService.validatePublicPromo,
 });
 
-export const useSubmitPublicPayMongoRequest = () => useMutation({
-  mutationFn: bookingsService.submitPublicPayMongoRequest,
-});
-
 export const useConfirmBooking = () => {
   const queryClient = useQueryClient();
   return useMutation({

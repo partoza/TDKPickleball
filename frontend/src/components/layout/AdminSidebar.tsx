@@ -56,6 +56,7 @@ export default function AdminSidebar({ unreadNotificationCount = 0 }: { unreadNo
     { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
     { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
     { icon: Users, label: 'Internal & Coaches', href: ROUTES.ADMIN.INTERNAL_COACHES },
+    { icon: Users, label: 'Customers', href: ROUTES.ADMIN.CUSTOMERS },
     { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },

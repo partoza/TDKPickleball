@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { usePromos } from '@/hooks/usePromos';
-import { Promo, DiscountType, RateType } from '@/types';
+import { Promo, DiscountType, RateType, PromoAudience } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,7 @@ export default function PromosPage() {
     startDate: '',
     endDate: '',
     appliesTo: 'All' as RateType | 'All',
+    audience: PromoAudience.Everyone,
     isLimitedUses: false,
     maxUses: '' as string | number,
     isActive: true,
@@ -53,6 +54,7 @@ export default function PromosPage() {
         startDate: promo.startDate ? promo.startDate.split('T')[0] : '',
         endDate: promo.endDate ? promo.endDate.split('T')[0] : '',
         appliesTo: promo.appliesTo || 'All',
+        audience: promo.audience || PromoAudience.Everyone,
         isLimitedUses: promo.maxUses != null,
         maxUses: promo.maxUses != null ? promo.maxUses.toString() : '',
         isActive: promo.isActive,
@@ -67,6 +69,7 @@ export default function PromosPage() {
         startDate: '',
         endDate: '',
         appliesTo: 'All',
+        audience: PromoAudience.Everyone,
         isLimitedUses: false,
         maxUses: '',
         isActive: true,
@@ -99,7 +102,7 @@ export default function PromosPage() {
     }
   };
 
-  if (loading && !promos.length) return <AdminPageSkeleton layout="table" label="Loading promos" />;
+  if (loading && !promos.length) return <AdminPageSkeleton layout="promos" label="Loading promos" />;
 
   return (
     <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -151,6 +154,8 @@ export default function PromosPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue placeholder="Select rates" /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue placeholder="Select usage limit" /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
+
+            <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value: PromoAudience) => setForm({ ...form, audience: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={PromoAudience.Everyone}>Everyone</SelectItem><SelectItem value={PromoAudience.NfcCustomersOnly}>NFC Customers Only</SelectItem></SelectContent></Select></div>
 
             {editing && (
               <div className="flex items-center gap-2">
@@ -209,6 +214,7 @@ export default function PromosPage() {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100">{promo.code}</div>
                       <div className="text-xs text-muted-foreground">{promo.description}</div>
+                      {promo.audience === PromoAudience.NfcCustomersOnly && <div className="mt-1 text-[11px] font-semibold text-primary">NFC customers only</div>}
                     </div>
                   </TableCell>
                   <TableCell>

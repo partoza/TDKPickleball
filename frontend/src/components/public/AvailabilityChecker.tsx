@@ -4,14 +4,14 @@ import { CalendarIcon, ClockIcon, ExclamationCircleIcon as AlertCircle, LightBul
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useScheduleBoard } from '@/hooks/useSchedule';
+import { usePublicBookingWindow, useScheduleBoard } from '@/hooks/useSchedule';
 import { ScheduleStatus } from '@/types';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { isValidTimeRange } from '@/lib/time-range';
 import { startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
 
-const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: (d: Date) => void }) => {
+const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDate: Date, onSelect: (d: Date) => void, bookingThroughDate?: string | null }) => {
   const [viewDate, setViewDate] = useState(currentDate);
   const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
   const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
@@ -57,19 +57,20 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
           const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
           const todayStart = new Date(); todayStart.setHours(0,0,0,0);
           const isPast = day < todayStart;
+          const isAfterBookingWindow = !!bookingThroughDate && format(day, 'yyyy-MM-dd') > bookingThroughDate;
           
           return (
             <button
               key={day.toISOString()}
-              onClick={() => !isPast && onSelect(day)}
-              disabled={isPast}
+              onClick={() => !isPast && !isAfterBookingWindow && onSelect(day)}
+              disabled={isPast || isAfterBookingWindow}
               className={cn(
                 "h-8 w-8 rounded-full flex items-center justify-center text-[12px] font-medium transition-colors",
-                isPast && "text-slate-200 cursor-not-allowed",
-                !isPast && !isCurrentMonth && "text-slate-300",
-                !isPast && isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
-                !isPast && isToday && !isSelected && "bg-slate-100 text-primary font-bold",
-                isSelected && "bg-primary text-primary-foreground font-bold shadow-sm"
+                (isPast || isAfterBookingWindow) && "text-slate-200 cursor-not-allowed",
+                !isPast && !isAfterBookingWindow && !isCurrentMonth && "text-slate-300",
+                !isPast && !isAfterBookingWindow && isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
+                !isPast && !isAfterBookingWindow && isToday && !isSelected && "bg-slate-100 text-primary font-bold",
+                isSelected && !isAfterBookingWindow && "bg-primary text-primary-foreground font-bold shadow-sm"
               )}
             >
               {format(day, 'd')}
@@ -93,11 +94,14 @@ export default function AvailabilityChecker() {
 
   // We fetch the board for the selected date
   const dateStr = format(date, 'yyyy-MM-dd');
+  const { data: publicBookingWindowResponse } = usePublicBookingWindow();
+  const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
+  const isAfterBookingWindow = !!bookingThroughDate && dateStr > bookingThroughDate;
   const { data: response, isLoading, isFetching } = useScheduleBoard(dateStr);
   const board = response?.data;
 
   const handleCheck = () => {
-    if (!isValidTimeRange(startTime, endTime)) return;
+    if (isAfterBookingWindow || !isValidTimeRange(startTime, endTime)) return;
     setSelectedCourt(null);
     setHasChecked(true);
   };
@@ -259,11 +263,18 @@ export default function AvailabilityChecker() {
                 <PopoverContent className="w-auto p-0 rounded-xl" align="start">
                   <MiniCalendar
                     currentDate={date}
+                    bookingThroughDate={bookingThroughDate}
                     onSelect={(d) => { if (d) { setDate(d); setHasChecked(false); } }}
                   />
                 </PopoverContent>
               </Popover>
             </div>
+
+            {isAfterBookingWindow && bookingThroughDate && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -437,7 +448,7 @@ export default function AvailabilityChecker() {
           </button>
           <button
             onClick={handleCheck}
-            disabled={isLoading || isFetching || !isValidTimeRange(startTime, endTime)}
+            disabled={isLoading || isFetching || isAfterBookingWindow || !isValidTimeRange(startTime, endTime)}
             className="h-10 px-6 rounded-xl text-[13px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition-colors flex items-center gap-2"
           >
             {isLoading || (hasChecked && isFetching) ? 'Checking...' : 'Check'}

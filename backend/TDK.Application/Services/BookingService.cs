@@ -20,15 +20,16 @@ public class BookingService : IBookingService
     private readonly IRepository<Notification> _notifications;
     private readonly IRepository<Promo> _promos;
     private readonly IRepository<InternalCoachProfile> _internalCoaches;
+    private readonly IRepository<Customer> _customers;
     private readonly IRateService _rates;
     private readonly IEmailService _email;
     private readonly IBusinessClock _clock;
-    private readonly IPayMongoService _payMongo;
+    private readonly IPublicBookingWindowService _publicBookingWindow;
 
-    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRepository<Promo> promos, IRepository<InternalCoachProfile> internalCoaches, IRateService rates, IEmailService email, IBusinessClock clock, IPayMongoService payMongo)
+    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRepository<Promo> promos, IRepository<InternalCoachProfile> internalCoaches, IRepository<Customer> customers, IRateService rates, IEmailService email, IBusinessClock clock, IPublicBookingWindowService publicBookingWindow)
     {
         _bookings = bookings; _schedules = schedules; _timeSlots = timeSlots; _courts = courts;
-        _notifications = notifications; _promos = promos; _internalCoaches = internalCoaches; _rates = rates; _email = email; _clock = clock; _payMongo = payMongo;
+        _notifications = notifications; _promos = promos; _internalCoaches = internalCoaches; _customers = customers; _rates = rates; _email = email; _clock = clock; _publicBookingWindow = publicBookingWindow;
     }
 
     public async Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId)
@@ -46,9 +47,10 @@ public class BookingService : IBookingService
         return ApiResponse<BookingAvailabilityDto>.Ok(new(date, courtId, available, occupied));
     }
 
-    public async Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode)
+    public async Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode, string authenticatedEmail)
     {
-        var (promo, error) = await ResolvePublicPromoAsync(promoCode);
+        var customer = await FindActiveCustomerByEmailAsync(authenticatedEmail);
+        var (promo, error) = await ResolvePublicPromoAsync(promoCode, customer);
         if (promo is null)
             return ApiResponse<PublicPromoDto>.Fail(error ?? "Promo name is invalid or unavailable");
 
@@ -68,10 +70,14 @@ public class BookingService : IBookingService
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("A valid contact number is required");
         if (request.Schedules.Count is < 1 or > 20)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Select between 1 and 20 booking schedules");
+        var bookingThroughDate = await _publicBookingWindow.GetBookingThroughDateAsync();
+        if (bookingThroughDate.HasValue && request.Schedules.Any(schedule => schedule.BookingDate > bookingThroughDate.Value))
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail($"Public bookings are open through {bookingThroughDate:MMMM d, yyyy}");
         if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail($"Paddle rental quantity must be between 0 and {MaximumPaddleRentalQuantity}");
 
-        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode);
+        var publicCustomer = await FindActiveCustomerByEmailAsync(request.Email);
+        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode, publicCustomer);
         if (promoError is not null)
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail(promoError);
         if (promo?.MaxUses is int manualMaxUses && promo.CurrentUses + request.Schedules.Count > manualMaxUses)
@@ -172,6 +178,7 @@ public class BookingService : IBookingService
                     CreatedAt = submittedAt,
                     PromoId = promo?.Id,
                     ListedByName = $"Public request · {request.CustomerName.Trim()}"
+                    ,CustomerId = publicCustomer?.Id
                 };
                 await _bookings.AddAsync(booking);
                 await _bookings.SaveChangesAsync();
@@ -206,117 +213,14 @@ public class BookingService : IBookingService
             "Booking request recorded and awaiting admin confirmation.");
     }
 
-    public async Task<ApiResponse<PublicPayMongoRequestResponseDto>> SubmitPayMongoRequestAsync(
-        PublicBookingRequestSubmissionDto request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!IsValidPublicPhone(request.Phone))
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("A valid contact number is required");
-        if (request.Schedules.Count is < 1 or > 20)
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Select between 1 and 20 booking schedules");
-        if (request.PaddleRentalQuantity is < 0 or > MaximumPaddleRentalQuantity)
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail($"Paddle rental quantity must be between 0 and {MaximumPaddleRentalQuantity}");
-
-        var (promo, promoError) = await ResolvePublicPromoAsync(request.PromoCode);
-        if (promoError is not null)
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail(promoError);
-        if (promo?.MaxUses is int payMongoMaxUses && promo.CurrentUses + request.Schedules.Count > payMongoMaxUses)
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Promo does not have enough remaining uses for the selected schedules");
-
-        for (var leftIndex = 0; leftIndex < request.Schedules.Count; leftIndex++)
-        {
-            var left = request.Schedules[leftIndex];
-            for (var rightIndex = leftIndex + 1; rightIndex < request.Schedules.Count; rightIndex++)
-            {
-                var right = request.Schedules[rightIndex];
-                if (left.CourtId == right.CourtId && left.BookingDate == right.BookingDate &&
-                    Minutes(left.StartTime, false) < Minutes(right.EndTime, true) &&
-                    Minutes(right.StartTime, false) < Minutes(left.EndTime, true))
-                    return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Requested schedules cannot overlap on the same court");
-            }
-        }
-
-        decimal checkoutTotal = 0;
-        var lineItems = new List<PayMongoLineItem>();
-        foreach (var schedule in request.Schedules)
-        {
-            var conflict = await ValidateSlotAsync(schedule.CourtId, schedule.BookingDate, schedule.StartTime, schedule.EndTime);
-            if (conflict is not null) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail(conflict);
-            var court = await _courts.GetByIdAsync(schedule.CourtId);
-            if (court is null || !court.IsActive) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Court is not available");
-            var amount = await _rates.CalculateRateAsync(schedule.StartTime, schedule.EndTime, RateType.Booking);
-            if (amount <= 0) return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("No active rate covers one or more selected schedules");
-            var discountedAmount = amount - CalculatePromoDiscount(amount, promo);
-            checkoutTotal += discountedAmount;
-            
-            if (discountedAmount > 0)
-            {
-                lineItems.Add(new PayMongoLineItem(
-                    promo is null ? $"Court Booking - {court.Name}" : $"Court Booking - {court.Name} ({promo.Code})",
-                    discountedAmount,
-                    1,
-                    $"{schedule.BookingDate:MMM dd, yyyy} ({schedule.StartTime:HH:mm} - {schedule.EndTime:HH:mm})"
-                ));
-            }
-        }
-
-        if (request.PaddleRentalQuantity > 0)
-        {
-            var paddleRentalFee = request.PaddleRentalQuantity * PaddleRentalPrice;
-            checkoutTotal += paddleRentalFee;
-            lineItems.Add(new PayMongoLineItem("Paddle Rental", PaddleRentalPrice, request.PaddleRentalQuantity, "Pickleball Paddle Rental"));
-        }
-
-        if (checkoutTotal <= 0)
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("This promo covers the full amount. Please use manual booking so the store can verify it.");
-
-        var submittedAt = _clock.UtcNow.UtcDateTime;
-        var requestReference = $"PM-{submittedAt:yyyyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
-        
-        string checkoutUrl;
-        try
-        {
-            var billing = new PayMongoBilling(request.CustomerName, request.Email, request.Phone);
-            checkoutUrl = await _payMongo.CreateCheckoutSessionAsync(requestReference, lineItems, billing, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ApiResponse<PublicPayMongoRequestResponseDto>.Fail("Failed to initialize payment: " + ex.Message);
-        }
-
-        var createdRefs = new List<string>();
-        for (var scheduleIndex = 0; scheduleIndex < request.Schedules.Count; scheduleIndex++)
-        {
-            var schedule = request.Schedules[scheduleIndex];
-            var createReq = new CreateBookingRequest(
-                schedule.CourtId,
-                schedule.BookingDate,
-                schedule.StartTime,
-                schedule.EndTime,
-                request.CustomerName,
-                request.Email,
-                request.Phone,
-                $"[PayMongoRequest:{requestReference}] {request.Notes}".Trim(),
-                0,
-                RateType.Booking,
-                null,
-                promo?.Id,
-                scheduleIndex == 0 ? request.PaddleRentalQuantity : 0
-            );
-            var res = await CreateAsync(createReq, false); 
-            if (res.Success && res.Data != null) {
-                createdRefs.Add(res.Data.BookingReference);
-            }
-        }
-
-        await TryAddNotificationAsync(
-            "New PayMongo booking request",
-            $"{request.CustomerName.Trim()} started {requestReference} with {createdRefs.Count} booking schedule{(createdRefs.Count == 1 ? "" : "s")}.");
-        return ApiResponse<PublicPayMongoRequestResponseDto>.Ok(new(requestReference, checkoutUrl, submittedAt, createdRefs));
-    }
-
     public async Task<ApiResponse<BookingDto>> CreateAsync(CreateBookingRequest request, bool sendConfirmation = true, string? listedByUserId = null, string? listedByName = null)
     {
+        Customer? selectedCustomer = null;
+        if (request.CustomerId.HasValue)
+        {
+            selectedCustomer = await _customers.GetByIdAsync(request.CustomerId.Value);
+            if (selectedCustomer is null || !selectedCustomer.IsActive) return ApiResponse<BookingDto>.Fail("Selected customer is unavailable");
+        }
         var conflict = await ValidateSlotAsync(request.CourtId, request.BookingDate, request.StartTime, request.EndTime);
         if (conflict is not null) return ApiResponse<BookingDto>.Fail(conflict);
         var court = await _courts.GetByIdAsync(request.CourtId);
@@ -334,6 +238,8 @@ public class BookingService : IBookingService
             if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value) return ApiResponse<BookingDto>.Fail("Promo usage limit reached");
             var promoError = ValidatePromoAvailability(promo, request.RateType);
             if (promoError is not null) return ApiResponse<BookingDto>.Fail(promoError);
+            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || selectedCustomer.NfcTokenHash is not { Length: 32 }))
+                return ApiResponse<BookingDto>.Fail("Invalid or unavailable promo");
             
             discount = promo.Type == DiscountType.Percentage ? (subtotal * (promo.Value / 100)) : promo.Value;
             if (discount > subtotal) discount = subtotal;
@@ -351,7 +257,7 @@ public class BookingService : IBookingService
         var isPaid = paid >= total;
         var booking = new Booking {
             BookingReference = await GenerateReferenceAsync(), CourtId = request.CourtId,
-            CustomerName = request.CustomerName.Trim(), Email = request.Email?.Trim() ?? "", Phone = request.Phone?.Trim(),
+            CustomerName = selectedCustomer?.FullName ?? request.CustomerName.Trim(), Email = selectedCustomer?.Email ?? request.Email?.Trim() ?? "", Phone = selectedCustomer?.Phone ?? request.Phone?.Trim(),
             BookingDate = request.BookingDate, StartTime = request.StartTime, EndTime = request.EndTime,
             Subtotal = subtotal, DiscountAmount = discount, PaddleRentalQuantity = request.PaddleRentalQuantity, PaddleRentalFee = paddleRentalFee,
             TotalAmount = total, AmountPaid = paid, Status = isPaid ? BookingStatus.Paid : BookingStatus.Reserved,
@@ -359,6 +265,7 @@ public class BookingService : IBookingService
             ListedByUserId = listedByUserId, ListedByName = NormalizeActorName(listedByName, "Online booking"),
             ConfirmedAt = isPaid ? manilaNow : null, ConfirmedByUserId = isPaid ? listedByUserId : null,
             ConfirmedByName = isPaid ? NormalizeActorName(listedByName, "Online booking") : null
+            ,CustomerId = selectedCustomer?.Id
         };
         await _bookings.AddAsync(booking); await _bookings.SaveChangesAsync();
         await AssignScheduleAsync(booking, request.RateType);
@@ -506,6 +413,12 @@ public class BookingService : IBookingService
     {
         var b = await _bookings.GetByIdAsync(id);
         if (b is null) return ApiResponse<BookingDto>.Fail("Booking not found");
+        Customer? selectedCustomer = null;
+        if (request.CustomerId.HasValue)
+        {
+            selectedCustomer = await _customers.GetByIdAsync(request.CustomerId.Value);
+            if (selectedCustomer is null || !selectedCustomer.IsActive) return ApiResponse<BookingDto>.Fail("Selected customer is unavailable");
+        }
         var wasPaid = b.Status == BookingStatus.Paid;
         var rateType = await GetRateTypeAsync(id);
         var subtotal = await _rates.CalculateRateAsync(request.StartTime, request.EndTime, rateType);
@@ -516,6 +429,8 @@ public class BookingService : IBookingService
         {
             var promo = await _promos.GetByIdAsync(request.PromoId.Value);
             if (promo == null || !promo.IsActive) return ApiResponse<BookingDto>.Fail("Invalid or inactive promo");
+            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || selectedCustomer.NfcTokenHash is not { Length: 32 }))
+                return ApiResponse<BookingDto>.Fail("Invalid or unavailable promo");
             
             if (b.PromoId != request.PromoId.Value) 
             {
@@ -557,7 +472,7 @@ public class BookingService : IBookingService
         }
         var manilaNow = _clock.ManilaNow;
         b.CourtId = request.CourtId; b.BookingDate = request.BookingDate; b.StartTime = request.StartTime; b.EndTime = request.EndTime;
-        b.CustomerName = request.CustomerName.Trim(); b.Email = request.Email?.Trim() ?? ""; b.Phone = request.Phone?.Trim(); b.Notes = request.Notes?.Trim();
+        b.CustomerName = selectedCustomer?.FullName ?? request.CustomerName.Trim(); b.Email = selectedCustomer?.Email ?? request.Email?.Trim() ?? ""; b.Phone = selectedCustomer?.Phone ?? request.Phone?.Trim(); b.CustomerId = selectedCustomer?.Id; b.Notes = request.Notes?.Trim();
         b.Subtotal = subtotal; b.DiscountAmount = discount; b.PaddleRentalQuantity = paddleRentalQuantity; b.PaddleRentalFee = paddleRentalFee;
         b.TotalAmount = newTotal; b.AmountPaid = effectiveAmountPaid; b.PromoId = request.PromoId;
         b.Status = request.Status; b.InternalCoachProfileId = request.InternalCoachProfileId; b.UpdatedAt = manilaNow;
@@ -695,6 +610,7 @@ public class BookingService : IBookingService
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
         if (booking.Status is not (BookingStatus.Reserved or BookingStatus.Requested)) return ApiResponse<bool>.Fail("Only reservations and booking requests can be cancelled");
         var wasRequested = booking.Status == BookingStatus.Requested;
+        var promoUseReturned = await ReturnPromoUseAsync(booking);
         var manilaNow = _clock.ManilaNow;
         booking.Status = BookingStatus.Cancelled;
         booking.CancelledAt = manilaNow;
@@ -710,7 +626,9 @@ public class BookingService : IBookingService
             try { await _email.SendCancellationAsync(booking, courtName, normalizedReason, wasRequested); }
             catch (Exception ex) { return ApiResponse<bool>.Fail($"Booking cancelled but email failed: {ex.Message}"); }
         }
-        return ApiResponse<bool>.Ok(true, wasRequested ? "Booking request declined" : "Booking cancelled");
+        var message = wasRequested ? "Booking request declined" : "Booking cancelled";
+        if (promoUseReturned) message += " and promo use returned";
+        return ApiResponse<bool>.Ok(true, message);
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(long id)
@@ -809,6 +727,19 @@ public class BookingService : IBookingService
         await _schedules.SaveChangesAsync();
     }
 
+    private async Task<bool> ReturnPromoUseAsync(Booking booking)
+    {
+        if (!booking.PromoId.HasValue) return false;
+
+        var promo = await _promos.GetByIdAsync(booking.PromoId.Value);
+        if (promo is null || promo.CurrentUses <= 0) return false;
+
+        promo.CurrentUses--;
+        promo.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        _promos.Update(promo);
+        return true;
+    }
+
     private async Task<string> GenerateReferenceAsync()
     {
         for (var attempt = 0; attempt < 20; attempt++) { var value = $"TDK-{RandomNumberGenerator.GetInt32(0, 10_000_000):D7}"; if (!(await _bookings.FindAsync(x => x.BookingReference == value)).Any()) return value; }
@@ -852,7 +783,7 @@ public class BookingService : IBookingService
     }
     private static string NormalizeActorName(string? userName, string fallback = "Staff") => string.IsNullOrWhiteSpace(userName) ? fallback : userName.Trim();
     private static int Minutes(TimeOnly value, bool midnightAsEnd) => value == TimeOnly.MinValue && midnightAsEnd ? 1440 : value.Hour * 60 + value.Minute;
-    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee, b.ListedByName, b.VoidedPaddleRentalQuantity, b.VoidedPaddleRentalFee, b.PaddleRentalVoidedAt, b.PaddleRentalVoidedByName, b.RescheduledByName, b.CancelledAt, b.CancelledByName, b.ConfirmedAt, b.ConfirmedByName, ExtractPublicRequestReference(b.Notes));
+    private static BookingDto ToDto(Booking b, string court, RateType bookingType = RateType.Booking) => new(b.Id, b.BookingReference, b.CourtId, court, b.CustomerName, b.Email, b.Phone, b.BookingDate, b.StartTime, b.EndTime, b.Subtotal, b.DiscountAmount, b.TotalAmount, b.AmountPaid, b.Status == BookingStatus.Cancelled ? 0 : Math.Max(0, b.TotalAmount - b.AmountPaid), b.Status, b.Notes, b.CreatedAt, bookingType, !string.IsNullOrWhiteSpace(b.ReceiptFileName), b.RescheduledAt, b.InternalCoachProfileId, b.PromoId, b.PaddleRentalQuantity, b.PaddleRentalFee, b.ListedByName, b.VoidedPaddleRentalQuantity, b.VoidedPaddleRentalFee, b.PaddleRentalVoidedAt, b.PaddleRentalVoidedByName, b.RescheduledByName, b.CancelledAt, b.CancelledByName, b.ConfirmedAt, b.ConfirmedByName, ExtractPublicRequestReference(b.Notes), b.CustomerId);
 
     private static string? ExtractPublicRequestReference(string? notes)
     {
@@ -902,7 +833,7 @@ public class BookingService : IBookingService
         return null;
     }
 
-    private async Task<(Promo? Promo, string? Error)> ResolvePublicPromoAsync(string? promoCode)
+    private async Task<(Promo? Promo, string? Error)> ResolvePublicPromoAsync(string? promoCode, Customer? customer)
     {
         if (string.IsNullOrWhiteSpace(promoCode)) return (null, null);
         var exactCode = promoCode.Trim();
@@ -913,11 +844,20 @@ public class BookingService : IBookingService
             string.Equals(candidate.Code, exactCode, StringComparison.Ordinal));
         if (promo is null || !promo.IsActive)
             return (null, "Promo name is invalid or unavailable. Enter the exact promo name.");
+        if (promo.Audience == PromoAudience.NfcCustomersOnly && (customer is null || !customer.IsActive || customer.NfcTokenHash is not { Length: 32 }))
+            return (null, "Promo name is invalid or unavailable. Enter the exact promo name.");
         if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value)
             return (null, "Promo usage limit reached");
 
         var availabilityError = ValidatePromoAvailability(promo, RateType.Booking);
         return availabilityError is null ? (promo, null) : (null, availabilityError);
+    }
+
+    private async Task<Customer?> FindActiveCustomerByEmailAsync(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        var normalized = email.Trim().ToUpperInvariant();
+        return (await _customers.FindAsync(customer => customer.NormalizedEmail == normalized && customer.IsActive)).SingleOrDefault();
     }
 
     private static decimal CalculatePromoDiscount(decimal subtotal, Promo? promo)

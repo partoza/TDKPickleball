@@ -10,6 +10,19 @@ export const useScheduleBoard = (date: string) => {
   });
 };
 
+export const usePublicBookingWindow = () => useQuery({
+  queryKey: [QUERY_KEYS.PUBLIC_BOOKING_WINDOW],
+  queryFn: schedulesService.getPublicBookingWindow,
+});
+
+export const useUpdatePublicBookingWindow = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: schedulesService.updatePublicBookingWindow,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PUBLIC_BOOKING_WINDOW] }),
+  });
+};
+
 export const usePublicWeeklySchedules = (dates: string[]) => {
   return useQuery({
     queryKey: [QUERY_KEYS.SCHEDULES, 'board', 'weekly', dates],

@@ -57,6 +57,11 @@ builder.Services.AddRateLimiter(options =>
             rateLimitConfig.GetValue("EmailPermitLimit", 10),
             TimeSpan.FromMinutes(rateLimitConfig.GetValue("EmailWindowMinutes", 10)))));
 
+    options.AddPolicy("NfcValidation", context =>
+        RateLimitPartition.GetFixedWindowLimiter($"nfc:{ClientIp(context)}", _ => FixedWindow(
+            rateLimitConfig.GetValue("NfcPermitLimit", 20),
+            TimeSpan.FromMinutes(rateLimitConfig.GetValue("NfcWindowMinutes", 5)))));
+
     options.OnRejected = async (context, cancellationToken) =>
     {
         var retryAfterSeconds = 60;
@@ -80,6 +85,17 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseHttpsRedirection();
 app.Use(async (context, next) => { context.Response.Headers.XContentTypeOptions = "nosniff"; context.Response.Headers.XFrameOptions = "DENY"; await next(); });
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/customer/card"))
+    {
+        context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
+    }
+    await next();
+});
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();

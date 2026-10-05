@@ -16,17 +16,19 @@ public class ScheduleService : IScheduleService
     private readonly IRepository<TimeSlot> _timeSlotRepo;
     private readonly IRepository<Rate> _rateRepo;
     private readonly IRepository<Booking> _bookingRepo;
+    private readonly IRepository<Customer> _customerRepo;
     private readonly IBookingService _bookingService;
     private readonly IRateService _rateService;
     private readonly IBusinessClock _clock;
 
-    public ScheduleService(IRepository<Schedule> scheduleRepo, IRepository<Court> courtRepo, IRepository<TimeSlot> timeSlotRepo, IRepository<Rate> rateRepo, IRepository<Booking> bookingRepo, IBookingService bookingService, IRateService rateService, IBusinessClock clock)
+    public ScheduleService(IRepository<Schedule> scheduleRepo, IRepository<Court> courtRepo, IRepository<TimeSlot> timeSlotRepo, IRepository<Rate> rateRepo, IRepository<Booking> bookingRepo, IRepository<Customer> customerRepo, IBookingService bookingService, IRateService rateService, IBusinessClock clock)
     {
         _scheduleRepo = scheduleRepo;
         _courtRepo = courtRepo;
         _timeSlotRepo = timeSlotRepo;
         _rateRepo = rateRepo;
         _bookingRepo = bookingRepo;
+        _customerRepo = customerRepo;
         _bookingService = bookingService;
         _rateService = rateService;
         _clock = clock;
@@ -50,7 +52,7 @@ public class ScheduleService : IScheduleService
                 if (existing != null)
                 {
                     bookings.TryGetValue(existing.BookingId ?? 0, out var booking);
-                    courtScheds.Add(new ScheduleDto(existing.Id, court.Id, court.Name, date, slot.Id, slot.StartTime, slot.EndTime, existing.Status, existing.Notes, existing.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0));
+                    courtScheds.Add(new ScheduleDto(existing.Id, court.Id, court.Name, date, slot.Id, slot.StartTime, slot.EndTime, existing.Status, existing.Notes, existing.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.InternalCoachProfileId, booking?.CustomerId));
                 }
                 else
                 {
@@ -74,7 +76,7 @@ public class ScheduleService : IScheduleService
         var bookings = (await _bookingRepo.GetAllAsync()).Where(b => query.Any(s => s.BookingId == b.Id)).ToDictionary(b => b.Id);
         return ApiResponse<IEnumerable<ScheduleDto>>.Ok(query.Select(s => {
             slots.TryGetValue(s.TimeSlotId, out var slot); courts.TryGetValue(s.CourtId, out var court); bookings.TryGetValue(s.BookingId ?? 0, out var booking);
-            return new ScheduleDto(s.Id, s.CourtId, court?.Name ?? "Court", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.InternalCoachProfileId);
+            return new ScheduleDto(s.Id, s.CourtId, court?.Name ?? "Court", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.InternalCoachProfileId, booking?.CustomerId);
         }));
     }
 
@@ -84,7 +86,7 @@ public class ScheduleService : IScheduleService
         if (s == null) return ApiResponse<ScheduleDto>.Fail("Not found");
         var slot = await _timeSlotRepo.GetByIdAsync(s.TimeSlotId);
         var booking = s.BookingId.HasValue ? await _bookingRepo.GetByIdAsync(s.BookingId.Value) : null;
-        return ApiResponse<ScheduleDto>.Ok(new ScheduleDto(s.Id, s.CourtId, "", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.InternalCoachProfileId));
+        return ApiResponse<ScheduleDto>.Ok(new ScheduleDto(s.Id, s.CourtId, "", s.ScheduleDate, s.TimeSlotId, slot?.StartTime ?? new(), slot?.EndTime ?? new(), s.Status, s.Notes, s.BookingId, booking?.BookingReference, booking?.CustomerName, booking?.Email, booking?.Phone, booking?.Status, booking?.AmountPaid ?? 0, booking?.TotalAmount ?? 0, booking?.InternalCoachProfileId, booking?.CustomerId));
     }
 
     public async Task<ApiResponse<ScheduleDto>> CreateAsync(int courtId, DateOnly date, int timeSlotId)
@@ -123,10 +125,17 @@ public class ScheduleService : IScheduleService
         await _scheduleRepo.SaveChangesAsync();
         if (bookingToUpdate != null)
         {
+            Customer? selectedCustomer = null;
+            if (request.CustomerId.HasValue)
+            {
+                selectedCustomer = await _customerRepo.GetByIdAsync(request.CustomerId.Value);
+                if (selectedCustomer is null || !selectedCustomer.IsActive) return ApiResponse<ScheduleDto>.Fail("Selected customer is unavailable");
+            }
             var wasPaid = bookingToUpdate.Status == BookingStatus.Paid;
-            bookingToUpdate.CustomerName = request.BookedBy?.Trim() ?? bookingToUpdate.CustomerName;
-            bookingToUpdate.Email = request.Email?.Trim() ?? "";
-            bookingToUpdate.Phone = request.Phone?.Trim();
+            bookingToUpdate.CustomerName = selectedCustomer?.FullName ?? request.BookedBy?.Trim() ?? bookingToUpdate.CustomerName;
+            bookingToUpdate.Email = selectedCustomer?.Email ?? request.Email?.Trim() ?? "";
+            bookingToUpdate.Phone = selectedCustomer?.Phone ?? request.Phone?.Trim();
+            bookingToUpdate.CustomerId = selectedCustomer?.Id;
             bookingToUpdate.Notes = request.Notes?.Trim();
             bookingToUpdate.AmountPaid = request.PaymentStatus == BookingStatus.Paid ? bookingToUpdate.TotalAmount : request.AmountPaid;
             bookingToUpdate.Status = bookingToUpdate.AmountPaid >= bookingToUpdate.TotalAmount ? BookingStatus.Paid : BookingStatus.Reserved;
@@ -150,7 +159,7 @@ public class ScheduleService : IScheduleService
                 var total = await _rateService.CalculateRateAsync(slot.StartTime, slot.EndTime, rateType);
                 var totalWithPaddles = total + (request.PaddleRentalQuantity * 100m);
                 var amountPaid = request.PaymentStatus == BookingStatus.Paid ? totalWithPaddles : request.AmountPaid;
-                var created = await _bookingService.CreateAsync(new(s.CourtId, s.ScheduleDate, slot.StartTime, slot.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity), listedByUserId: userId, listedByName: userName);
+                var created = await _bookingService.CreateAsync(new(s.CourtId, s.ScheduleDate, slot.StartTime, slot.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity, request.CustomerId), listedByUserId: userId, listedByName: userName);
                 if (created.Success && created.Data != null)
                 {
                     s.BookingId = created.Data.Id;
@@ -191,7 +200,7 @@ public class ScheduleService : IScheduleService
             var totalWithPaddles = total + (request.PaddleRentalQuantity * 100m);
             if (request.PaymentStatus == BookingStatus.Reserved && request.AmountPaid > totalWithPaddles && request.Status != ScheduleStatus.Internal) return ApiResponse<bool>.Fail($"Reservation amount cannot exceed the total amount of ₱{totalWithPaddles:N2}");
             var amountPaid = request.AmountPaid;
-            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity), listedByUserId: userId, listedByName: userName);
+            var created = await _bookingService.CreateAsync(new(request.CourtId, request.Date, request.StartTime, request.EndTime, request.BookedBy ?? "", request.Email ?? "", request.Phone, request.Notes, amountPaid, rateType, request.InternalCoachProfileId, request.PromoId, request.PaddleRentalQuantity, request.CustomerId), listedByUserId: userId, listedByName: userName);
             if (!created.Success || created.Data is null) return ApiResponse<bool>.Fail(created.Message, created.Errors);
             if (request.Status is ScheduleStatus.Training or ScheduleStatus.Internal)
             {

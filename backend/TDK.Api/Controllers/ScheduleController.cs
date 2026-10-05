@@ -13,11 +13,25 @@ public class ScheduleController : ControllerBase
 {
     private readonly IScheduleService _scheduleService;
     private readonly IAuthService _authService;
+    private readonly IPublicBookingWindowService _publicBookingWindowService;
 
-    public ScheduleController(IScheduleService scheduleService, IAuthService authService)
+    public ScheduleController(IScheduleService scheduleService, IAuthService authService, IPublicBookingWindowService publicBookingWindowService)
     {
         _scheduleService = scheduleService;
         _authService = authService;
+        _publicBookingWindowService = publicBookingWindowService;
+    }
+
+    [HttpGet("api/public-booking-window")]
+    [EnableRateLimiting("PublicRead")]
+    public async Task<IActionResult> GetPublicBookingWindow() => Ok(await _publicBookingWindowService.GetAsync());
+
+    [HttpPut("api/admin/public-booking-window")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdatePublicBookingWindow(UpdatePublicBookingWindowRequest request)
+    {
+        var result = await _publicBookingWindowService.UpdateAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpGet("api/schedule-board")]
@@ -33,11 +47,11 @@ public class ScheduleController : ControllerBase
     public async Task<IActionResult> GetById(long id) => Ok(await _scheduleService.GetByIdAsync(id));
 
     [HttpPost("api/admin/schedules")]
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(int courtId, DateOnly date, int timeSlotId) => Ok(await _scheduleService.CreateAsync(courtId, date, timeSlotId));
 
     [HttpPut("api/admin/schedules/{id}")]
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(long id, UpdateScheduleRequest request) => Ok(await _scheduleService.UpdateAsync(id, request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/schedules/{id}/delete")]
@@ -54,10 +68,10 @@ public class ScheduleController : ControllerBase
     }
 
     [HttpPost("api/admin/schedules/bulk-update")]
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkUpdate(BulkUpdateRequest request) => Ok(await _scheduleService.BulkUpdateAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!, User.FindFirstValue(ClaimTypes.Name) ?? "Staff"));
 
     [HttpPost("api/admin/schedules/copy")]
-    [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Copy(CopyScheduleRequest request) => Ok(await _scheduleService.CopyScheduleAsync(request, User.FindFirstValue(ClaimTypes.NameIdentifier)!));
 }

@@ -15,6 +15,7 @@ public class Promo
     public int? MaxUses { get; set; }
     public int CurrentUses { get; set; }
     public RateType? AppliesTo { get; set; }
+    public PromoAudience Audience { get; set; } = PromoAudience.Everyone;
     
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

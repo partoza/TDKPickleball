@@ -13,6 +13,7 @@ public record PromoDto(
     int? MaxUses,
     int CurrentUses,
     RateType? AppliesTo,
+    PromoAudience Audience,
     bool IsActive
 );
 
@@ -24,7 +25,8 @@ public record CreatePromoRequest(
     DateTime? StartDate,
     DateTime? EndDate,
     int? MaxUses,
-    RateType? AppliesTo
+    RateType? AppliesTo,
+    PromoAudience Audience = PromoAudience.Everyone
 );
 
 public record UpdatePromoRequest(
@@ -36,5 +38,6 @@ public record UpdatePromoRequest(
     DateTime? EndDate,
     int? MaxUses,
     RateType? AppliesTo,
-    bool IsActive
+    bool IsActive,
+    PromoAudience Audience = PromoAudience.Everyone
 );

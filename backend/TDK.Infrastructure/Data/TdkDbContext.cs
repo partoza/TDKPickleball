@@ -21,6 +21,8 @@ public class TdkDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<InternalCoachProfile> InternalCoachProfiles { get; set; }
     public DbSet<Promo> Promos { get; set; }
+    public DbSet<PublicBookingWindow> PublicBookingWindows { get; set; }
+    public DbSet<Customer> Customers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -28,5 +30,6 @@ public class TdkDbContext : IdentityDbContext<ApplicationUser>
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
         builder.Entity<ApplicationUser>().Property(user => user.ProfileImageUrl).HasMaxLength(2048);
         builder.Entity<ApplicationUser>().Property(user => user.ProfileImagePublicId).HasMaxLength(255);
+        builder.Entity<PublicBookingWindow>().Property(settings => settings.UpdatedByUserId).HasMaxLength(450);
     }
 }

@@ -1,8 +1,16 @@
 import { api } from './api';
-import { ScheduleBoardResponse, Schedule, ApiResponse } from '@/types';
+import { ScheduleBoardResponse, Schedule, ApiResponse, PublicBookingWindow } from '@/types';
 import { withSeconds } from '@/lib/time-range';
 
 export const schedulesService = {
+  getPublicBookingWindow: async (): Promise<ApiResponse<PublicBookingWindow>> => {
+    const { data } = await api.get('/api/public-booking-window');
+    return data;
+  },
+  updatePublicBookingWindow: async (bookingThroughDate: string | null): Promise<ApiResponse<PublicBookingWindow>> => {
+    const { data } = await api.put('/api/admin/public-booking-window', { bookingThroughDate });
+    return data;
+  },
   getScheduleBoard: async (date: string): Promise<ApiResponse<ScheduleBoardResponse>> => {
     const { data } = await api.get(`/api/schedule-board?date=${date}`);
     return data;

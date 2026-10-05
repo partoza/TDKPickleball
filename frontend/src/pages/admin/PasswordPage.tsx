@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
+import { AdminIconLoader, AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 
 export default function PasswordPage({ forced = false }: { forced?: boolean }) {
   const { user, isAuthenticated, isLoading, refreshUser, logout } = useAuth();
@@ -27,7 +27,7 @@ export default function PasswordPage({ forced = false }: { forced?: boolean }) {
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  if (isLoading) return <AdminIconLoader label="Loading profile" />;
+  if (isLoading) return forced ? <AdminIconLoader label="Loading profile" /> : <AdminPageSkeleton layout="profile" label="Loading profile" />;
   if (!isAuthenticated) return <Navigate to={ROUTES.ADMIN.LOGIN} replace />;
   if (forced && !user?.mustChangePassword) return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />;
 

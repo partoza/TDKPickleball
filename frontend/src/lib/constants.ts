@@ -6,6 +6,7 @@ export const QUERY_KEYS = {
   BOOKINGS: 'bookings',
   RATES: 'rates',
   AVAILABILITY: 'availability',
+  PUBLIC_BOOKING_WINDOW: 'public-booking-window',
   USER: 'user',
   NOTIFICATIONS: 'notifications',
 };
@@ -31,6 +32,7 @@ export const STATUS_LABELS: Record<ScheduleStatus, string> = {
 export const ROUTES = {
   HOME: '/',
   SCHEDULE: '/schedule',
+  TRAINING: '/training',
   BOOKING: '/booking',
   VERIFY: '/verify',
   SUCCESS: '/success',
@@ -53,6 +55,7 @@ export const ROUTES = {
     PROFILE: '/tdkadmin/profile',
     WIDGET: '/tdkadmin/widget',
     SOCIAL_MEDIA: '/tdkadmin/social-media',
+    CUSTOMERS: '/tdkadmin/customers',
   }
 };
 

@@ -46,7 +46,7 @@ export default function RevenuePage() {
   const rows = [...(revenue?.daily || [])].reverse();
   const paginatedRows = rows.slice(page * TABLE_PAGE_SIZE, (page + 1) * TABLE_PAGE_SIZE);
 
-  if (report.isLoading) return <AdminPageSkeleton layout="dashboard" label="Loading revenue report" />;
+  if (report.isLoading) return <AdminPageSkeleton layout="revenue" label="Loading revenue report" />;
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 pb-12 sm:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

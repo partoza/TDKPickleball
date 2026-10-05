@@ -46,7 +46,7 @@ export default function CourtsPage() {
   const pending = create.isPending || update.isPending;
   const paginatedCourts = courts.slice(page * 10, (page + 1) * 10);
 
-  if (isLoading) return <AdminPageSkeleton layout="table" label="Loading courts" />;
+  if (isLoading) return <AdminPageSkeleton layout="management" label="Loading courts" />;
   
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Courts</h1><p className="mt-1 text-slate-500">Configure each court’s operating schedule.</p></div><Button onClick={() => open()} disabled={courts.length >= 10}><Plus className="h-4 w-4" />Add Court</Button></div>
     <Card className="rounded-2xl"><CardHeader><CardTitle>All courts</CardTitle></CardHeader><CardContent><div className="space-y-4">

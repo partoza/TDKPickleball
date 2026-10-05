@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftIcon } from '@heroicons/react/24/solid';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { useAuth } from '@/hooks/useAuth';
 import { getApiErrorMessage } from '@/services/api';
@@ -31,9 +31,14 @@ function loadGoogleIdentityServices() {
 export default function GoogleLoginPage() {
   const buttonRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { verifyGoogleCredential } = useAuth();
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const requestedReturn = searchParams.get('returnTo') || '';
+  const safeReturnTo = /^\/card\/[a-z0-9]+(?:-[a-z0-9]+)*\/[A-Za-z0-9_-]{20,200}$/.test(requestedReturn)
+    ? requestedReturn
+    : ROUTES.BOOKING;
 
   useEffect(() => {
     let active = true;
@@ -61,7 +66,7 @@ export default function GoogleLoginPage() {
             setIsVerifying(true);
             try {
               await verifyGoogleCredential(credential);
-              if (active) navigate(ROUTES.BOOKING, { replace: true });
+              if (active) navigate(safeReturnTo, { replace: true });
             } catch (requestError) {
               if (active) setError(getApiErrorMessage(requestError, 'Google could not verify this email address.'));
             } finally {
@@ -87,7 +92,7 @@ export default function GoogleLoginPage() {
       active = false;
       (window as any).google?.accounts?.id?.cancel();
     };
-  }, [navigate, verifyGoogleCredential]);
+  }, [navigate, verifyGoogleCredential, safeReturnTo]);
 
   return (
     <main className="flex-1 bg-gradient-to-br from-white via-white to-primary/10 flex w-full">

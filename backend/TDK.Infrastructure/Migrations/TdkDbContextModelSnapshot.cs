@@ -202,6 +202,9 @@ namespace TDK.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("CustomerName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -310,6 +313,8 @@ namespace TDK.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("CourtId");
+
+                    b.HasIndex("CustomerId");
 
                     b.HasIndex("InternalCoachProfileId");
 
@@ -436,6 +441,79 @@ namespace TDK.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TDK.Domain.Entities.Customer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AdminNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("NfcIssuedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("NfcLastTappedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("NfcTokenHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("varchar(254)")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("NormalizedUsername")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedUsername")
+                        .IsUnique();
+
+                    b.ToTable("Customers", (string)null);
+                });
+
             modelBuilder.Entity("TDK.Domain.Entities.InternalCoachProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -524,6 +602,13 @@ namespace TDK.Infrastructure.Migrations
                     b.Property<int?>("AppliesTo")
                         .HasColumnType("int");
 
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("Everyone");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -570,6 +655,29 @@ namespace TDK.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Promos", (string)null);
+                });
+
+            modelBuilder.Entity("TDK.Domain.Entities.PublicBookingWindow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly?>("BookingThroughDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PublicBookingWindows");
                 });
 
             modelBuilder.Entity("TDK.Domain.Entities.Rate", b =>
@@ -1024,6 +1132,11 @@ namespace TDK.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TDK.Domain.Entities.Customer", "Customer")
+                        .WithMany("Bookings")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TDK.Domain.Entities.InternalCoachProfile", "InternalCoachProfile")
                         .WithMany()
                         .HasForeignKey("InternalCoachProfileId")
@@ -1035,6 +1148,8 @@ namespace TDK.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Court");
+
+                    b.Navigation("Customer");
 
                     b.Navigation("InternalCoachProfile");
 
@@ -1087,6 +1202,11 @@ namespace TDK.Infrastructure.Migrations
                     b.Navigation("Bookings");
 
                     b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("TDK.Domain.Entities.Customer", b =>
+                {
+                    b.Navigation("Bookings");
                 });
 
             modelBuilder.Entity("TDK.Domain.Entities.Promo", b =>

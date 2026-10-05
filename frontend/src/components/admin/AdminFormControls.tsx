@@ -49,7 +49,7 @@ export function AdminTimeSelect({ value, onChange, options, placeholder = 'Selec
   );
 }
 
-export function AdminDatePicker({ value, onChange, minDate, invalid, displayRange, placeholder = 'Select date' }: { value: string; onChange: (value: string) => void; minDate?: Date; invalid?: boolean; displayRange?: 'day' | 'week' | 'month'; placeholder?: string }) {
+export function AdminDatePicker({ value, onChange, minDate, maxDate, invalid, displayRange, placeholder = 'Select date' }: { value: string; onChange: (value: string) => void; minDate?: Date; maxDate?: Date; invalid?: boolean; displayRange?: 'day' | 'week' | 'month'; placeholder?: string }) {
   const selected = value ? parseISO(value) : new Date();
   const [month, setMonth] = useState(startOfMonth(selected));
   const [open, setOpen] = useState(false);
@@ -87,7 +87,8 @@ export function AdminDatePicker({ value, onChange, minDate, invalid, displayRang
         </div>
         <div className="grid grid-cols-7 gap-1">
           {days.map(day => {
-            const disabled = !!minDate && isBefore(day, new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate()));
+            const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+            const disabled = (!!minDate && isBefore(normalizedDay, new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate()))) || (!!maxDate && normalizedDay > new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate()));
             const active = isSameDay(day, selected);
             return <button key={day.toISOString()} type="button" disabled={disabled} onClick={() => { onChange(format(day, 'yyyy-MM-dd')); setOpen(false); }} className={cn('grid h-8 w-8 place-items-center rounded-md text-[12px] transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-25', day.getMonth() !== month.getMonth() && 'text-muted-foreground/45', active && 'bg-primary text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground')}>{format(day, 'd')}</button>;
           })}

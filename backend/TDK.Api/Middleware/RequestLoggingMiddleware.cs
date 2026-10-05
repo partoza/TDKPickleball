@@ -19,9 +19,12 @@ public class RequestLoggingMiddleware
         await _next(context);
         sw.Stop();
         
+        var safePath = context.Request.Path.StartsWithSegments("/api/customer/card")
+            ? "/api/customer/card/[redacted]"
+            : context.Request.Path.Value;
         Log.Information("Handled {Method} {Path} with status {StatusCode} in {Elapsed}ms",
             context.Request.Method,
-            context.Request.Path,
+            safePath,
             context.Response.StatusCode,
             sw.ElapsedMilliseconds);
     }

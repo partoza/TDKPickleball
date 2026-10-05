@@ -3,6 +3,7 @@ import PublicLayout from '@/components/layout/PublicLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 import HomePage from '@/pages/public/HomePage';
 import SchedulePage from '@/pages/public/SchedulePage';
+import TrainingPage from '@/pages/public/TrainingPage';
 import BookingPage from '@/pages/public/BookingPage';
 import VerifyPage from '@/pages/public/VerifyPage';
 import SuccessPage from '@/pages/public/SuccessPage';
@@ -24,6 +25,8 @@ import StoragePage from '@/pages/admin/StoragePage';
 import InternalCoachesPage from '@/pages/admin/InternalCoachesPage';
 import AdminWidgetPage from '@/pages/admin/AdminWidgetPage';
 import SocialMediaPage from '@/pages/admin/SocialMediaPage';
+import CustomersPage from '@/pages/admin/CustomersPage';
+import CustomerCardPage from '@/pages/public/CustomerCardPage';
 import { ROUTES } from '@/lib/constants';
 
 export const router = createBrowserRouter([
@@ -34,12 +37,14 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: ROUTES.SCHEDULE.substring(1), element: <SchedulePage /> },
+      { path: ROUTES.TRAINING.substring(1), element: <TrainingPage /> },
       { path: ROUTES.BOOKING.substring(1), element: <BookingPage /> },
       { path: ROUTES.VERIFY.substring(1), element: <VerifyPage /> },
       { path: ROUTES.SUCCESS.substring(1), element: <SuccessPage /> },
       { path: ROUTES.CONTACT.substring(1), element: <ContactPage /> },
       { path: ROUTES.LOGIN.substring(1), element: <GoogleLoginPage /> },
       { path: ROUTES.GOOGLE_CALLBACK.substring(1), element: <GoogleCallbackPage /> },
+      { path: 'card/:username/:token', element: <CustomerCardPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -67,6 +72,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.ADMIN.STORAGE.replace('/tdkadmin/', ''), element: <StoragePage /> },
       { path: ROUTES.ADMIN.PROFILE.replace('/tdkadmin/', ''), element: <PasswordPage /> },
       { path: ROUTES.ADMIN.SOCIAL_MEDIA.replace('/tdkadmin/', ''), element: <SocialMediaPage /> },
+      { path: ROUTES.ADMIN.CUSTOMERS.replace('/tdkadmin/', ''), element: <CustomersPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

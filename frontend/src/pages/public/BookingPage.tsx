@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import { useSubmitPublicBookingRequest, useSubmitPublicPayMongoRequest, useValidatePublicPromo } from '@/hooks/useBookings';
+import { useSubmitPublicBookingRequest, useValidatePublicPromo } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
 import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
+import { usePublicBookingWindow } from '@/hooks/useSchedule';
 
 const BOOKING_DRAFT_KEY = 'tdk-public-booking-draft';
 const PADDLE_RENTAL_PRICE = 100;
@@ -71,7 +72,6 @@ export default function BookingPage() {
   const [promoError, setPromoError] = useState('');
   const [errors, setErrors] = useState<any>({});
   const [requestReference, setRequestReference] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'manual' | 'paymongo'>('manual');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState('');
@@ -88,8 +88,9 @@ export default function BookingPage() {
   const courts = courtsRes?.data || [];
   const { data: ratesRes } = useRates();
   const rates = ratesRes?.data || [];
+  const { data: publicBookingWindowResponse } = usePublicBookingWindow();
+  const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
   const submitBookingRequest = useSubmitPublicBookingRequest();
-  const submitPayMongoRequest = useSubmitPublicPayMongoRequest();
   const validatePromo = useValidatePublicPromo();
   const courtBookingTotal = blocks.reduce((total, block) => {
     const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
@@ -176,6 +177,14 @@ export default function BookingPage() {
 
   const validateStep1 = () => {
     const blockErrors = validateBookingBlocks(blocks, rates, RateType.Booking);
+    if (bookingThroughDate) {
+      const formattedCutoff = format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy');
+      blocks.forEach((block, index) => {
+        if (block.date && block.date > bookingThroughDate) {
+          blockErrors[index] = { ...blockErrors[index], date: `Online bookings are open through ${formattedCutoff}.` };
+        }
+      });
+    }
     setErrors({ blocks: blockErrors });
     return !hasBookingBlockErrors(blockErrors);
   };
@@ -262,7 +271,7 @@ export default function BookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (paymentMethod === 'manual' && !receipt) {
+    if (!receipt) {
       setReceiptError('Upload your payment receipt before sending the request.');
       return;
     }
@@ -270,29 +279,6 @@ export default function BookingPage() {
     setIsSubmitting(true);
     
     try {
-      if (paymentMethod === 'paymongo') {
-        const result = await submitPayMongoRequest.mutateAsync({
-          customerName,
-          email,
-          phone,
-          notes,
-          paddleRentalQuantity: paddleQuantity,
-          promoCode: appliedPromo?.code,
-          schedules: blocks,
-        });
-        
-        if (result.success && result.data?.checkoutUrl) {
-          if (result.data.bookingReferences) {
-            sessionStorage.setItem('PM_TDK_REFS', JSON.stringify(result.data.bookingReferences));
-          }
-          window.location.href = result.data.checkoutUrl;
-        } else {
-          setSubmitError(result.message || 'Failed to initialize payment.');
-          setIsSubmitting(false);
-        }
-        return;
-      }
-      
       const result = await submitBookingRequest.mutateAsync({
         customerName,
         email,
@@ -478,14 +464,19 @@ export default function BookingPage() {
             <CardDescription>
               {step === 1 && "Choose when and where you want to play. You can book multiple timeslots at once."}
               {step === 2 && "Provide your contact information for the reservation."}
-              {step === 3 && "Choose your payment method. You can upload a receipt for manual verification or use PayMongo for instant confirmation."}
+              {step === 3 && "Scan the merchant QR and upload your payment receipt for verification."}
             </CardDescription>
           </CardHeader>
           
           <CardContent className="space-y-6">
             {step === 1 && (
               <div>
-                <BookingBlocksEditor blocks={blocks} onChange={setBlocks} courts={courts} rates={rates} rateType={RateType.Booking} errors={errors?.blocks} />
+                {bookingThroughDate && (
+                  <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                    Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+                  </p>
+                )}
+                <BookingBlocksEditor blocks={blocks} onChange={setBlocks} courts={courts} rates={rates} rateType={RateType.Booking} errors={errors?.blocks} maxBookingDate={bookingThroughDate} />
               </div>
             )}
 
@@ -622,25 +613,7 @@ export default function BookingPage() {
                   <span className="font-mono text-2xl font-bold tabular-nums">{String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:{String(secondsLeft % 60).padStart(2, '0')}</span>
                 </div>
 
-                {false && (<div className="flex gap-2 p-1 bg-muted/50 rounded-xl border">
-                  <button 
-                    type="button" 
-                    onClick={() => setPaymentMethod('manual')} 
-                    className={cn('flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all', paymentMethod === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5')}
-                  >
-                    Manual Upload
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setPaymentMethod('paymongo')} 
-                    className={cn('flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all', paymentMethod === 'paymongo' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5')}
-                  >
-                    PayMongo QR Ph
-                  </button>
-                </div>)}
-
-                {paymentMethod === 'manual' ? (
-                  <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
+                <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
                     <div className="rounded-2xl border bg-muted/20 p-5 text-center">
                       <div className="mx-auto mb-4 flex h-10 w-fit items-center gap-2 rounded-full bg-primary/10 px-4 text-sm font-semibold text-primary"><QrCode className="h-4 w-4" /> QR Ph</div>
                       {!paymentQrUnavailable ? (
@@ -703,23 +676,6 @@ export default function BookingPage() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="rounded-2xl border bg-muted/20 p-8 text-center space-y-6">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                      <QrCode className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">Pay with PayMongo QR Ph</h3>
-                      <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-                        Once you click &quot;Proceed with PayMongo&quot;, a secure payment QR will be generated. Your booking will be automatically confirmed upon successful payment.
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-background p-4 border mx-auto max-w-xs">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</p>
-                      <p className="mt-1 text-2xl font-bold text-primary">₱{checkoutTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </CardContent>
@@ -747,8 +703,8 @@ export default function BookingPage() {
                 </Button>
               ) : (
                 <Button type="submit" disabled={isSubmitting} className="hover:scale-105 transition-all duration-200">
-                  {paymentMethod === 'manual' ? 'Send Booking Request' : 'Proceed with PayMongo'}
-                  {isSubmitting && <LoadingIndicator className="ml-2" label={paymentMethod === 'manual' ? "Sending booking request" : "Processing"} />}
+                  Send Booking Request
+                  {isSubmitting && <LoadingIndicator className="ml-2" label="Sending booking request" />}
                 </Button>
               )}
             </div>

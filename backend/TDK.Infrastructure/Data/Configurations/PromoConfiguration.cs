@@ -29,5 +29,10 @@ public class PromoConfiguration : IEntityTypeConfiguration<Promo>
         builder.Property(p => p.Value)
             .IsRequired()
             .HasPrecision(18, 2);
+
+        builder.Property(p => p.Audience)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasDefaultValue(TDK.Domain.Enums.PromoAudience.Everyone);
     }
 }

@@ -37,5 +37,7 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.HasOne(x => x.Court).WithMany(c => c.Bookings).HasForeignKey(x => x.CourtId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.InternalCoachProfile).WithMany().HasForeignKey(x => x.InternalCoachProfileId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(x => x.Promo).WithMany(p => p.Bookings).HasForeignKey(x => x.PromoId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasOne(x => x.Customer).WithMany(c => c.Bookings).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasIndex(x => x.CustomerId);
     }
 }

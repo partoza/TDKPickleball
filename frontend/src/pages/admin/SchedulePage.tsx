@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
-import { useAdminWeeklySchedules, useBulkUpdate, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedule';
+import { useAdminWeeklySchedules, useBulkUpdate, useDeleteSchedule, usePublicBookingWindow, useUpdatePublicBookingWindow, useUpdateSchedule } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
 import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MinusIcon as Minus, MapPinIcon as MapPin, TrashIcon as Trash } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
@@ -11,7 +11,7 @@ import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { BookingStatus, InternalCoachType, RateType, Schedule, ScheduleStatus } from '@/types';
+import { BookingStatus, InternalCoachType, PromoAudience, RateType, Schedule, ScheduleStatus } from '@/types';
 import { useInternalCoaches } from '@/hooks/useInternalCoaches';
 import { usePromos } from '@/hooks/usePromos';
 import { toast } from 'sonner';
@@ -26,6 +26,8 @@ import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 import { useAuth } from '@/hooks/useAuth';
 import { isPromoAvailable } from '@/lib/promo-availability';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
+import { AdminDatePicker } from '@/components/admin/AdminFormControls';
+import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 
 function getWeekRangeString(start: Date, end: Date) {
   if (start.getFullYear() !== end.getFullYear()) {
@@ -117,10 +119,11 @@ const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: 
 
 export default function SchedulePage() {
   const { user } = useAuth();
+  const isStaff = user?.role === 'Staff';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number } | null>(null);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number; customerId: number | null } | null>(null);
   const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
   const [scheduleBlocks, setScheduleBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [scheduleBlockErrors, setScheduleBlockErrors] = useState<BookingBlockErrors[]>([]);
@@ -132,6 +135,9 @@ export default function SchedulePage() {
   const bulkUpdateMutation = useBulkUpdate();
   const updateMutation = useUpdateSchedule();
   const deleteMutation = useDeleteSchedule();
+  const { data: publicBookingWindowResponse } = usePublicBookingWindow();
+  const updatePublicBookingWindow = useUpdatePublicBookingWindow();
+  const [publicBookingThroughDate, setPublicBookingThroughDate] = useState('');
   
   const { data: courtsRes, isLoading: courtsLoading } = useCourts();
   const courts = courtsRes?.data || [];
@@ -141,6 +147,21 @@ export default function SchedulePage() {
   const { promos, fetchPromos } = usePromos();
   useEffect(() => { fetchInternalCoaches(); fetchPromos(); }, [fetchInternalCoaches, fetchPromos]);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
+
+  useEffect(() => {
+    setPublicBookingThroughDate(publicBookingWindowResponse?.data?.bookingThroughDate || '');
+  }, [publicBookingWindowResponse?.data?.bookingThroughDate]);
+
+  const savePublicBookingWindow = (bookingThroughDate: string | null) => {
+    updatePublicBookingWindow.mutate(bookingThroughDate, {
+      onSuccess: response => {
+        if (!response.success) return toast.error(response.message || 'The public booking window could not be updated');
+        setPublicBookingThroughDate(response.data?.bookingThroughDate || '');
+        toast.success(response.message || 'Public booking window updated');
+      },
+      onError: error => toast.error(getApiErrorMessage(error, 'The public booking window could not be updated')),
+    });
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 30_000);
@@ -251,6 +272,7 @@ export default function SchedulePage() {
             internalCoachProfileId: bookingModalData.internalCoachProfileId,
             promoId: needsContact ? bookingModalData.promoId : null,
             paddleRentalQuantity: needsContact && index === 0 ? bookingModalData.paddleRentalQuantity : 0,
+            customerId: needsContact ? bookingModalData.customerId : null,
           }));
         }
         const failed = results.find((response: any) => response?.success === false);
@@ -285,6 +307,9 @@ export default function SchedulePage() {
       paymentStatus: needsContact ? bookingModalData.paymentStatus : BookingStatus.Paid,
       amountPaid: needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved ? Number(bookingModalData.amountPaid) : 0,
       internalCoachProfileId: bookingModalData.internalCoachProfileId,
+      promoId: needsContact ? bookingModalData.promoId : null,
+      paddleRentalQuantity: needsContact ? bookingModalData.paddleRentalQuantity : 0,
+      customerId: needsContact ? bookingModalData.customerId : null,
     };
     const mutation = bookingModalData.id
       ? { mutate: (p: any, o: any) => updateMutation.mutate({ id: bookingModalData.id!, update: p }, o) }
@@ -315,6 +340,26 @@ export default function SchedulePage() {
           Manage court availability, daily bookings, and coordinate upcoming time slots. Click any empty slot to add a new booking.
         </p>
       </div>
+
+      {user?.role === 'Admin' && <section className="rounded-xl border border-primary/15 bg-primary/[0.035] p-4 shadow-sm md:p-5" aria-labelledby="public-booking-window-title">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Public booking access</p>
+            <h2 id="public-booking-window-title" className="mt-1 text-lg font-bold text-slate-900">Set the last publicly bookable date</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">Customers cannot select or submit dates after this limit. Admin scheduling remains available for every future date.</p>
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:items-end">
+            <div className="w-full sm:w-[230px]">
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Booking open through</label>
+              <AdminDatePicker value={publicBookingThroughDate} minDate={new Date(`${getManilaDate()}T00:00:00`)} onChange={setPublicBookingThroughDate} placeholder="No date limit" />
+            </div>
+            <button type="button" className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 disabled:opacity-60" onClick={() => savePublicBookingWindow(publicBookingThroughDate || null)} disabled={updatePublicBookingWindow.isPending || !publicBookingThroughDate}>
+              {updatePublicBookingWindow.isPending ? <LoadingIndicator label="Saving public booking window" /> : 'Save limit'}
+            </button>
+            {publicBookingWindowResponse?.data?.bookingThroughDate && <button type="button" className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60" onClick={() => savePublicBookingWindow(null)} disabled={updatePublicBookingWindow.isPending}>Remove limit</button>}
+          </div>
+        </div>
+      </section>}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
         
@@ -396,7 +441,7 @@ export default function SchedulePage() {
           </div>
 
           {/* Add Schedule Button */}
-          <div className="w-full lg:w-auto mt-2 lg:mt-0">
+          {!isStaff && <div className="w-full lg:w-auto mt-2 lg:mt-0">
             <button 
               onClick={() => {
                 setScheduleBlocks([createBookingBlock({ courtId: activeCourtId, date: format(currentDate, 'yyyy-MM-dd') })]);
@@ -406,7 +451,7 @@ export default function SchedulePage() {
                   startTimeStr: '07:00:00',
                   endTimeStr: '08:00:00',
                   status: 'Booked',
-                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0
+                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null
                 });
               }}
               className="h-11 sm:h-9 w-full sm:px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-[14px] sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
@@ -414,7 +459,7 @@ export default function SchedulePage() {
               <Plus className="h-4 w-4" />
               Add Schedule
             </button>
-          </div>
+          </div>}
         </div>
 
         {/* Mobile Day Selector */}
@@ -527,12 +572,12 @@ export default function SchedulePage() {
                             className={cn(
                               "border-l border-slate-200 p-1.5 h-[90px] relative group/cell transition-colors",
                               isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
-                              !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
+                              !isStaff && !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
                               !slot && isPastStart && "cursor-not-allowed bg-slate-100/70 dark:bg-white/[0.03]",
                               isSelectedDay ? "block" : "hidden md:block"
                             )}
                             onClick={() => {
-                              if (!slot && !isPastStart) {
+                               if (!isStaff && !slot && !isPastStart) {
                                 setScheduleBlocks([createBookingBlock({
                                   courtId: activeCourtId,
                                   date: dStr,
@@ -545,7 +590,7 @@ export default function SchedulePage() {
                                   startTimeStr: timeStr,
                                   endTimeStr: hour + 1 === 24 ? '00:00:00' : `${(hour + 1).toString().padStart(2, '0')}:00:00`,
                                   status: 'Booked',
-                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0
+                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null
                                 });
                               }
                             }}
@@ -592,13 +637,13 @@ export default function SchedulePage() {
                               );
                             })() : isPastStart ? (
                               <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Past</div>
-                            ) : (
+                            ) : !isStaff ? (
                               <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm border border-primary/20">
                                   <Plus className="h-4 w-4" />
                                 </div>
                               </div>
-                            )}
+                            ) : null}
                           </div>
                         );
                       })}
@@ -766,9 +811,10 @@ export default function SchedulePage() {
                     <div className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2 sm:grid-cols-2 dark:border-white/10 dark:bg-[#323234]">
                       {bookingModalData.id && modalQuote && <div className={cn("rounded-xl border p-3 sm:col-span-2", modalQuote.covered ? "border-primary/25 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20")}><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Calculated total</p><p className="mt-1 text-xs text-muted-foreground">{modalQuote.covered ? modalQuote.lines.map(line => `${Number.isInteger(line.hours) ? line.hours : line.hours.toFixed(2)} hr × ₱${line.pricePerHour.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${line.pricingId})`).join(' + ') : `No ${modalRateType} rate covers the complete schedule.`}</p></div><p className="shrink-0 text-base font-bold text-primary">{modalQuote.covered ? `₱${modalQuote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p></div></div>}
                       
+                      <CustomerCombobox value={bookingModalData.customerId} onSelect={customer => setBookingModalData({...bookingModalData, customerId: customer.id, bookedBy: customer.fullName, email: customer.email, phone: customer.phone || '', promoId: null})} onClear={() => setBookingModalData({...bookingModalData, customerId: null, bookedBy: '', email: '', phone: '', promoId: null})} />
                       <div className={cn("space-y-1.5", bookingModalData.status === 'Training' ? "" : "sm:col-span-2")}>
                         <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">{bookingModalData.status === 'Training' ? 'Trainee *' : 'Booked By *'}</label>
-                        <Input aria-invalid={!!scheduleErrors.bookedBy} value={bookingModalData.bookedBy} onChange={e => { setBookingModalData({...bookingModalData, bookedBy: e.target.value}); setScheduleErrors(v => ({...v, bookedBy: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.bookedBy && "field-invalid")} placeholder={bookingModalData.status === 'Training' ? "Trainee name" : "Customer name"} />
+                        <Input aria-invalid={!!scheduleErrors.bookedBy} value={bookingModalData.bookedBy} onChange={e => { setBookingModalData({...bookingModalData, customerId: null, bookedBy: e.target.value, promoId: null}); setScheduleErrors(v => ({...v, bookedBy: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.bookedBy && "field-invalid")} placeholder={bookingModalData.status === 'Training' ? "Trainee name" : "Customer name"} />
                         {scheduleErrors.bookedBy && <p className="field-error" role="alert">{scheduleErrors.bookedBy}</p>}
                       </div>
 
@@ -800,10 +846,10 @@ export default function SchedulePage() {
                         </div>
                       )}
 
-                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email (optional)</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, email: e.target.value}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
-                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, phone: e.target.value})} className="h-10 text-[13px] bg-white" placeholder="Optional phone number" /></div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email (optional)</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, customerId: null, email: e.target.value, promoId: null}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
+                      <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, customerId: null, phone: e.target.value, promoId: null})} className="h-10 text-[13px] bg-white" placeholder="Optional phone number" /></div>
                       {!bookingModalData.id && (
-                        <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Promo Code (Optional)</label><Select value={bookingModalData.promoId?.toString() || 'none'} onValueChange={value => setBookingModalData({...bookingModalData, promoId: value !== 'none' ? Number(value) : null})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select promo" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{promos.filter((p) => isPromoAvailable(p, modalRateType)).map((p) => (<SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>))}</SelectContent></Select></div>
+                        <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Promo Code (Optional)</label><Select value={bookingModalData.promoId?.toString() || 'none'} onValueChange={value => setBookingModalData({...bookingModalData, promoId: value !== 'none' ? Number(value) : null})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select promo" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{promos.filter((p) => isPromoAvailable(p, modalRateType) && (p.audience !== PromoAudience.NfcCustomersOnly || !!bookingModalData.customerId)).map((p) => (<SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>))}</SelectContent></Select></div>
                       )}
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment *</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? '' : bookingModalData.amountPaid})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select payment status" /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
                       {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Downpayment</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" max={modalGrandTotal} step="0.01" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: e.target.value === '' ? '' : Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.amountPaid && "field-invalid")} placeholder="0" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}
@@ -972,7 +1018,7 @@ export default function SchedulePage() {
           </div>
           
           <div data-slot="dialog-footer" className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-2">
-            {viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0 }); setViewModalData(null); }}>Edit Details</button>}
+            {!isStaff && viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0, customerId: viewModalData.customerId || null }); setViewModalData(null); }}>Edit Details</button>}
             <button
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}

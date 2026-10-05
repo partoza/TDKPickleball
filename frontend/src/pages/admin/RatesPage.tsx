@@ -82,7 +82,7 @@ export default function RatesPage() {
     disabled: !isValidTimeRange(form.startTime, option.value),
   }));
 
-  if (isLoading) return <AdminPageSkeleton layout="table" label="Loading rates" />;
+  if (isLoading) return <AdminPageSkeleton layout="management" label="Loading rates" />;
 
   return <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="flex items-end justify-between">

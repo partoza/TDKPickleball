@@ -24,7 +24,7 @@ public class PromoService : IPromoService
         }
         
         var dtos = promos.OrderByDescending(p => p.CreatedAt).Select(p => new PromoDto(
-            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.IsActive
+            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.Audience, p.IsActive
         ));
         
         return ApiResponse<IEnumerable<PromoDto>>.Ok(dtos);
@@ -35,7 +35,7 @@ public class PromoService : IPromoService
         var p = await _repo.GetByIdAsync(id);
         if (p == null) return ApiResponse<PromoDto>.Fail("Promo not found");
         return ApiResponse<PromoDto>.Ok(new PromoDto(
-            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.IsActive
+            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.Audience, p.IsActive
         ));
     }
 
@@ -45,7 +45,7 @@ public class PromoService : IPromoService
         var p = all.FirstOrDefault(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
         if (p == null) return ApiResponse<PromoDto>.Fail("Promo not found");
         return ApiResponse<PromoDto>.Ok(new PromoDto(
-            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.IsActive
+            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.Audience, p.IsActive
         ));
     }
 
@@ -66,6 +66,7 @@ public class PromoService : IPromoService
             StartDate = NormalizeStartDate(request.StartDate),
             EndDate = NormalizeEndDate(request.EndDate),
             AppliesTo = request.AppliesTo,
+            Audience = request.Audience,
             MaxUses = request.MaxUses,
             IsActive = true,
             CurrentUses = 0,
@@ -77,7 +78,7 @@ public class PromoService : IPromoService
         await _repo.SaveChangesAsync();
 
         return ApiResponse<PromoDto>.Ok(new PromoDto(
-            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.IsActive
+            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.Audience, p.IsActive
         ));
     }
 
@@ -98,6 +99,7 @@ public class PromoService : IPromoService
         p.EndDate = NormalizeEndDate(request.EndDate);
         p.MaxUses = request.MaxUses;
         p.AppliesTo = request.AppliesTo;
+        p.Audience = request.Audience;
         p.IsActive = request.IsActive;
         p.UpdatedAt = DateTime.UtcNow;
 
@@ -105,7 +107,7 @@ public class PromoService : IPromoService
         await _repo.SaveChangesAsync();
 
         return ApiResponse<PromoDto>.Ok(new PromoDto(
-            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.IsActive
+            p.Id, p.Code, p.Description, p.Type, p.Value, p.StartDate, p.EndDate, p.MaxUses, p.CurrentUses, p.AppliesTo, p.Audience, p.IsActive
         ));
     }
 
