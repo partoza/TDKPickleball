@@ -421,8 +421,8 @@ export default function SchedulePage() {
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-3">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Court</label>
               {courts.length > 0 && (
-                <div className="flex h-10 w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-100/80 p-1 shadow-sm sm:h-9 sm:w-auto">
-                  {courts.map(c => <button key={c.id} type="button" onClick={() => setSelectedCourt(c.id.toString())} className={cn("h-8 min-w-[88px] flex-1 whitespace-nowrap rounded-md px-4 text-[13px] font-bold transition-all sm:h-7 sm:flex-none", selectedCourt === c.id.toString() ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700")}>{c.name}</button>)}
+                <div className="grid h-10 w-full auto-cols-fr grid-flow-col items-center gap-1 overflow-hidden rounded-lg border border-slate-200 bg-slate-100/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/10 sm:h-9 sm:w-[200px]">
+                  {courts.map(c => <button key={c.id} type="button" aria-pressed={selectedCourt === c.id.toString()} onClick={() => setSelectedCourt(c.id.toString())} className={cn("h-8 min-w-0 whitespace-nowrap rounded-md px-3 text-[13px] font-bold transition-all sm:h-7", selectedCourt === c.id.toString() ? "bg-primary text-white shadow-sm dark:bg-[#72151d] dark:text-white" : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white")}>{c.name}</button>)}
                 </div>
               )}
             </div>
