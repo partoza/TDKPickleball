@@ -49,6 +49,16 @@ public class BookingController : ControllerBase
         return Ok(await _bookingService.GetAvailablePublicPromosAsync(email));
     }
 
+    [HttpGet("api/admin/customers/{customerId:long}/available-promos")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAvailableCustomerPromos(long customerId, [FromQuery] RateType rateType = RateType.Booking, [FromQuery] int requestedUses = 1)
+    {
+        if (requestedUses is < 1 or > 20)
+            return BadRequest(new { success = false, message = "Requested uses must be between 1 and 20" });
+        var result = await _bookingService.GetAvailableCustomerPromosAsync(customerId, rateType, requestedUses);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
     [HttpPost("api/bookings")]
     [EnableRateLimiting("Email")]
     [Authorize(Roles = "Admin")]

@@ -22,5 +22,7 @@ public record PublicBookingRequestEmailDto(string RequestReference, string Custo
 public record PublicBookingRequestReceiptDto(string RequestReference, DateTime SubmittedAt);
 public record PublicPromoValidationRequest(string PromoCode);
 public record PublicPromoDto(string Code, string Description, DiscountType Type, decimal Value, int? MonthlyUsageLimitPerCustomer = null, int? RemainingUsesThisMonth = null);
+public record PublicNfcPromoAvailabilityDto(bool IsNfcCustomer, IReadOnlyList<PublicPromoDto> Promos);
+public record CustomerAvailablePromoDto(int Id, string Code, string Description, DiscountType Type, decimal Value, PromoAudience Audience, int? MonthlyUsageLimitPerCustomer, int? RemainingUsesThisMonth);
 public record RevenueDailyDto(DateOnly Date, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, decimal PromoDiscounts, int PromosAppliedCount, decimal GrossSales, decimal CollectedRevenue, decimal OutstandingBalance, int TransactionCount);
 public record RevenueSummaryDto(DateOnly FromDate, DateOnly ThroughDate, decimal CollectedRevenue, decimal GrossSales, decimal OutstandingBalance, decimal BookingSales, decimal TrainingSales, decimal PaddleRentalSales, decimal PromoDiscounts, int PromosAppliedCount, int PaddleRentalCount, int TransactionCount, int PaidCount, int ReservedCount, int CompletedCount, IReadOnlyList<RevenueDailyDto> Daily);

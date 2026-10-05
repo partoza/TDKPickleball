@@ -28,6 +28,7 @@ import { isPromoAvailable } from '@/lib/promo-availability';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
+import { useCustomerAvailablePromos } from '@/hooks/useBookings';
 
 function getWeekRangeString(start: Date, end: Date) {
   if (start.getFullYear() !== end.getFullYear()) {
@@ -193,7 +194,30 @@ export default function SchedulePage() {
   const isLoading = courtsLoading || scheduleLoading;
   const weekSchedules = schedules || [];
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
+  const isAddingCustomerSchedule = !!bookingModalData && !bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training');
+  const { data: customerPromosResponse, isFetching: customerPromosLoading } = useCustomerAvailablePromos(
+    bookingModalData?.customerId,
+    modalRateType,
+    scheduleBlocks.length,
+    isAddingCustomerSchedule,
+  );
+  const linkedCustomerPromos = customerPromosResponse?.data || [];
+  const modalPromoOptions = bookingModalData?.customerId
+    ? linkedCustomerPromos
+    : promos.filter(promo => isPromoAvailable(promo, modalRateType) && promo.audience !== PromoAudience.NfcCustomersOnly);
+  const selectedLinkedPromo = linkedCustomerPromos.find(promo => promo.id === bookingModalData?.promoId);
   const modalQuote = bookingModalData ? calculateRateQuote(rates, bookingModalData.startTimeStr, bookingModalData.endTimeStr, modalRateType) : null;
+
+  useEffect(() => {
+    if (!isAddingCustomerSchedule || !bookingModalData?.customerId || customerPromosLoading || !customerPromosResponse) return;
+    setBookingModalData(current => {
+      if (!current?.customerId || current.id) return current;
+      const nextPromoId = linkedCustomerPromos.some(promo => promo.id === current.promoId)
+        ? current.promoId
+        : linkedCustomerPromos[0]?.id ?? null;
+      return nextPromoId === current.promoId ? current : { ...current, promoId: nextPromoId };
+    });
+  }, [isAddingCustomerSchedule, bookingModalData?.customerId, modalRateType, scheduleBlocks.length, customerPromosLoading, customerPromosResponse]);
   
   let batchDiscount = 0;
   if (!bookingModalData?.id && bookingModalData?.promoId && promos) {
@@ -837,7 +861,7 @@ export default function SchedulePage() {
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Email (optional)</label><Input aria-invalid={!!scheduleErrors.email} type="email" value={bookingModalData.email} onChange={e => { setBookingModalData({...bookingModalData, customerId: null, email: e.target.value, promoId: null}); setScheduleErrors(v => ({...v, email: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.email && "field-invalid")} placeholder="name@example.com" />{scheduleErrors.email && <p className="field-error" role="alert">{scheduleErrors.email}</p>}</div>
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Phone</label><Input value={bookingModalData.phone} onChange={e => setBookingModalData({...bookingModalData, customerId: null, phone: e.target.value, promoId: null})} className="h-10 text-[13px] bg-white" placeholder="Optional phone number" /></div>
                       {!bookingModalData.id && (
-                        <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Promo Code (Optional)</label><Select value={bookingModalData.promoId?.toString() || 'none'} onValueChange={value => setBookingModalData({...bookingModalData, promoId: value !== 'none' ? Number(value) : null})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select promo" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{promos.filter((p) => isPromoAvailable(p, modalRateType) && (p.audience !== PromoAudience.NfcCustomersOnly || !!bookingModalData.customerId)).map((p) => (<SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>))}</SelectContent></Select></div>
+                        <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Promo Code (Optional)</label><Select value={bookingModalData.promoId?.toString() || 'none'} onValueChange={value => setBookingModalData({...bookingModalData, promoId: value !== 'none' ? Number(value) : null})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select promo" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{modalPromoOptions.map((p) => (<SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off{p.remainingUsesThisMonth != null ? ` · ${p.remainingUsesThisMonth} left this month` : ''}</SelectItem>))}</SelectContent></Select>{bookingModalData.customerId && customerPromosLoading && <p className="text-xs text-muted-foreground">Checking this customer’s promo usage…</p>}{bookingModalData.customerId && !customerPromosLoading && !modalPromoOptions.length && <p className="text-xs text-muted-foreground">No promos are currently available for this customer.</p>}{selectedLinkedPromo?.remainingUsesThisMonth != null && <p className="text-xs font-medium text-primary">{selectedLinkedPromo.remainingUsesThisMonth} use{selectedLinkedPromo.remainingUsesThisMonth === 1 ? '' : 's'} remaining this month · {Math.max(0, selectedLinkedPromo.remainingUsesThisMonth - scheduleBlocks.length)} after these {scheduleBlocks.length} schedule{scheduleBlocks.length === 1 ? '' : 's'}.</p>}</div>
                       )}
                       <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Payment *</label><Select value={bookingModalData.paymentStatus} onValueChange={(value: BookingStatus) => setBookingModalData({...bookingModalData, paymentStatus: value, amountPaid: value === BookingStatus.Paid ? '' : bookingModalData.amountPaid})}><SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select payment status" /></SelectTrigger><SelectContent><SelectItem value={BookingStatus.Paid}>Paid</SelectItem><SelectItem value={BookingStatus.Reserved}>Reservation</SelectItem></SelectContent></Select></div>
                       {bookingModalData.paymentStatus === BookingStatus.Reserved && <div className="space-y-1.5"><label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider dark:text-slate-200">Downpayment</label><Input aria-invalid={!!scheduleErrors.amountPaid} type="number" min="0" max={modalGrandTotal} step="0.01" value={bookingModalData.amountPaid} onChange={e => { setBookingModalData({...bookingModalData, amountPaid: e.target.value === '' ? '' : Number(e.target.value)}); setScheduleErrors(v => ({...v, amountPaid: ''})); }} className={cn("h-10 text-[13px] bg-white", scheduleErrors.amountPaid && "field-invalid")} placeholder="0" />{scheduleErrors.amountPaid && <p className="field-error" role="alert">{scheduleErrors.amountPaid}</p>}</div>}

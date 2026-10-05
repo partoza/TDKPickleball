@@ -191,6 +191,7 @@ export interface Promo {
   appliesTo?: RateType;
   audience: PromoAudience;
   isActive: boolean;
+  remainingUsesThisMonth?: number;
 }
 
 export interface PublicPromo {
@@ -198,6 +199,22 @@ export interface PublicPromo {
   description: string;
   type: DiscountType;
   value: number;
+  monthlyUsageLimitPerCustomer?: number;
+  remainingUsesThisMonth?: number;
+}
+
+export interface PublicNfcPromoAvailability {
+  isNfcCustomer: boolean;
+  promos: PublicPromo[];
+}
+
+export interface CustomerAvailablePromo {
+  id: number;
+  code: string;
+  description: string;
+  type: DiscountType;
+  value: number;
+  audience: PromoAudience;
   monthlyUsageLimitPerCustomer?: number;
   remainingUsesThisMonth?: number;
 }

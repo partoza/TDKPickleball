@@ -53,29 +53,63 @@ public class BookingService : IBookingService
         var (promo, error) = await ResolvePublicPromoAsync(promoCode, customer, 1);
         if (promo is null)
             return ApiResponse<PublicPromoDto>.Fail(error ?? "Promo name is invalid or unavailable");
+        if (promo.Audience == PromoAudience.NfcCustomersOnly)
+            return ApiResponse<PublicPromoDto>.Fail("Choose NFC customer promos from the NFC promo list");
 
         return ApiResponse<PublicPromoDto>.Ok(await ToPublicPromoDtoAsync(promo, customer), "Promo applied");
     }
 
-    public async Task<ApiResponse<IEnumerable<PublicPromoDto>>> GetAvailablePublicPromosAsync(string authenticatedEmail)
+    public async Task<ApiResponse<PublicNfcPromoAvailabilityDto>> GetAvailablePublicPromosAsync(string authenticatedEmail)
     {
         var customer = await FindActiveNfcCustomerByEmailAsync(authenticatedEmail);
+        if (customer is null)
+            return ApiResponse<PublicNfcPromoAvailabilityDto>.Ok(new(false, []));
+
         var available = new List<PublicPromoDto>();
         foreach (var promo in (await _promos.GetAllAsync()).OrderBy(promo => promo.Code))
         {
-            if (!promo.IsActive || ValidatePromoAvailability(promo, RateType.Booking) is not null)
+            if (!promo.IsActive || promo.Audience != PromoAudience.NfcCustomersOnly || ValidatePromoAvailability(promo, RateType.Booking) is not null)
                 continue;
             if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value)
                 continue;
-            if (promo.Audience == PromoAudience.NfcCustomersOnly && customer is null)
-                continue;
-            if (customer is not null && !await HasMonthlyPromoCapacityAsync(promo, customer.Id, 1))
+            if (!await HasMonthlyPromoCapacityAsync(promo, customer.Id, 1))
                 continue;
 
             available.Add(await ToPublicPromoDtoAsync(promo, customer));
         }
 
-        return ApiResponse<IEnumerable<PublicPromoDto>>.Ok(available);
+        return ApiResponse<PublicNfcPromoAvailabilityDto>.Ok(new(true, available));
+    }
+
+    public async Task<ApiResponse<IEnumerable<CustomerAvailablePromoDto>>> GetAvailableCustomerPromosAsync(long customerId, RateType rateType, int requestedUses = 1)
+    {
+        if (requestedUses is < 1 or > 20)
+            return ApiResponse<IEnumerable<CustomerAvailablePromoDto>>.Fail("Requested uses must be between 1 and 20");
+        var customer = await _customers.GetByIdAsync(customerId);
+        if (customer is null || !customer.IsActive)
+            return ApiResponse<IEnumerable<CustomerAvailablePromoDto>>.Fail("Selected customer is unavailable");
+
+        var hasNfcCard = customer.NfcTokenHash is { Length: 32 };
+        var available = new List<CustomerAvailablePromoDto>();
+        foreach (var promo in (await _promos.GetAllAsync())
+                     .OrderByDescending(promo => promo.Audience == PromoAudience.NfcCustomersOnly)
+                     .ThenBy(promo => promo.Code))
+        {
+            if (!promo.IsActive || ValidatePromoAvailability(promo, rateType) is not null)
+                continue;
+            if (promo.MaxUses.HasValue && promo.CurrentUses + requestedUses > promo.MaxUses.Value)
+                continue;
+            if (promo.Audience == PromoAudience.NfcCustomersOnly && !hasNfcCard)
+                continue;
+            if (!await HasMonthlyPromoCapacityAsync(promo, customer.Id, requestedUses))
+                continue;
+
+            available.Add(new CustomerAvailablePromoDto(
+                promo.Id, promo.Code, promo.Description, promo.Type, promo.Value, promo.Audience,
+                promo.MonthlyUsageLimitPerCustomer, await GetRemainingMonthlyUsesAsync(promo, customer.Id)));
+        }
+
+        return ApiResponse<IEnumerable<CustomerAvailablePromoDto>>.Ok(available);
     }
 
     public async Task<ApiResponse<PublicBookingRequestReceiptDto>> SubmitPublicRequestAsync(
@@ -906,23 +940,24 @@ public class BookingService : IBookingService
 
     private async Task<PublicPromoDto> ToPublicPromoDtoAsync(Promo promo, Customer? customer)
     {
-        int? remaining = null;
-        if (promo.MonthlyUsageLimitPerCustomer.HasValue && customer is not null)
-        {
-            var now = _clock.ManilaNow;
-            var monthStart = new DateTime(now.Year, now.Month, 1);
-            var nextMonth = monthStart.AddMonths(1);
-            var uses = (await _bookings.FindAsync(booking =>
-                    booking.CustomerId == customer.Id &&
-                    booking.PromoId == promo.Id &&
-                    booking.Status != BookingStatus.Cancelled &&
-                    booking.CreatedAt >= monthStart &&
-                    booking.CreatedAt < nextMonth))
-                .Count();
-            remaining = Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - uses);
-        }
-
+        var remaining = customer is null ? null : await GetRemainingMonthlyUsesAsync(promo, customer.Id);
         return new PublicPromoDto(promo.Code, promo.Description, promo.Type, promo.Value, promo.MonthlyUsageLimitPerCustomer, remaining);
+    }
+
+    private async Task<int?> GetRemainingMonthlyUsesAsync(Promo promo, long customerId)
+    {
+        if (!promo.MonthlyUsageLimitPerCustomer.HasValue) return null;
+        var now = _clock.ManilaNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var nextMonth = monthStart.AddMonths(1);
+        var uses = (await _bookings.FindAsync(booking =>
+                booking.CustomerId == customerId &&
+                booking.PromoId == promo.Id &&
+                booking.Status != BookingStatus.Cancelled &&
+                booking.CreatedAt >= monthStart &&
+                booking.CreatedAt < nextMonth))
+            .Count();
+        return Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - uses);
     }
 
     private static string MonthlyPromoLimitMessage(Promo promo) =>

@@ -92,10 +92,39 @@ public sealed class BookingCustomerIntegrationTests
         customer.IsActive = false;
         var inactive = await fixture.Service.GetAvailablePublicPromosAsync(customer.Email);
 
-        Assert.Single(eligible.Data!);
-        Assert.Equal(3, eligible.Data!.Single().RemainingUsesThisMonth);
-        Assert.Empty(unmatched.Data!);
-        Assert.Empty(inactive.Data!);
+        Assert.True(eligible.Data!.IsNfcCustomer);
+        Assert.Single(eligible.Data.Promos);
+        Assert.Equal(3, eligible.Data.Promos.Single().RemainingUsesThisMonth);
+        Assert.False(unmatched.Data!.IsNfcCustomer);
+        Assert.Empty(unmatched.Data.Promos);
+        Assert.False(inactive.Data!.IsNfcCustomer);
+        Assert.Empty(inactive.Data.Promos);
+    }
+
+    [Fact]
+    public async Task Nfc_only_promo_cannot_be_applied_through_the_regular_text_input()
+    {
+        var fixture = new BookingFixture();
+        var customer = fixture.AddCustomer(active: true, issued: true);
+        var promo = fixture.AddPromo(PromoAudience.NfcCustomersOnly);
+        promo.MonthlyUsageLimitPerCustomer = 3;
+
+        var result = await fixture.Service.ValidatePublicPromoAsync(promo.Code, customer.Email);
+
+        Assert.False(result.Success);
+        Assert.Contains("NFC promo list", result.Message);
+    }
+
+    [Fact]
+    public async Task Everyone_promo_can_still_be_applied_through_the_regular_text_input()
+    {
+        var fixture = new BookingFixture();
+        var promo = fixture.AddPromo(PromoAudience.Everyone);
+
+        var result = await fixture.Service.ValidatePublicPromoAsync(promo.Code, "signed-in@gmail.com");
+
+        Assert.True(result.Success);
+        Assert.Equal(promo.Code, result.Data!.Code);
     }
 
     [Fact]

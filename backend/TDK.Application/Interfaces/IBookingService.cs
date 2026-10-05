@@ -1,5 +1,6 @@
 using TDK.Application.DTOs.Bookings;
 using TDK.Application.DTOs.Common;
+using TDK.Domain.Enums;
 
 namespace TDK.Application.Interfaces;
 
@@ -7,7 +8,8 @@ public interface IBookingService
 {
     Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId);
     Task<ApiResponse<PublicPromoDto>> ValidatePublicPromoAsync(string promoCode, string authenticatedEmail);
-    Task<ApiResponse<IEnumerable<PublicPromoDto>>> GetAvailablePublicPromosAsync(string authenticatedEmail);
+    Task<ApiResponse<PublicNfcPromoAvailabilityDto>> GetAvailablePublicPromosAsync(string authenticatedEmail);
+    Task<ApiResponse<IEnumerable<CustomerAvailablePromoDto>>> GetAvailableCustomerPromosAsync(long customerId, RateType rateType, int requestedUses = 1);
     Task<ApiResponse<PublicBookingRequestReceiptDto>> SubmitPublicRequestAsync(PublicBookingRequestSubmissionDto request, byte[] receiptBytes, string receiptFileName, string receiptContentType, string authenticatedEmail, CancellationToken cancellationToken = default);
     Task<ApiResponse<RevenueSummaryDto>> GetRevenueAsync(DateOnly fromDate, DateOnly throughDate);
     Task<ApiResponse<BookingDto>> CreateAsync(CreateBookingRequest request, bool sendConfirmation = true, string? listedByUserId = null, string? listedByName = null);

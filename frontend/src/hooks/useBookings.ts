@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsService } from '@/services/bookings';
 import { QUERY_KEYS } from '@/lib/constants';
+import { RateType } from '@/types';
 
 export const useAvailability = (date: string, courtId: string) => {
   return useQuery({
@@ -86,6 +87,13 @@ export const useAvailablePublicPromos = (enabled = true) => useQuery({
   queryFn: bookingsService.getAvailablePublicPromos,
   enabled,
   staleTime: 60_000,
+});
+
+export const useCustomerAvailablePromos = (customerId: number | null | undefined, rateType: RateType, requestedUses: number, enabled = true) => useQuery({
+  queryKey: [QUERY_KEYS.AVAILABLE_PROMOS, 'customer', customerId, rateType, requestedUses],
+  queryFn: () => bookingsService.getAvailableCustomerPromos({ customerId: customerId!, rateType, requestedUses }),
+  enabled: enabled && !!customerId && requestedUses > 0,
+  staleTime: 15_000,
 });
 
 export const useConfirmBooking = () => {

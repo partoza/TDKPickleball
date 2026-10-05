@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Booking, ApiResponse, PublicBookingRequestStatus, PublicPromo, RateType } from '@/types';
+import { Booking, ApiResponse, CustomerAvailablePromo, PublicBookingRequestStatus, PublicNfcPromoAvailability, PublicPromo, RateType } from '@/types';
 import { withSeconds } from '@/lib/time-range';
 
 export const bookingsService = {
@@ -11,8 +11,12 @@ export const bookingsService = {
     const { data } = await api.post('/api/booking-requests/promo/validate', { promoCode });
     return data;
   },
-  getAvailablePublicPromos: async (): Promise<ApiResponse<PublicPromo[]>> => {
+  getAvailablePublicPromos: async (): Promise<ApiResponse<PublicNfcPromoAvailability>> => {
     const { data } = await api.get('/api/booking-requests/promos/available');
+    return data;
+  },
+  getAvailableCustomerPromos: async ({ customerId, rateType, requestedUses }: { customerId: number; rateType: RateType; requestedUses: number }): Promise<ApiResponse<CustomerAvailablePromo[]>> => {
+    const { data } = await api.get(`/api/admin/customers/${customerId}/available-promos`, { params: { rateType, requestedUses } });
     return data;
   },
   createBooking: async (payload: any): Promise<ApiResponse<Booking>> => {

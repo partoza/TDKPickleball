@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import { useAvailablePublicPromos, useSubmitPublicBookingRequest } from '@/hooks/useBookings';
+import { useAvailablePublicPromos, useSubmitPublicBookingRequest, useValidatePublicPromo } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -69,6 +69,7 @@ export default function BookingPage() {
   const [notes, setNotes] = useState('');
   const [paddleQuantity, setPaddleQuantity] = useState(0);
   const [promoName, setPromoName] = useState('');
+  const [nfcPromoCode, setNfcPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PublicPromo | null>(null);
   const [promoError, setPromoError] = useState('');
   const [errors, setErrors] = useState<any>({});
@@ -92,8 +93,10 @@ export default function BookingPage() {
   const { data: publicBookingWindowResponse } = usePublicBookingWindow();
   const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
   const submitBookingRequest = useSubmitPublicBookingRequest();
+  const validatePromo = useValidatePublicPromo();
   const { data: availablePromosResponse, isLoading: promosLoading } = useAvailablePublicPromos(isGoogleCustomer);
-  const availablePromos = availablePromosResponse?.data || [];
+  const isNfcCustomer = availablePromosResponse?.data?.isNfcCustomer === true;
+  const availableNfcPromos = availablePromosResponse?.data?.promos || [];
   const courtBookingTotal = blocks.reduce((total, block) => {
     const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
     return total + (quote.covered ? quote.total : 0);
@@ -113,6 +116,7 @@ export default function BookingPage() {
     if (appliedPromo?.remainingUsesThisMonth != null && appliedPromo.remainingUsesThisMonth < blocks.length) {
       setAppliedPromo(null);
       setPromoName('');
+      setNfcPromoCode('');
       setPromoError(`That promo has fewer than ${blocks.length} uses remaining for this month.`);
     }
   }, [blocks.length, appliedPromo]);
@@ -255,6 +259,29 @@ export default function BookingPage() {
       return;
     }
     setReceipt(file);
+  };
+
+  const handleApplyPromo = async () => {
+    const exactName = promoName.trim();
+    setPromoError('');
+    setAppliedPromo(null);
+    setNfcPromoCode('');
+    if (!exactName) {
+      setPromoError('Enter the exact promo code.');
+      return;
+    }
+
+    try {
+      const result = await validatePromo.mutateAsync(exactName);
+      if (!result.success || !result.data) {
+        setPromoError(result.message || 'Promo code is invalid or unavailable.');
+        return;
+      }
+      setAppliedPromo(result.data);
+      setPromoName(result.data.code);
+    } catch (error: any) {
+      setPromoError(error.response?.data?.message || 'Promo code is invalid or unavailable.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -522,38 +549,60 @@ export default function BookingPage() {
                     <h4 id="promo-title" className="font-semibold">Promo</h4>
                     <span className="text-xs text-muted-foreground">Optional</span>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Choose from the promos currently available for your signed-in Gmail account.</p>
-                  <div className="mt-3">
-                    <Select
-                      value={promoName || 'none'}
-                      onValueChange={value => {
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Enter the promo code provided by The Dirty Kitchen.</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      aria-label="Promo code"
+                      value={promoName}
+                      maxLength={100}
+                      placeholder="Enter promo code"
+                      onChange={event => {
+                        setPromoName(event.target.value);
+                        setNfcPromoCode('');
+                        setAppliedPromo(null);
                         setPromoError('');
-                        if (value === 'none') {
-                          setPromoName('');
-                          setAppliedPromo(null);
-                          return;
-                        }
-                        const promo = availablePromos.find(candidate => candidate.code === value) || null;
-                        setPromoName(promo?.code || '');
-                        setAppliedPromo(promo);
                       }}
-                      disabled={promosLoading}
-                    >
-                      <SelectTrigger aria-label="Available promo" className={cn(promoError && 'border-red-500 ring-red-500')}>
-                        <SelectValue placeholder={promosLoading ? 'Loading available promos…' : 'Select a promo'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No promo</SelectItem>
-                        {availablePromos.map(promo => {
-                          const insufficientUses = promo.remainingUsesThisMonth != null && promo.remainingUsesThisMonth < blocks.length;
-                          const discount = promo.type === DiscountType.Percentage ? `${promo.value}% off` : `₱${promo.value.toLocaleString()} off`;
-                          const remaining = promo.remainingUsesThisMonth != null ? ` · ${promo.remainingUsesThisMonth} use${promo.remainingUsesThisMonth === 1 ? '' : 's'} left this month` : '';
-                          return <SelectItem key={promo.code} value={promo.code} disabled={insufficientUses}>{promo.code} · {discount}{remaining}</SelectItem>;
-                        })}
-                      </SelectContent>
-                    </Select>
-                    {!promosLoading && availablePromos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No promos are available for this account right now.</p>}
+                      className={cn('sm:flex-1', promoError && 'border-red-500 ring-red-500')}
+                    />
+                    <Button type="button" className="sm:px-6" onClick={handleApplyPromo} disabled={validatePromo.isPending || !promoName.trim()}>
+                      {validatePromo.isPending ? <LoadingIndicator label="Checking promo" /> : 'Apply Promo'}
+                    </Button>
                   </div>
+                  {isNfcCustomer && (
+                    <div className="mt-4 border-t pt-4">
+                      <div className="mb-2 flex items-center justify-between gap-2"><Label className="text-sm font-semibold">NFC customer promo</Label><span className="text-[11px] font-medium text-primary">Active NFC customer</span></div>
+                      <Select
+                        value={nfcPromoCode || 'none'}
+                        onValueChange={value => {
+                          setPromoError('');
+                          setPromoName('');
+                          if (value === 'none') {
+                            setNfcPromoCode('');
+                            setAppliedPromo(null);
+                            return;
+                          }
+                          const promo = availableNfcPromos.find(candidate => candidate.code === value) || null;
+                          setNfcPromoCode(promo?.code || '');
+                          setAppliedPromo(promo);
+                        }}
+                        disabled={promosLoading || availableNfcPromos.length === 0}
+                      >
+                        <SelectTrigger aria-label="Available NFC customer promo">
+                          <SelectValue placeholder={promosLoading ? 'Loading NFC promos…' : 'Select an NFC promo'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No NFC promo</SelectItem>
+                          {availableNfcPromos.map(promo => {
+                            const insufficientUses = promo.remainingUsesThisMonth != null && promo.remainingUsesThisMonth < blocks.length;
+                            const discount = promo.type === DiscountType.Percentage ? `${promo.value}% off` : `₱${promo.value.toLocaleString()} off`;
+                            const remaining = promo.remainingUsesThisMonth != null ? ` · ${promo.remainingUsesThisMonth} use${promo.remainingUsesThisMonth === 1 ? '' : 's'} left this month` : '';
+                            return <SelectItem key={promo.code} value={promo.code} disabled={insufficientUses}>{promo.code} · {discount}{remaining}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {!promosLoading && availableNfcPromos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No NFC customer promos are available right now.</p>}
+                    </div>
+                  )}
                   <FieldError message={promoError} />
                   {appliedPromo && (
                     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">

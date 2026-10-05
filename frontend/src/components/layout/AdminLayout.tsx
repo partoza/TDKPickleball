@@ -16,11 +16,14 @@ import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
 
 function notificationHref(title: string) {
   const normalized = title.toLowerCase();
+  if (normalized.includes('customer') || normalized.includes('nfc card')) return ROUTES.ADMIN.CUSTOMERS;
   if (normalized.includes('schedule')) return ROUTES.ADMIN.SCHEDULE;
+  if (normalized.includes('revenue')) return ROUTES.ADMIN.REVENUE;
   if (normalized.includes('rate')) return ROUTES.ADMIN.RATES;
   if (normalized.includes('court')) return ROUTES.ADMIN.COURTS;
   if (normalized.includes('promo')) return ROUTES.ADMIN.PROMOS;
   if (normalized.includes('coach')) return ROUTES.ADMIN.INTERNAL_COACHES;
+  if (normalized.includes('social')) return ROUTES.ADMIN.SOCIAL_MEDIA;
   if (normalized.includes('storage') || normalized.includes('cleanup')) return ROUTES.ADMIN.STORAGE;
   if (normalized.includes('user') || normalized.includes('staff') || normalized.includes('admin')) return ROUTES.ADMIN.ADMINS;
   return ROUTES.ADMIN.BOOKINGS;
@@ -50,6 +53,11 @@ export default function AdminLayout() {
   const notificationStorageKey = user?.email ? `tdk-notifications-seen:${user.email.toLowerCase()}` : '';
   const notifications = notificationsQuery.data?.data || [];
   const unreadNotifications = notifications.filter(notification => !seenNotificationIds.includes(notification.id));
+  const unreadNotificationCounts = unreadNotifications.reduce<Record<string, number>>((counts, notification) => {
+    const href = notificationHref(notification.title);
+    counts[href] = (counts[href] || 0) + 1;
+    return counts;
+  }, {});
 
   useEffect(() => {
     if (!notificationStorageKey) {
@@ -130,7 +138,7 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-shell flex min-h-screen">
-      <AdminSidebar unreadNotificationCount={unreadNotifications.length} />
+      <AdminSidebar unreadNotificationCounts={unreadNotificationCounts} />
       <div className="admin-workspace flex-1 flex flex-col min-w-0 md:pl-72 pb-16 md:pb-0">
         <header className="admin-topbar sticky top-0 z-30 flex h-16 items-center justify-between px-4 md:px-5 lg:px-7">
           <div className="flex items-center gap-3 min-w-0">

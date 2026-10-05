@@ -8,7 +8,7 @@ import { EyeIcon as Eye, PlusIcon as Plus, MinusIcon as Minus, QrCodeIcon as QrC
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { toast } from 'sonner';
-import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useConfirmBooking, useCreateBooking, useDeleteBooking, useRescheduleBooking, useVerifyBooking, useVoidPaddleRental } from '@/hooks/useBookings';
+import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useConfirmBooking, useCreateBooking, useCustomerAvailablePromos, useDeleteBooking, useRescheduleBooking, useVerifyBooking, useVoidPaddleRental } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { Booking, BookingStatus, Promo, PromoAudience, RateType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,6 +114,12 @@ export default function BookingsPage() {
   const create = useCreateBooking(); const move = useRescheduleBooking(); const verify = useVerifyBooking(); const addPaddleRental = useAddPaddleRental();
   const { data: availabilityResponse, isFetching: availabilityLoading } = useAvailability(form.bookingDate, form.courtId);
   const availability = availabilityResponse?.data;
+  const { data: customerPromosResponse, isFetching: customerPromosLoading } = useCustomerAvailablePromos(form.customerId, form.rateType, addBlocks.length, showAdd);
+  const linkedCustomerPromos = customerPromosResponse?.data || [];
+  const addPromoOptions = form.customerId
+    ? linkedCustomerPromos
+    : promos.filter(promo => isPromoAvailable(promo, form.rateType) && promo.audience !== PromoAudience.NfcCustomersOnly);
+  const selectedLinkedPromo = linkedCustomerPromos.find(promo => promo.id === form.promoId);
   const markPaid = useConfirmBooking(); const cancel = useCancelBooking(); const remove = useDeleteBooking();
   const busy = creatingBatch || create.isPending || move.isPending;
   const [page, setPage] = useState(0);
@@ -122,6 +128,16 @@ export default function BookingsPage() {
     const timer = window.setInterval(() => setClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!showAdd || !form.customerId || customerPromosLoading || !customerPromosResponse) return;
+    setForm(current => {
+      if (!current.customerId) return current;
+      const nextPromoId = linkedCustomerPromos.some(promo => promo.id === current.promoId)
+        ? current.promoId
+        : linkedCustomerPromos[0]?.id ?? null;
+      return nextPromoId === current.promoId ? current : { ...current, promoId: nextPromoId };
+    });
+  }, [showAdd, form.customerId, form.rateType, addBlocks.length, customerPromosLoading, customerPromosResponse]);
   const filteredBookings = useMemo(() => bookings
     .slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .filter(b => !search.trim() || `${b.bookingReference} ${getRequestReference(b) || ''} ${b.customerName}`.toLowerCase().includes(search.trim().toLowerCase()))
@@ -377,11 +393,14 @@ export default function BookingsPage() {
                   <SelectTrigger><SelectValue placeholder="Select promo code" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {promos.filter((p) => isPromoAvailable(p, form.rateType) && (p.audience !== PromoAudience.NfcCustomersOnly || !!form.customerId)).map((p) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off</SelectItem>
+                    {addPromoOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.code} - {p.type === 'Percentage' ? `${p.value}%` : `₱${p.value}`} off{p.remainingUsesThisMonth != null ? ` · ${p.remainingUsesThisMonth} left this month` : ''}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {form.customerId && customerPromosLoading && <p className="mt-1 text-xs text-muted-foreground">Checking this customer’s promo usage…</p>}
+                {form.customerId && !customerPromosLoading && !addPromoOptions.length && <p className="mt-1 text-xs text-muted-foreground">No promos are currently available for this customer.</p>}
+                {selectedLinkedPromo?.remainingUsesThisMonth != null && <p className="mt-1 text-xs font-medium text-primary">{selectedLinkedPromo.remainingUsesThisMonth} use{selectedLinkedPromo.remainingUsesThisMonth === 1 ? '' : 's'} remaining this month · {Math.max(0, selectedLinkedPromo.remainingUsesThisMonth - addBlocks.length)} after these {addBlocks.length} schedule{addBlocks.length === 1 ? '' : 's'}.</p>}
               </div>
               <CustomerCombobox value={form.customerId} onSelect={customer => setForm({...form, customerId: customer.id, customerName: customer.fullName, email: customer.email, phone: customer.phone || '', promoId: null})} onClear={() => setForm({...form, customerId: null, customerName: '', email: '', phone: '', promoId: null})} />
               <div><Label>{form.rateType === RateType.Training ? 'Trainee *' : 'Booked by *'}</Label><Input aria-invalid={!!formErrors.customerName} className={cn(formErrors.customerName && 'field-invalid')} value={form.customerName} onChange={event => { setForm({...form, customerId: null, customerName: event.target.value, promoId: null}); setFormErrors(current => ({...current, customerName: ''})); }} placeholder="e.g. John Doe" /><FieldError message={formErrors.customerName} /></div>
