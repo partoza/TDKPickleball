@@ -16,6 +16,7 @@ import { TablePagination } from '@/components/admin/TablePagination';
 import { getPromoValidity } from '@/lib/promo-availability';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function PromosPage() {
   const { promos, loading, fetchPromos, createPromo, updatePromo, deletePromo } = usePromos();
@@ -170,9 +171,9 @@ export default function PromosPage() {
             )}
 
             {editing && (
-              <div className="flex items-center gap-2">
-                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-                <Label>Active</Label>
+              <div className="flex items-center gap-2.5 rounded-lg border bg-muted/20 px-3 py-2.5">
+                <Checkbox id="promo-active" checked={form.isActive} onCheckedChange={(isActive) => setForm({ ...form, isActive })} />
+                <Label htmlFor="promo-active" className="cursor-pointer">Active</Label>
               </div>
             )}
 

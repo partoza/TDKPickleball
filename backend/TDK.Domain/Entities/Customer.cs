@@ -9,6 +9,7 @@ public class Customer
     public string Email { get; set; } = null!;
     public string NormalizedEmail { get; set; } = null!;
     public string? Phone { get; set; }
+    public string? ProfilePictureUrl { get; set; }
     public bool IsActive { get; set; } = true;
     public byte[]? NfcTokenHash { get; set; }
     public string? NfcTokenProtected { get; set; }

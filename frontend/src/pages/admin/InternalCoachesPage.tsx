@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EyeIcon as Eye, FunnelIcon as Filter, MagnifyingGlassIcon as Search, NoSymbolIcon as Disable, PencilIcon as Pencil, PlusIcon as Plus, PowerIcon as Enable, TrashIcon as Trash } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function InternalCoachesPage() {
 
@@ -222,9 +223,9 @@ export default function InternalCoachesPage() {
               <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="09XX XXX XXXX" disabled={isSaving} />
             </div>
             {editing && (
-              <div className="flex items-center gap-2">
-                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-                <Label>Active</Label>
+              <div className="flex items-center gap-2.5 rounded-lg border bg-muted/20 px-3 py-2.5">
+                <Checkbox id="profile-active" checked={form.isActive} onCheckedChange={(isActive) => setForm({ ...form, isActive })} disabled={isSaving} />
+                <Label htmlFor="profile-active" className="cursor-pointer">Active</Label>
               </div>
             )}
             <DialogFooter>

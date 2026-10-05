@@ -3,7 +3,7 @@ import { Outlet, Navigate, useLocation, Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/lib/constants';
-import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar, MegaphoneIcon as Megaphone, ArrowPathIcon as Refresh } from '@heroicons/react/24/solid';
+import { BellIcon as Bell, ChevronDownIcon as ChevronDown, ArrowRightStartOnRectangleIcon as LogOut, Squares2X2Icon as LayoutDashboard, CalendarDaysIcon as Calendar, TicketIcon as Ticket, BanknotesIcon as CircleDollarSign, RectangleGroupIcon as Dumbbell, SunIcon as Sun, MoonIcon as Moon, UserCircleIcon as UserCircle, UsersIcon as Users, EllipsisHorizontalIcon as More, ReceiptPercentIcon as Percent, CircleStackIcon as Database, ChartBarIcon as ChartBar, MegaphoneIcon as Megaphone, ArrowPathIcon as Refresh, ComputerDesktopIcon as Monitor } from '@heroicons/react/24/solid';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -124,17 +124,26 @@ export default function AdminLayout() {
     { icon: Calendar, label: 'Schedule', href: ROUTES.ADMIN.SCHEDULE },
     { icon: Ticket, label: 'Bookings', href: ROUTES.ADMIN.BOOKINGS },
     { icon: Megaphone, label: 'Social', href: ROUTES.ADMIN.SOCIAL_MEDIA },
-    ...(user?.role === 'Admin' ? [{ icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS }] : []),
   ];
 
-  const othersItems = user?.role === 'Admin' ? [
-    { icon: ChartBar, label: 'Revenue', href: ROUTES.ADMIN.REVENUE },
-    { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
-    { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
+  const sharedOthersItems = [
+    { icon: Users, label: 'Customers', href: ROUTES.ADMIN.CUSTOMERS },
     { icon: Users, label: 'Internal & Coaches', href: ROUTES.ADMIN.INTERNAL_COACHES },
     { icon: Percent, label: 'Promos', href: ROUTES.ADMIN.PROMOS },
     { icon: Database, label: 'Data storage', href: ROUTES.ADMIN.STORAGE },
-  ] : [];
+    { icon: Monitor, label: 'Schedule Widget', href: ROUTES.ADMIN.WIDGET },
+    { icon: UserCircle, label: 'Profile', href: ROUTES.ADMIN.PROFILE },
+  ];
+
+  const othersItems = user?.role === 'Admin' ? [
+    ...sharedOthersItems.slice(0, 1),
+    { icon: ChartBar, label: 'Revenue', href: ROUTES.ADMIN.REVENUE },
+    { icon: CircleDollarSign, label: 'Rates', href: ROUTES.ADMIN.RATES },
+    { icon: Dumbbell, label: 'Courts', href: ROUTES.ADMIN.COURTS },
+    ...sharedOthersItems.slice(1, 4),
+    { icon: Users, label: 'Users', href: ROUTES.ADMIN.ADMINS },
+    ...sharedOthersItems.slice(4),
+  ] : sharedOthersItems;
 
   return (
     <div className="admin-shell flex min-h-screen">
@@ -215,7 +224,7 @@ export default function AdminLayout() {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-xl border-t border-border/40 pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center justify-around px-2 h-16">
+        <div className="mx-auto flex h-16 max-w-md items-center justify-around px-2">
           {bottomNavItems.map((item) => {
             const isActive = location.pathname.startsWith(item.href);
             return (
@@ -256,7 +265,7 @@ export default function AdminLayout() {
                   <span className="text-[10px] font-medium tracking-wide">Others</span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" sideOffset={16} className="w-56">
+              <DropdownMenuContent align="end" side="top" sideOffset={16} className="max-h-[70vh] w-64 overflow-y-auto">
                 {othersItems.map(item => {
                   const isItemActive = location.pathname.startsWith(item.href);
                   return (

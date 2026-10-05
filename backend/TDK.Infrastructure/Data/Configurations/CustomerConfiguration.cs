@@ -18,6 +18,7 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(customer => customer.NormalizedEmail).IsRequired().HasMaxLength(254)
             .UseCollation("utf8mb4_bin");
         builder.Property(customer => customer.Phone).HasMaxLength(30);
+        builder.Property(customer => customer.ProfilePictureUrl).HasMaxLength(2048);
         builder.Property(customer => customer.NfcTokenHash).HasMaxLength(32);
         builder.Property(customer => customer.NfcTokenProtected).HasMaxLength(1000);
         builder.Property(customer => customer.AdminNotes).HasMaxLength(1000);

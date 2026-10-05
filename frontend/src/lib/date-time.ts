@@ -3,11 +3,15 @@ import { RateValidityUnit } from '@/types';
 const MANILA_TIME_ZONE = 'Asia/Manila';
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_ONLY = /^\d{2}:\d{2}(?::\d{2})?$/;
+const DATE_TIME_WITHOUT_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
 function dateValue(value: string | Date) {
   if (value instanceof Date) return value;
   if (DATE_ONLY.test(value)) return new Date(`${value}T12:00:00+08:00`);
   if (TIME_ONLY.test(value)) return new Date(`2000-01-01T${value}+08:00`);
+  // API audit timestamps are UTC, but MySQL DateTime values can be serialized
+  // without a suffix. Treat those values as UTC before displaying in Manila.
+  if (DATE_TIME_WITHOUT_OFFSET.test(value)) return new Date(`${value}Z`);
   return new Date(value);
 }
 

@@ -28,11 +28,12 @@ public sealed partial class CustomerService : ICustomerService
     private readonly IBusinessClock _clock;
     private readonly INfcTokenProtector _tokenProtector;
     private readonly IEmailService _email;
+    private readonly IProfileImageService _profileImages;
 
     public CustomerService(IRepository<Customer> customers, IRepository<Booking> bookings,
         IRepository<Court> courts, IRepository<Schedule> schedules, IRepository<Promo> promos, IRepository<Rate> rates,
         IRepository<CustomerCardTransaction> cardTransactions, IBusinessClock clock, INfcTokenProtector tokenProtector,
-        IEmailService email)
+        IEmailService email, IProfileImageService profileImages)
     {
         _customers = customers;
         _bookings = bookings;
@@ -44,6 +45,7 @@ public sealed partial class CustomerService : ICustomerService
         _clock = clock;
         _tokenProtector = tokenProtector;
         _email = email;
+        _profileImages = profileImages;
     }
 
     public async Task<ApiResponse<IEnumerable<CustomerSummaryDto>>> GetAllAsync(string? query, bool includeInactive)
@@ -157,6 +159,54 @@ public sealed partial class CustomerService : ICustomerService
         return ApiResponse<CustomerSummaryDto>.Ok(ToSummary(customer, true), "Customer updated");
     }
 
+    public async Task<ApiResponse<CustomerSummaryDto>> UpdateProfileImageAsync(long id, Stream content, string fileName, string contentType, CancellationToken cancellationToken = default)
+    {
+        var customer = await _customers.GetByIdAsync(id);
+        if (customer is null) return ApiResponse<CustomerSummaryDto>.Fail("Customer not found");
+
+        var oldPublicId = GetCloudinaryPublicId(customer.ProfilePictureUrl);
+        TDK.Application.DTOs.Auth.ProfileImageUploadResult uploaded;
+        try
+        {
+            uploaded = await _profileImages.UploadAsync(content, fileName, contentType, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (InvalidOperationException ex) { return ApiResponse<CustomerSummaryDto>.Fail(ex.Message); }
+        catch { return ApiResponse<CustomerSummaryDto>.Fail("The customer profile image upload failed. Please try again"); }
+
+        customer.ProfilePictureUrl = uploaded.Url;
+        customer.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        _customers.Update(customer);
+        try { await _customers.SaveChangesAsync(); }
+        catch
+        {
+            try { await _profileImages.DeleteAsync(uploaded.PublicId, cancellationToken); } catch { }
+            return ApiResponse<CustomerSummaryDto>.Fail("The customer profile image could not be saved");
+        }
+
+        if (!string.IsNullOrWhiteSpace(oldPublicId) && oldPublicId != uploaded.PublicId)
+        {
+            try { await _profileImages.DeleteAsync(oldPublicId, cancellationToken); } catch { }
+        }
+        return ApiResponse<CustomerSummaryDto>.Ok(ToSummary(customer, true), "Customer profile image updated");
+    }
+
+    public async Task<ApiResponse<bool>> RemoveProfileImageAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var customer = await _customers.GetByIdAsync(id);
+        if (customer is null) return ApiResponse<bool>.Fail("Customer not found");
+        var publicId = GetCloudinaryPublicId(customer.ProfilePictureUrl);
+        customer.ProfilePictureUrl = null;
+        customer.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        _customers.Update(customer);
+        await _customers.SaveChangesAsync();
+        if (!string.IsNullOrWhiteSpace(publicId))
+        {
+            try { await _profileImages.DeleteAsync(publicId, cancellationToken); } catch { }
+        }
+        return ApiResponse<bool>.Ok(true, "Customer profile image removed");
+    }
+
     public async Task<ApiResponse<CustomerSummaryDto>> SetActiveAsync(long id, bool active)
     {
         var customer = await _customers.GetByIdAsync(id);
@@ -185,8 +235,13 @@ public sealed partial class CustomerService : ICustomerService
         var customer = await _customers.GetByIdAsync(id);
         if (customer is null) return ApiResponse<bool>.Fail("Customer not found");
         if (customer.IsActive) return ApiResponse<bool>.Fail("Deactivate the customer before deleting them");
+        var profileImagePublicId = GetCloudinaryPublicId(customer.ProfilePictureUrl);
         _customers.Delete(customer);
         await _customers.SaveChangesAsync();
+        if (!string.IsNullOrWhiteSpace(profileImagePublicId))
+        {
+            try { await _profileImages.DeleteAsync(profileImagePublicId); } catch { }
+        }
         return ApiResponse<bool>.Ok(true, "Inactive customer deleted");
     }
 
@@ -201,13 +256,16 @@ public sealed partial class CustomerService : ICustomerService
         return new(CardUrl(frontendBaseUrl, customer.Username, token), now);
     }
 
-    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token)
+    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token, string authenticatedEmail)
     {
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200)
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200 ||
+            string.IsNullOrWhiteSpace(authenticatedEmail))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         var normalizedUsername = NormalizeUsername(username);
         var customer = (await _customers.FindAsync(item => item.NormalizedUsername == normalizedUsername)).SingleOrDefault();
         if (customer is null || !HasUsableCard(customer, _clock.ManilaToday))
+            return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
+        if (!string.Equals(customer.NormalizedEmail, NormalizeEmail(authenticatedEmail), StringComparison.Ordinal))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         if (!TokenMatches(customer, token))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
@@ -242,7 +300,7 @@ public sealed partial class CustomerService : ICustomerService
             return new CustomerPromoDto(promo.Code, promo.Description, promo.Type.ToString(), promo.Value, remaining, resetsOn);
         }).Where(promo => !promo.RemainingUsesThisMonth.HasValue || promo.RemainingUsesThisMonth.Value > 0).ToList();
         return ApiResponse<CustomerCardDto>.Ok(new(customer.FullName, customer.Username, CustomerNumber(customer.Id), customer.CreatedAt, customer.CardValidFrom, customer.CardValidThrough,
-            groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled, eligiblePromos));
+            groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled, eligiblePromos, customer.ProfilePictureUrl));
     }
 
     private static bool TokenMatches(Customer customer, string token)
@@ -276,7 +334,21 @@ public sealed partial class CustomerService : ICustomerService
 
     private static CustomerSummaryDto ToSummary(Customer customer, bool includeNotes) => new(customer.Id, CustomerNumber(customer.Id), customer.FullName, customer.Username,
         customer.Email, customer.Phone, customer.IsActive, customer.NfcTokenHash is { Length: 32 }, customer.NfcIssuedAt, customer.NfcLastTappedAt,
-        customer.CreatedAt, customer.UpdatedAt, includeNotes ? customer.AdminNotes : null, customer.CardValidFrom, customer.CardValidThrough);
+        customer.CreatedAt, customer.UpdatedAt, includeNotes ? customer.AdminNotes : null, customer.CardValidFrom, customer.CardValidThrough, customer.ProfilePictureUrl);
+
+    private static string? GetCloudinaryPublicId(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !uri.Host.EndsWith("cloudinary.com", StringComparison.OrdinalIgnoreCase)) return null;
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var uploadIndex = Array.FindIndex(segments, segment => segment.Equals("upload", StringComparison.OrdinalIgnoreCase));
+        if (uploadIndex < 0) return null;
+        var versionIndex = Array.FindIndex(segments, uploadIndex + 1, segment => segment.Length > 1 && segment[0] == 'v' && segment[1..].All(char.IsDigit));
+        var publicIdStart = versionIndex >= 0 ? versionIndex + 1 : uploadIndex + 1;
+        if (publicIdStart >= segments.Length) return null;
+        var publicId = string.Join('/', segments[publicIdStart..]);
+        var extensionIndex = publicId.LastIndexOf('.');
+        return extensionIndex > 0 ? publicId[..extensionIndex] : publicId;
+    }
 
     private async Task<Rate?> GetActiveCardRateAsync() => (await _rates.GetAllAsync())
         .Where(rate => rate.IsActive && rate.RateType == RateType.CustomerCard && rate.ValidityDuration.HasValue && rate.ValidityUnit.HasValue)

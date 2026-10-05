@@ -127,6 +127,7 @@ export interface Customer {
   username: string;
   email: string;
   phone?: string;
+  profilePictureUrl?: string;
   isActive: boolean;
   hasNfcCard: boolean;
   nfcIssuedAt?: string;
@@ -153,6 +154,7 @@ export interface CustomerCard {
   memberSince: string;
   cardValidFrom?: string;
   cardValidThrough?: string;
+  profilePictureUrl?: string;
   upcoming: Booking[];
   pending: Booking[];
   past: Booking[];

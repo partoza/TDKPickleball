@@ -6,7 +6,7 @@ public record CustomerSummaryDto(
     long Id, string CustomerNumber, string FullName, string Username, string Email, string? Phone,
     bool IsActive, bool HasNfcCard, DateTime? NfcIssuedAt, DateTime? NfcLastTappedAt,
     DateTime CreatedAt, DateTime UpdatedAt, string? AdminNotes = null,
-    DateOnly? CardValidFrom = null, DateOnly? CardValidThrough = null);
+    DateOnly? CardValidFrom = null, DateOnly? CardValidThrough = null, string? ProfilePictureUrl = null);
 
 public record CustomerDetailsDto(
     CustomerSummaryDto Customer,
@@ -26,4 +26,4 @@ public record CustomerCardDto(
     string FullName, string Username, string CustomerNumber, DateTime MemberSince, DateOnly? CardValidFrom, DateOnly? CardValidThrough,
     IReadOnlyList<BookingDto> Upcoming, IReadOnlyList<BookingDto> Pending,
     IReadOnlyList<BookingDto> Past, IReadOnlyList<BookingDto> Cancelled,
-    IReadOnlyList<CustomerPromoDto> EligiblePromos);
+    IReadOnlyList<CustomerPromoDto> EligiblePromos, string? ProfilePictureUrl = null);

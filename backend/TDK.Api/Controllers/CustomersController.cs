@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 using TDK.Application.DTOs.Customers;
 using TDK.Application.Interfaces;
+using TDK.Api.Validation;
 
 namespace TDK.Api.Controllers;
 
@@ -51,6 +53,24 @@ public sealed class CustomersController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    [HttpPost("api/admin/customers/{id:long}/profile-image")]
+    [Authorize(Roles = "Admin")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ProfileImageValidator.MaximumRequestBytes)]
+    public async Task<IActionResult> UpdateProfileImage(long id, [FromForm] IFormFile? image, CancellationToken cancellationToken)
+    {
+        var validation = await ProfileImageValidator.ValidateAsync(image, cancellationToken);
+        if (!validation.IsValid) return BadRequest(new { success = false, message = validation.Error });
+        await using var content = image!.OpenReadStream();
+        var result = await _customers.UpdateProfileImageAsync(id, content, validation.FileName, validation.ContentType, cancellationToken);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpDelete("api/admin/customers/{id:long}/profile-image")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RemoveProfileImage(long id, CancellationToken cancellationToken) =>
+        Result(await _customers.RemoveProfileImageAsync(id, cancellationToken));
+
     [HttpPost("api/admin/customers/{id:long}/activate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Activate(long id) => Result(await _customers.SetActiveAsync(id, true));
@@ -72,7 +92,7 @@ public sealed class CustomersController : ControllerBase
     public async Task<IActionResult> Delete(long id) => Result(await _customers.DeleteAsync(id));
 
     [HttpGet("api/customer/card/{username}/{token}")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Customer")]
     [EnableRateLimiting("NfcValidation")]
     public async Task<IActionResult> Card(string username, string token)
     {
@@ -80,7 +100,14 @@ public sealed class CustomersController : ControllerBase
         Response.Headers.Pragma = "no-cache";
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
-        var result = await _customers.ValidateCardAsync(username, token);
+        if (!string.Equals(User.FindFirstValue("auth_provider"), "google_email_verification", StringComparison.Ordinal))
+            return NotFound(TDK.Application.DTOs.Common.ApiResponse<CustomerCardDto>.Fail(
+                "This loyalty card is currently unavailable. Please contact The Dirty Kitchen for assistance."));
+
+        var result = await _customers.ValidateCardAsync(
+            username,
+            token,
+            User.FindFirstValue(ClaimTypes.Email) ?? "");
         return result.Success ? Ok(result) : NotFound(result);
     }
 

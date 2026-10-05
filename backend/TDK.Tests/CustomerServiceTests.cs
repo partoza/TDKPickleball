@@ -73,7 +73,7 @@ public sealed class CustomerServiceTests
         var token = created.Data!.Card.Url.Split('/').Last();
         fixture.Customers.Items.Single().CardValidThrough = new DateOnly(2026, 10, 4);
 
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
     }
 
     [Fact]
@@ -82,8 +82,25 @@ public sealed class CustomerServiceTests
         var fixture = new Fixture();
         var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
         var token = created.Data!.Card.Url.Split('/').Last();
-        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token + "x")).Success);
+        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token + "x", "juan@example.com")).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "someone-else@example.com")).Success);
+    }
+
+    [Fact]
+    public async Task Customer_profile_image_is_saved_and_visible_on_public_card()
+    {
+        var fixture = new Fixture();
+        var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
+        var token = created.Data!.Card.Url.Split('/').Last();
+        await using var content = new MemoryStream([1, 2, 3]);
+
+        var uploaded = await fixture.Service.UpdateProfileImageAsync(created.Data.Customer.Id, content, "profile.jpg", "image/jpeg");
+        var publicCard = await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com");
+
+        Assert.True(uploaded.Success);
+        Assert.Equal("https://res.cloudinary.com/test/image/upload/v1/customers/profile.jpg", uploaded.Data!.ProfilePictureUrl);
+        Assert.Equal(uploaded.Data.ProfilePictureUrl, publicCard.Data!.ProfilePictureUrl);
     }
 
     [Fact]
@@ -94,9 +111,9 @@ public sealed class CustomerServiceTests
         var token = created.Data!.Card.Url.Split('/').Last();
         await fixture.Service.SetActiveAsync(created.Data.Customer.Id, false);
         Assert.Empty((await fixture.Service.SearchAsync("juan")).Data!);
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
         await fixture.Service.SetActiveAsync(created.Data.Customer.Id, true);
-        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
+        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
     }
 
     [Fact]
@@ -119,7 +136,7 @@ public sealed class CustomerServiceTests
         var second = await fixture.Service.CreateAsync(NewCustomer("maria-santos", "maria@example.com"), "https://example.com");
         fixture.Bookings.Items.Add(new Booking { Id = 1, CustomerId = second.Data!.Customer.Id, BookingReference = "TDK-OTHER", CourtId = 1, CustomerName = "Maria", Email = "maria@example.com", BookingDate = new DateOnly(2026, 10, 8), StartTime = new(10, 0), EndTime = new(11, 0), Status = TDK.Domain.Enums.BookingStatus.Reserved });
         var token = first.Data!.Card.Url.Split('/').Last();
-        var card = await fixture.Service.ValidateCardAsync("juan-delacruz", token);
+        var card = await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com");
         Assert.True(card.Success);
         Assert.Empty(card.Data!.Upcoming);
         Assert.Empty(card.Data.Pending);
@@ -140,9 +157,16 @@ public sealed class CustomerServiceTests
         {
             var rates = new MemoryRepository<Rate>();
             rates.Items.Add(new Rate { Id = 1, RateType = TDK.Domain.Enums.RateType.CustomerCard, PricePerHour = 1200, ValidityDuration = 3, ValidityUnit = TDK.Domain.Enums.RateValidityUnit.Month, IsActive = true });
-            Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), new MemoryRepository<Promo>(), rates, CardTransactions, new FixedClock(), new TestTokenProtector(), new NullEmailService());
+            Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), new MemoryRepository<Promo>(), rates, CardTransactions, new FixedClock(), new TestTokenProtector(), new NullEmailService(), new TestProfileImageService());
         }
     }
+}
+
+internal sealed class TestProfileImageService : IProfileImageService
+{
+    public Task<TDK.Application.DTOs.Auth.ProfileImageUploadResult> UploadAsync(Stream content, string fileName, string contentType, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new TDK.Application.DTOs.Auth.ProfileImageUploadResult("https://res.cloudinary.com/test/image/upload/v1/customers/profile.jpg", "customers/profile"));
+    public Task DeleteAsync(string publicId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 internal sealed class TestTokenProtector : INfcTokenProtector

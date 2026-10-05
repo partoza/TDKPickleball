@@ -32,6 +32,8 @@ export const customerService = {
   get: (id: number) => cached(detailsCache, id, 10_000, async () => (await api.get<ApiResponse<CustomerDetails>>(`/api/admin/customers/${id}`)).data.data),
   create: async (input: CustomerInput) => { const result = (await api.post<ApiResponse<CreatedCustomer>>('/api/admin/customers', input)).data.data; invalidateCustomer(); return result; },
   update: async (id: number, input: CustomerInput) => { const result = (await api.put<ApiResponse<Customer>>(`/api/admin/customers/${id}`, input)).data.data; invalidateCustomer(id); return result; },
+  uploadProfileImage: async (id: number, image: File) => { const form = new FormData(); form.append('image', image); const result = (await api.post<ApiResponse<Customer>>(`/api/admin/customers/${id}/profile-image`, form)).data.data; invalidateCustomer(id); return result; },
+  removeProfileImage: async (id: number) => { await api.delete(`/api/admin/customers/${id}/profile-image`); invalidateCustomer(id); },
   setActive: async (id: number, active: boolean) => { const result = (await api.post<ApiResponse<Customer>>(`/api/admin/customers/${id}/${active ? 'activate' : 'deactivate'}`)).data.data; invalidateCustomer(id); return result; },
   renew: async (id: number) => { const result = (await api.post<ApiResponse<CustomerCardRenewal>>(`/api/admin/customers/${id}/renew`)).data.data; invalidateCustomer(id); return result; },
   getCard: async (id: number) => (await api.get<ApiResponse<NfcCard>>(`/api/admin/customers/${id}/nfc`)).data.data,
