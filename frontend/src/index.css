@@ -4,6 +4,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+#nprogress {
+  pointer-events: none;
+}
+
+#nprogress .bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 99999;
+  height: 3px;
+  background: var(--primary);
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--primary), 0 0 5px var(--primary);
+  opacity: .9;
+}
+
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   

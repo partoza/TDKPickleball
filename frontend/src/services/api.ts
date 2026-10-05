@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { beginRequestProgress, endRequestProgress } from '@/lib/request-progress';
 
 const defaultApiUrl = typeof window !== 'undefined' 
   ? `http://${window.location.hostname}:5000` 
@@ -22,6 +23,7 @@ export function getApiErrorMessage(error: any, fallback = 'The request could not
 }
 
 api.interceptors.request.use((config) => {
+  beginRequestProgress();
   const token = localStorage.getItem('token') || sessionStorage.getItem('booking-verification-token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -30,8 +32,9 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => { endRequestProgress(); return response; },
   (error) => {
+    endRequestProgress();
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('booking-verification-token');
