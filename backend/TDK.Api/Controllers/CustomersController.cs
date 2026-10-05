@@ -59,6 +59,10 @@ public sealed class CustomersController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Deactivate(long id) => Result(await _customers.SetActiveAsync(id, false));
 
+    [HttpPost("api/admin/customers/{id:long}/renew")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Renew(long id) => Result(await _customers.RenewAsync(id));
+
     [HttpGet("api/admin/customers/{id:long}/nfc")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetNfc(long id) => Result(await _customers.GetNfcAsync(id, FrontendBaseUrl()));

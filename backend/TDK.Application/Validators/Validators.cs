@@ -104,8 +104,11 @@ public class CreateRateValidator : AbstractValidator<CreateRateRequest>
     public CreateRateValidator()
     {
         RuleFor(x => x.RateType).IsInEnum();
-        RuleFor(x => x.PricePerHour).GreaterThan(0);
-        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
+        RuleFor(x => x.PricePerHour).GreaterThan(0).When(x => x.RateType != TDK.Domain.Enums.RateType.Internal);
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime))
+            .When(x => x.RateType != TDK.Domain.Enums.RateType.CustomerCard).WithMessage("End time must be at least 1 hour after start time");
+        RuleFor(x => x.ValidityDuration).InclusiveBetween(1, 3650).When(x => x.RateType == TDK.Domain.Enums.RateType.CustomerCard);
+        RuleFor(x => x.ValidityUnit).NotNull().IsInEnum().When(x => x.RateType == TDK.Domain.Enums.RateType.CustomerCard);
     }
 }
 
@@ -114,8 +117,11 @@ public class UpdateRateValidator : AbstractValidator<UpdateRateRequest>
     public UpdateRateValidator()
     {
         RuleFor(x => x.RateType).IsInEnum();
-        RuleFor(x => x.PricePerHour).GreaterThan(0);
-        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime)).WithMessage("End time must be at least 1 hour after start time");
+        RuleFor(x => x.PricePerHour).GreaterThan(0).When(x => x.RateType != TDK.Domain.Enums.RateType.Internal);
+        RuleFor(x => x).Must(x => TimeRangeValidation.IsAtLeastOneHour(x.StartTime, x.EndTime))
+            .When(x => x.RateType != TDK.Domain.Enums.RateType.CustomerCard).WithMessage("End time must be at least 1 hour after start time");
+        RuleFor(x => x.ValidityDuration).InclusiveBetween(1, 3650).When(x => x.RateType == TDK.Domain.Enums.RateType.CustomerCard);
+        RuleFor(x => x.ValidityUnit).NotNull().IsInEnum().When(x => x.RateType == TDK.Domain.Enums.RateType.CustomerCard);
     }
 }
 

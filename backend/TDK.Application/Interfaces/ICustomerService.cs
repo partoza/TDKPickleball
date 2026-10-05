@@ -11,6 +11,7 @@ public interface ICustomerService
     Task<ApiResponse<CreateCustomerDto>> CreateAsync(CreateCustomerRequest request, string frontendBaseUrl);
     Task<ApiResponse<CustomerSummaryDto>> UpdateAsync(long id, UpdateCustomerRequest request);
     Task<ApiResponse<CustomerSummaryDto>> SetActiveAsync(long id, bool active);
+    Task<ApiResponse<CustomerCardRenewalDto>> RenewAsync(long id);
     Task<ApiResponse<NfcIssueDto>> GetNfcAsync(long id, string frontendBaseUrl);
     Task<ApiResponse<bool>> DeleteAsync(long id);
     Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token);

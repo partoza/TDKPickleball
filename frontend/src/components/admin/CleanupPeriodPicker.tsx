@@ -17,6 +17,7 @@ import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { formatAppDate } from '@/lib/date-time';
 import { getManilaDateAsLocalDate } from '@/lib/manila-time';
 
 export type CleanupGranularity = 'day' | 'week' | 'month' | 'year';
@@ -37,8 +38,8 @@ export function CleanupPeriodPicker({ mode, value, onChange }: { mode: CleanupGr
   const [viewMonth, setViewMonth] = useState(startOfMonth(selected));
   const [viewYear, setViewYear] = useState(selected.getFullYear());
   const bounds = cleanupPeriodBounds(mode, value);
-  const label = mode === 'day' ? format(selected, 'MMM d, yyyy')
-    : mode === 'week' ? `${format(parseISO(bounds.start), 'MMM d')} – ${format(parseISO(bounds.end), 'MMM d, yyyy')}`
+  const label = mode === 'day' ? formatAppDate(selected)
+    : mode === 'week' ? `${formatAppDate(parseISO(bounds.start))} – ${formatAppDate(parseISO(bounds.end))}`
     : mode === 'month' ? format(selected, 'MMMM yyyy')
     : format(selected, 'yyyy');
 

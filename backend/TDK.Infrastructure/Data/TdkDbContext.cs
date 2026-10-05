@@ -23,6 +23,7 @@ public class TdkDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Promo> Promos { get; set; }
     public DbSet<PublicBookingWindow> PublicBookingWindows { get; set; }
     public DbSet<Customer> Customers { get; set; }
+    public DbSet<CustomerCardTransaction> CustomerCardTransactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

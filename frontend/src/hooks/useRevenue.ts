@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { ApiResponse, RevenueSummary } from '@/types';
 
-export function useRevenue(fromDate: string, throughDate: string) {
+export function useRevenue(fromDate: string, throughDate: string, enabled = true) {
   return useQuery({
     queryKey: ['admin-revenue', fromDate, throughDate],
     queryFn: async () => {
@@ -11,6 +11,6 @@ export function useRevenue(fromDate: string, throughDate: string) {
       });
       return data;
     },
-    enabled: Boolean(fromDate && throughDate),
+    enabled: enabled && Boolean(fromDate && throughDate),
   });
 }

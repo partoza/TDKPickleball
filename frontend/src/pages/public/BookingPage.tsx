@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import { useAvailablePublicPromos, useSubmitPublicBookingRequest, useValidatePublicPromo } from '@/hooks/useBookings';
@@ -15,7 +14,6 @@ import { CheckCircleIcon as CheckCircle2, CheckIcon, ClockIcon as Clock3, QrCode
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { calculateRateQuote } from '@/lib/rate-calculation';
 import { cn } from '@/lib/utils';
-import { formatTimeLabel } from '@/components/admin/AdminFormControls';
 import { useAuth } from '@/hooks/useAuth';
 import { EXTERNAL_LINKS, ROUTES } from '@/lib/constants';
 import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
@@ -24,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { usePublicBookingWindow } from '@/hooks/useSchedule';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 
 const BOOKING_DRAFT_KEY = 'tdk-public-booking-draft';
 const PADDLE_RENTAL_PRICE = 100;
@@ -192,7 +191,7 @@ export default function BookingPage() {
   const validateStep1 = () => {
     const blockErrors = validateBookingBlocks(blocks, rates, RateType.Booking);
     if (bookingThroughDate) {
-      const formattedCutoff = format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy');
+      const formattedCutoff = formatAppDate(bookingThroughDate);
       blocks.forEach((block, index) => {
         if (block.date && block.date > bookingThroughDate) {
           blockErrors[index] = { ...blockErrors[index], date: `Online bookings are open through ${formattedCutoff}.` };
@@ -374,7 +373,7 @@ export default function BookingPage() {
                   {blocks.map((block, index) => (
                     <div key={`${block.courtId}-${block.date}-${block.startTime}-${index}`} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm font-semibold text-foreground">{courts.find(court => String(court.id) === block.courtId)?.name || 'Court'}</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(`${block.date}T00:00:00`), 'MMM d, yyyy')} · {formatTimeLabel(block.startTime)}–{formatTimeLabel(block.endTime)}</p>
+                      <p className="text-sm text-muted-foreground">{formatAppDate(block.date)} · {formatAppTime(block.startTime)}–{formatAppTime(block.endTime)}</p>
                     </div>
                   ))}
                   {paddleQuantity > 0 && <div className="flex items-center justify-between px-5 py-4 text-sm"><span className="font-medium flex items-center gap-1.5"><PaddleIcon className="w-4 h-4" /> Selkirk Paddle Rental</span><span className="font-semibold text-primary">× {paddleQuantity}</span></div>}
@@ -488,7 +487,7 @@ export default function BookingPage() {
               <div>
                 {bookingThroughDate && (
                   <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                    Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+                    Online bookings are open through {formatAppDate(bookingThroughDate)}.
                   </p>
                 )}
                 <BookingBlocksEditor blocks={blocks} onChange={setBlocks} courts={courts} rates={rates} rateType={RateType.Booking} errors={errors?.blocks} maxBookingDate={bookingThroughDate} />
@@ -570,7 +569,7 @@ export default function BookingPage() {
                   </div>
                   {isNfcCustomer && (
                     <div className="mt-4 border-t pt-4">
-                      <div className="mb-2 flex items-center justify-between gap-2"><Label className="text-sm font-semibold">NFC customer promo</Label><span className="text-[11px] font-medium text-primary">Active NFC customer</span></div>
+                      <div className="mb-2 flex items-center justify-between gap-2"><Label className="text-sm font-semibold">Customer Card Promo</Label><span className="text-[11px] font-medium text-primary">Active Customer Card</span></div>
                       <Select
                         value={nfcPromoCode || 'none'}
                         onValueChange={value => {
@@ -587,11 +586,11 @@ export default function BookingPage() {
                         }}
                         disabled={promosLoading || availableNfcPromos.length === 0}
                       >
-                        <SelectTrigger aria-label="Available NFC customer promo">
-                          <SelectValue placeholder={promosLoading ? 'Loading NFC promos…' : 'Select an NFC promo'} />
+                        <SelectTrigger aria-label="Available Customer Card promo">
+                          <SelectValue placeholder={promosLoading ? 'Loading Customer Card promos…' : 'Select a Customer Card promo'} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">No NFC promo</SelectItem>
+                          <SelectItem value="none">No Customer Card promo</SelectItem>
                           {availableNfcPromos.map(promo => {
                             const insufficientUses = promo.remainingUsesThisMonth != null && promo.remainingUsesThisMonth < blocks.length;
                             const discount = promo.type === DiscountType.Percentage ? `${promo.value}% off` : `₱${promo.value.toLocaleString()} off`;
@@ -600,7 +599,8 @@ export default function BookingPage() {
                           })}
                         </SelectContent>
                       </Select>
-                      {!promosLoading && availableNfcPromos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No NFC customer promos are available right now.</p>}
+                      {appliedPromo?.remainingUsesThisMonth != null && <p className="mt-2 text-xs font-semibold text-primary">{appliedPromo.remainingUsesThisMonth} use{appliedPromo.remainingUsesThisMonth === 1 ? '' : 's'} left this month{appliedPromo.resetsOn ? ` · Resets on ${formatAppDate(appliedPromo.resetsOn)}` : ''}</p>}
+                      {!promosLoading && availableNfcPromos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No Customer Card promos are available right now.</p>}
                     </div>
                   )}
                   <FieldError message={promoError} />
@@ -622,7 +622,7 @@ export default function BookingPage() {
                           <div>
                             <span className="font-medium">Court Booking · {courts.find(c => String(c.id) === b.courtId)?.name || 'Court'}</span>
                             <span className="text-muted-foreground ml-2">
-                              {format(new Date(`${b.date}T00:00:00`), 'MMM d')} · {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${b.endTime}`), 'h:mm a')}
+                              {formatAppDate(b.date)} · {formatAppTime(b.startTime)} - {formatAppTime(b.endTime)}
                             </span>
                           </div>
                           <span className="font-medium text-primary">

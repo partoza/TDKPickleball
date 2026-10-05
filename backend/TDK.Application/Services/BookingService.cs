@@ -21,15 +21,16 @@ public class BookingService : IBookingService
     private readonly IRepository<Promo> _promos;
     private readonly IRepository<InternalCoachProfile> _internalCoaches;
     private readonly IRepository<Customer> _customers;
+    private readonly IRepository<CustomerCardTransaction> _cardTransactions;
     private readonly IRateService _rates;
     private readonly IEmailService _email;
     private readonly IBusinessClock _clock;
     private readonly IPublicBookingWindowService _publicBookingWindow;
 
-    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRepository<Promo> promos, IRepository<InternalCoachProfile> internalCoaches, IRepository<Customer> customers, IRateService rates, IEmailService email, IBusinessClock clock, IPublicBookingWindowService publicBookingWindow)
+    public BookingService(IRepository<Booking> bookings, IRepository<Schedule> schedules, IRepository<TimeSlot> timeSlots, IRepository<Court> courts, IRepository<Notification> notifications, IRepository<Promo> promos, IRepository<InternalCoachProfile> internalCoaches, IRepository<Customer> customers, IRepository<CustomerCardTransaction> cardTransactions, IRateService rates, IEmailService email, IBusinessClock clock, IPublicBookingWindowService publicBookingWindow)
     {
         _bookings = bookings; _schedules = schedules; _timeSlots = timeSlots; _courts = courts;
-        _notifications = notifications; _promos = promos; _internalCoaches = internalCoaches; _customers = customers; _rates = rates; _email = email; _clock = clock; _publicBookingWindow = publicBookingWindow;
+        _notifications = notifications; _promos = promos; _internalCoaches = internalCoaches; _customers = customers; _cardTransactions = cardTransactions; _rates = rates; _email = email; _clock = clock; _publicBookingWindow = publicBookingWindow;
     }
 
     public async Task<ApiResponse<BookingAvailabilityDto>> GetAvailabilityAsync(DateOnly date, int courtId)
@@ -54,7 +55,7 @@ public class BookingService : IBookingService
         if (promo is null)
             return ApiResponse<PublicPromoDto>.Fail(error ?? "Promo name is invalid or unavailable");
         if (promo.Audience == PromoAudience.NfcCustomersOnly)
-            return ApiResponse<PublicPromoDto>.Fail("Choose NFC customer promos from the NFC promo list");
+            return ApiResponse<PublicPromoDto>.Fail("Choose Customer Card promos from the Customer Card promo list");
 
         return ApiResponse<PublicPromoDto>.Ok(await ToPublicPromoDtoAsync(promo, customer), "Promo applied");
     }
@@ -89,7 +90,7 @@ public class BookingService : IBookingService
         if (customer is null || !customer.IsActive)
             return ApiResponse<IEnumerable<CustomerAvailablePromoDto>>.Fail("Selected customer is unavailable");
 
-        var hasNfcCard = customer.NfcTokenHash is { Length: 32 };
+        var hasNfcCard = HasActiveCustomerCard(customer);
         var available = new List<CustomerAvailablePromoDto>();
         foreach (var promo in (await _promos.GetAllAsync())
                      .OrderByDescending(promo => promo.Audience == PromoAudience.NfcCustomersOnly)
@@ -290,7 +291,7 @@ public class BookingService : IBookingService
             if (promo.MaxUses.HasValue && promo.CurrentUses >= promo.MaxUses.Value) return ApiResponse<BookingDto>.Fail("Promo usage limit reached");
             var promoError = ValidatePromoAvailability(promo, request.RateType);
             if (promoError is not null) return ApiResponse<BookingDto>.Fail(promoError);
-            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || selectedCustomer.NfcTokenHash is not { Length: 32 }))
+            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || !HasActiveCustomerCard(selectedCustomer)))
                 return ApiResponse<BookingDto>.Fail("Invalid or unavailable promo");
             if (selectedCustomer is not null && !await HasMonthlyPromoCapacityAsync(promo, selectedCustomer.Id, 1))
                 return ApiResponse<BookingDto>.Fail(MonthlyPromoLimitMessage(promo));
@@ -360,39 +361,50 @@ public class BookingService : IBookingService
                     schedule.Status == ScheduleStatus.Training))
                 .Select(schedule => schedule.BookingId!.Value)
                 .ToHashSet();
+        var cardTransactions = (await _cardTransactions.GetAllAsync())
+            .Select(transaction => new { Transaction = transaction, Date = DateOnly.FromDateTime(_clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(transaction.CreatedAt, DateTimeKind.Utc))).DateTime) })
+            .Where(item => item.Date >= fromDate && item.Date <= throughDate)
+            .ToList();
 
         static decimal BaseSale(Booking booking) => Math.Max(0, booking.TotalAmount - booking.PaddleRentalFee);
         static decimal Outstanding(Booking booking) => Math.Max(0, booking.TotalAmount - booking.AmountPaid);
 
-        var daily = bookings
-            .GroupBy(booking => booking.BookingDate)
-            .OrderBy(group => group.Key)
-            .Select(group => new RevenueDailyDto(
-                group.Key,
-                group.Where(booking => !trainingIds.Contains(booking.Id)).Sum(BaseSale),
-                group.Where(booking => trainingIds.Contains(booking.Id)).Sum(BaseSale),
-                group.Sum(booking => booking.PaddleRentalFee),
-                group.Sum(booking => booking.DiscountAmount),
-                group.Count(booking => booking.PromoId.HasValue),
-                group.Sum(booking => booking.TotalAmount),
-                group.Sum(booking => booking.AmountPaid),
-                group.Sum(Outstanding),
-                group.Count()))
-            .ToList();
+        var daily = bookings.Select(booking => booking.BookingDate).Concat(cardTransactions.Select(item => item.Date)).Distinct().OrderBy(date => date)
+            .Select(date =>
+            {
+                var dayBookings = bookings.Where(booking => booking.BookingDate == date).ToList();
+                var cardSales = cardTransactions.Where(item => item.Date == date).Sum(item => item.Transaction.Amount);
+                return new RevenueDailyDto(
+                    date,
+                    dayBookings.Where(booking => !trainingIds.Contains(booking.Id)).Sum(BaseSale),
+                    dayBookings.Where(booking => trainingIds.Contains(booking.Id)).Sum(BaseSale),
+                    dayBookings.Sum(booking => booking.PaddleRentalFee),
+                    cardSales,
+                    dayBookings.Sum(booking => booking.DiscountAmount),
+                    dayBookings.Count(booking => booking.PromoId.HasValue),
+                    dayBookings.Sum(booking => booking.TotalAmount) + cardSales,
+                    dayBookings.Sum(booking => booking.AmountPaid) + cardSales,
+                    dayBookings.Sum(Outstanding),
+                    dayBookings.Count + cardTransactions.Count(item => item.Date == date));
+            }).ToList();
+
+        var customerCardSales = cardTransactions.Sum(item => item.Transaction.Amount);
 
         var summary = new RevenueSummaryDto(
             fromDate,
             throughDate,
-            bookings.Sum(booking => booking.AmountPaid),
-            bookings.Sum(booking => booking.TotalAmount),
+            bookings.Sum(booking => booking.AmountPaid) + customerCardSales,
+            bookings.Sum(booking => booking.TotalAmount) + customerCardSales,
             bookings.Sum(Outstanding),
             bookings.Where(booking => !trainingIds.Contains(booking.Id)).Sum(BaseSale),
             bookings.Where(booking => trainingIds.Contains(booking.Id)).Sum(BaseSale),
             bookings.Sum(booking => booking.PaddleRentalFee),
+            customerCardSales,
             bookings.Sum(booking => booking.DiscountAmount),
             bookings.Count(booking => booking.PromoId.HasValue),
             bookings.Sum(booking => booking.PaddleRentalQuantity),
-            bookings.Count,
+            cardTransactions.Count,
+            bookings.Count + cardTransactions.Count,
             bookings.Count(booking => booking.Status == BookingStatus.Paid),
             bookings.Count(booking => booking.Status == BookingStatus.Reserved),
             bookings.Count(booking => booking.Status == BookingStatus.Completed),
@@ -483,7 +495,7 @@ public class BookingService : IBookingService
         {
             var promo = await _promos.GetByIdAsync(request.PromoId.Value);
             if (promo == null || !promo.IsActive) return ApiResponse<BookingDto>.Fail("Invalid or inactive promo");
-            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || selectedCustomer.NfcTokenHash is not { Length: 32 }))
+            if (promo.Audience == PromoAudience.NfcCustomersOnly && (selectedCustomer is null || !HasActiveCustomerCard(selectedCustomer)))
                 return ApiResponse<BookingDto>.Fail("Invalid or unavailable promo");
             if (selectedCustomer is not null && !await HasMonthlyPromoCapacityAsync(promo, selectedCustomer.Id, 1, b.Id))
                 return ApiResponse<BookingDto>.Fail(MonthlyPromoLimitMessage(promo));
@@ -900,7 +912,7 @@ public class BookingService : IBookingService
             string.Equals(candidate.Code, exactCode, StringComparison.Ordinal));
         if (promo is null || !promo.IsActive)
             return (null, "Promo name is invalid or unavailable. Enter the exact promo name.");
-        if (promo.Audience == PromoAudience.NfcCustomersOnly && (customer is null || !customer.IsActive || customer.NfcTokenHash is not { Length: 32 }))
+        if (promo.Audience == PromoAudience.NfcCustomersOnly && (customer is null || !HasActiveCustomerCard(customer)))
             return (null, "Promo name is invalid or unavailable. Enter the exact promo name.");
         if (promo.MaxUses.HasValue && promo.CurrentUses + requestedUses > promo.MaxUses.Value)
             return (null, "Promo does not have enough remaining uses for the selected schedules");
@@ -918,8 +930,12 @@ public class BookingService : IBookingService
         var normalizedEmail = authenticatedEmail.Trim().ToUpperInvariant();
         return (await _customers.FindAsync(customer =>
                 customer.NormalizedEmail == normalizedEmail && customer.IsActive))
-            .FirstOrDefault(customer => customer.NfcTokenHash is { Length: 32 });
+            .FirstOrDefault(HasActiveCustomerCard);
     }
+
+    private bool HasActiveCustomerCard(Customer customer) => customer.IsActive && customer.NfcTokenHash is { Length: 32 } &&
+        customer.CardValidFrom.HasValue && customer.CardValidThrough.HasValue &&
+        customer.CardValidFrom.Value <= _clock.ManilaToday && customer.CardValidThrough.Value >= _clock.ManilaToday;
 
     private async Task<bool> HasMonthlyPromoCapacityAsync(Promo promo, long customerId, int requestedUses, long? excludedBookingId = null)
     {
@@ -931,17 +947,22 @@ public class BookingService : IBookingService
                 booking.CustomerId == customerId &&
                 booking.PromoId == promo.Id &&
                 booking.Status != BookingStatus.Cancelled &&
-                booking.CreatedAt >= monthStart &&
-                booking.CreatedAt < nextMonth &&
                 (!excludedBookingId.HasValue || booking.Id != excludedBookingId.Value)))
-            .Count();
+            .Count(booking =>
+            {
+                var createdAt = _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime;
+                return createdAt >= monthStart && createdAt < nextMonth;
+            });
         return uses + requestedUses <= promo.MonthlyUsageLimitPerCustomer.Value;
     }
 
     private async Task<PublicPromoDto> ToPublicPromoDtoAsync(Promo promo, Customer? customer)
     {
         var remaining = customer is null ? null : await GetRemainingMonthlyUsesAsync(promo, customer.Id);
-        return new PublicPromoDto(promo.Code, promo.Description, promo.Type, promo.Value, promo.MonthlyUsageLimitPerCustomer, remaining);
+        DateOnly? resetsOn = promo.MonthlyUsageLimitPerCustomer.HasValue
+            ? new DateOnly(_clock.ManilaToday.Year, _clock.ManilaToday.Month, 1).AddMonths(1)
+            : null;
+        return new PublicPromoDto(promo.Code, promo.Description, promo.Type, promo.Value, promo.MonthlyUsageLimitPerCustomer, remaining, resetsOn);
     }
 
     private async Task<int?> GetRemainingMonthlyUsesAsync(Promo promo, long customerId)
@@ -953,10 +974,12 @@ public class BookingService : IBookingService
         var uses = (await _bookings.FindAsync(booking =>
                 booking.CustomerId == customerId &&
                 booking.PromoId == promo.Id &&
-                booking.Status != BookingStatus.Cancelled &&
-                booking.CreatedAt >= monthStart &&
-                booking.CreatedAt < nextMonth))
-            .Count();
+                booking.Status != BookingStatus.Cancelled))
+            .Count(booking =>
+            {
+                var createdAt = _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime;
+                return createdAt >= monthStart && createdAt < nextMonth;
+            });
         return Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - uses);
     }
 

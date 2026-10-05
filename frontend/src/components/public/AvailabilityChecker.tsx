@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { isValidTimeRange } from '@/lib/time-range';
 import { startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 
 const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDate: Date, onSelect: (d: Date) => void, bookingThroughDate?: string | null }) => {
   const [viewDate, setViewDate] = useState(currentDate);
@@ -197,8 +198,7 @@ export default function AvailabilityChecker() {
   }
 
   const formatTimeLabel = (tStr: string) => {
-    const d = new Date(`2000-01-01T${tStr}`);
-    return format(d, 'h:mm a');
+    return formatAppTime(`2000-01-01T${tStr}+08:00`);
   };
 
   // Filter end time slots to only those AFTER the selected start time
@@ -257,7 +257,7 @@ export default function AvailabilityChecker() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-semibold h-11 border-slate-200 text-slate-700 rounded-xl shadow-sm">
                     <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
-                    {format(date, 'MMM d, yyyy')}
+                    {formatAppDate(date)}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 rounded-xl" align="start">
@@ -272,7 +272,7 @@ export default function AvailabilityChecker() {
 
             {isAfterBookingWindow && bookingThroughDate && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+                Online bookings are open through {formatAppDate(bookingThroughDate)}.
               </p>
             )}
 
@@ -324,7 +324,7 @@ export default function AvailabilityChecker() {
                     <div className="flex items-center gap-2 px-1">
                       <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest">Available Slots</p>
                       <span className="ml-auto text-[11px] font-semibold text-slate-400">
-                        {format(date, 'MMM d')} · {formatTimeLabel(startTime)}–{formatTimeLabel(endTime)}
+                        {formatAppDate(date)} · {formatTimeLabel(startTime)}–{formatTimeLabel(endTime)}
                       </span>
                     </div>
 
@@ -397,7 +397,7 @@ export default function AvailabilityChecker() {
                       <div className="flex-1">
                         <p className="text-rose-900 font-bold">Fully Booked</p>
                         <p className="text-[13px] text-rose-700/90 mt-1 font-medium leading-relaxed">
-                          We're completely full on <strong className="font-bold">{format(date, 'MMM d')}</strong> from <strong className="font-bold">{formatTimeLabel(startTime)}</strong> to <strong className="font-bold">{formatTimeLabel(endTime)}</strong>.
+                          We're completely full on <strong className="font-bold">{formatAppDate(date)}</strong> from <strong className="font-bold">{formatTimeLabel(startTime)}</strong> to <strong className="font-bold">{formatTimeLabel(endTime)}</strong>.
                         </p>
                       </div>
                     </div>

@@ -14,15 +14,10 @@ import AvailabilityChecker from '@/components/public/AvailabilityChecker';
 import { Link } from 'react-router-dom';
 import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
+import { formatAppDate } from '@/lib/date-time';
 
 function getWeekRangeString(start: Date, end: Date) {
-  if (start.getFullYear() !== end.getFullYear()) {
-    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
-  }
-  if (start.getMonth() !== end.getMonth()) {
-    return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
-  }
-  return `${format(start, 'MMM d')} - ${format(end, 'd, yyyy')}`;
+  return `${formatAppDate(start)} - ${formatAppDate(end)}`;
 }
 
 function getTimedStatus(slot: Schedule) {
@@ -218,7 +213,7 @@ export default function SchedulePage() {
 
       {bookingThroughDate && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-          Online bookings are open through {format(new Date(`${bookingThroughDate}T00:00:00`), 'MMMM d, yyyy')}.
+          Online bookings are open through {formatAppDate(bookingThroughDate)}.
         </div>
       )}
 

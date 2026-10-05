@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { toPng } from 'html-to-image';
-import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
@@ -22,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { AdminDatePicker, AdminTimeSelect, formatTimeLabel, TimeOption } from '@/components/admin/AdminFormControls';
@@ -595,7 +595,8 @@ function canReschedule(booking: Booking) {
   const elapsed = Date.now() - createdAt;
   return Number.isFinite(createdAt) && elapsed >= 0 && elapsed <= 24 * 60 * 60 * 1000;
 }
-function time(value: string) { return format(new Date(`2000-01-01T${value}`), 'h:mm a'); }
+function time(value: string) { return formatAppTime(value); }
+function format(value: Date, pattern: string) { return pattern.includes('h:mm') ? formatAppTime(value) : formatAppDate(value); }
 function getRequestReference(booking: Booking) {
   if (booking.requestReference) return booking.requestReference;
   return booking.notes?.match(/\[PublicRequest:(REQ-\d{8}-\d{6})\]/i)?.[1]?.toUpperCase();
@@ -623,7 +624,7 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
         </div>
         <div className="p-4 grid gap-3">
           <Detail k="Court" v={b.courtName} />
-          <Detail k="Schedule" v={`${format(new Date(`${b.bookingDate}T00:00:00`), 'MMMM d, yyyy')} · ${time(b.startTime)}–${time(b.endTime)}`} />
+          <Detail k="Schedule" v={`${formatAppDate(b.bookingDate)} · ${time(b.startTime)}–${time(b.endTime)}`} />
           <Detail k="Type" v={b.bookingType || RateType.Booking} />
           <Detail k="Status" v={bookingStatusLabel(b.status)} />
           {b.status === BookingStatus.Requested && requestReference && <Detail k="Request reference" v={requestReference} valueClass="font-mono text-primary" />}

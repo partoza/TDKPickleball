@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
-import { format } from 'date-fns';
 import { ArrowPathIcon, ClockIcon, RectangleGroupIcon, ArrowLeftIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookings } from '@/hooks/useBookings';
@@ -13,6 +12,7 @@ import { Booking, BookingStatus, Court, RateType, Schedule, ScheduleStatus } fro
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminIconLoader, AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
@@ -32,7 +32,8 @@ const displayCountdown = (totalSeconds: number) => {
   return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
 };
 
-const displayTime = (value: string) => format(new Date(`2000-01-01T${value}`), 'h:mm a');
+const displayTime = (value: string) => formatAppTime(value);
+const format = (value: Date, _pattern: string) => formatAppDate(value);
 
 const statusStyles: Record<ScheduleStatus, string> = {
   [ScheduleStatus.Available]: 'bg-emerald-600 text-white',
@@ -131,10 +132,10 @@ export default function AdminWidgetPage() {
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end justify-center text-right hidden sm:flex mr-2">
             <div className="text-[16px] font-bold tracking-[-0.015em] text-white tabular-nums leading-none mb-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-              {new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+              {formatAppTime(new Date())}
             </div>
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-white/90 leading-none" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-              {new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'short', day: 'numeric' })}
+              {formatAppDate(new Date())}
             </div>
           </div>
           <Link to={ROUTES.ADMIN.DASHBOARD} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Back to Dashboard"><ArrowLeftIcon className="h-5 w-5 drop-shadow-md" /></Link>

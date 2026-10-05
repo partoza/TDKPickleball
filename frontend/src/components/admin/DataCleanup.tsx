@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { format, startOfMonth, subMonths } from 'date-fns';
+import { formatAppDate } from '@/lib/date-time';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldExclamationIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { toast } from 'sonner';
@@ -30,7 +31,7 @@ function storageError(error: unknown, fallback: string) {
     return `${fallback} Restart the backend to load the new storage endpoints.`;
   return error ? getApiErrorMessage(error, fallback) : fallback;
 }
-function formatDate(value: string) { return format(new Date(`${value}T00:00:00`), 'MMM d, yyyy'); }
+function formatDate(value: string) { return formatAppDate(value); }
 
 export function DataCleanupButton({ className }: { className?: string }) {
   const client = useQueryClient();

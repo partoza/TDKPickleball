@@ -9,6 +9,7 @@ import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/admin/TablePagination';
 import { cn } from '@/lib/utils';
+import { formatAppDate } from '@/lib/date-time';
 
 type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 
@@ -85,6 +86,7 @@ export default function RevenuePage() {
             <SalesCard label="Court bookings" value={revenue.bookingSales} color="bg-primary" />
             <SalesCard label="Training" value={revenue.trainingSales} color="bg-orange-500" />
             <SalesCard label="Paddle rentals" value={revenue.paddleRentalSales} color="bg-emerald-500" note={`${revenue.paddleRentalCount} paddle rental${revenue.paddleRentalCount === 1 ? '' : 's'}`} />
+            <SalesCard label="Customer Cards" value={revenue.customerCardSales} color="bg-sky-500" note={`${revenue.customerCardTransactionCount} purchase${revenue.customerCardTransactionCount === 1 ? '' : 's'} or renewal${revenue.customerCardTransactionCount === 1 ? '' : 's'}`} />
           </div>
 
           <Card>
@@ -98,13 +100,15 @@ export default function RevenuePage() {
                       const bookingHeight = day.grossSales ? (day.bookingSales / day.grossSales) * totalHeight : 0;
                       const trainingHeight = day.grossSales ? (day.trainingSales / day.grossSales) * totalHeight : 0;
                       const paddleHeight = day.grossSales ? (day.paddleRentalSales / day.grossSales) * totalHeight : 0;
+                      const customerCardHeight = day.grossSales ? (day.customerCardSales / day.grossSales) * totalHeight : 0;
                       const tooltipPosition = index === 0 ? 'left-0' : index === revenue.daily.length - 1 ? 'right-0' : 'left-1/2 -translate-x-1/2';
-                      return <div key={day.date} className="group relative flex h-full w-9 shrink-0 flex-col items-center justify-end gap-1" tabIndex={0} aria-label={`${format(new Date(`${day.date}T00:00:00`), 'MMMM d, yyyy')}: ${money(day.grossSales)} gross sales`}>
+                      return <div key={day.date} className="group relative flex h-full w-9 shrink-0 flex-col items-center justify-end gap-1" tabIndex={0} aria-label={`${formatAppDate(day.date)}: ${money(day.grossSales)} gross sales`}>
                         <div className={cn('pointer-events-none absolute top-1 z-20 w-max min-w-44 rounded-xl bg-primary px-3 py-2 text-primary-foreground opacity-0 shadow-lg transition-all duration-200 group-hover:-translate-y-1 group-hover:opacity-100 group-focus:-translate-y-1 group-focus:opacity-100', tooltipPosition)}>
                           <p className="text-sm font-bold leading-tight">{money(day.grossSales)} Total</p>
                           <p className="mt-1 text-[10px] font-medium leading-tight opacity-90">{money(day.bookingSales)} Bookings · {money(day.trainingSales)} Training</p>
                           <p className="mt-0.5 text-[10px] font-medium leading-tight opacity-90">{money(day.paddleRentalSales)} Paddle rentals</p>
-                          <p className="mt-1 text-[9px] font-medium leading-tight opacity-70">{format(new Date(`${day.date}T00:00:00`), 'MMM d, yyyy')}</p>
+                          <p className="mt-0.5 text-[10px] font-medium leading-tight opacity-90">{money(day.customerCardSales)} Customer Cards</p>
+                          <p className="mt-1 text-[9px] font-medium leading-tight opacity-70">{formatAppDate(day.date)}</p>
                           <span className={cn('absolute -bottom-1 h-3 w-3 rotate-45 rounded-sm bg-primary', index === 0 ? 'left-3' : index === revenue.daily.length - 1 ? 'right-3' : 'left-1/2 -translate-x-1/2')} />
                         </div>
                         <span className="text-[9px] font-semibold text-muted-foreground">{day.grossSales >= 1000 ? `${(day.grossSales / 1000).toFixed(1)}k` : day.grossSales.toFixed(0)}</span>
@@ -112,12 +116,13 @@ export default function RevenuePage() {
                           <span className="bg-primary" style={{ height: `${bookingHeight}px` }} />
                           <span className="bg-orange-500" style={{ height: `${trainingHeight}px` }} />
                           <span className="bg-emerald-500" style={{ height: `${paddleHeight}px` }} />
+                          <span className="bg-sky-500" style={{ height: `${customerCardHeight}px` }} />
                         </div>
                         <span className="text-[9px] text-muted-foreground">{format(new Date(`${day.date}T00:00:00`), 'd')}</span>
                       </div>;
                     })}
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground"><Legend color="bg-primary" label="Bookings" /><Legend color="bg-orange-500" label="Training" /><Legend color="bg-emerald-500" label="Paddle rentals" /></div>
+                  <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground"><Legend color="bg-primary" label="Bookings" /><Legend color="bg-orange-500" label="Training" /><Legend color="bg-emerald-500" label="Paddle rentals" /><Legend color="bg-sky-500" label="Customer Cards" /></div>
                 </div>
               )}
             </CardContent>
@@ -126,7 +131,7 @@ export default function RevenuePage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><CalendarDaysIcon className="h-5 w-5 text-primary" />Daily revenue details</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {rows.length === 0 ? <EmptyRevenue /> : <div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Bookings</TableHead><TableHead>Training</TableHead><TableHead>Paddles</TableHead><TableHead>Discounts</TableHead><TableHead>Gross sales</TableHead><TableHead>Collected</TableHead><TableHead>Outstanding</TableHead><TableHead className="text-right">Transactions</TableHead></TableRow></TableHeader><TableBody>{paginatedRows.map(day => <TableRow key={day.date}><TableCell className="font-semibold">{format(new Date(`${day.date}T00:00:00`), 'MMM d, yyyy')}</TableCell><TableCell>{money(day.bookingSales)}</TableCell><TableCell>{money(day.trainingSales)}</TableCell><TableCell>{money(day.paddleRentalSales)}</TableCell><TableCell className="text-rose-600">{money(-day.promoDiscounts)}</TableCell><TableCell className="font-semibold">{money(day.grossSales)}</TableCell><TableCell className="font-semibold text-emerald-600">{money(day.collectedRevenue)}</TableCell><TableCell className={cn('font-semibold', day.outstandingBalance > 0 ? 'text-amber-600' : 'text-muted-foreground')}>{money(day.outstandingBalance)}</TableCell><TableCell className="text-right">{day.transactionCount}</TableCell></TableRow>)}</TableBody></Table></div>}
+              {rows.length === 0 ? <EmptyRevenue /> : <div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Bookings</TableHead><TableHead>Training</TableHead><TableHead>Paddles</TableHead><TableHead>Customer Cards</TableHead><TableHead>Discounts</TableHead><TableHead>Gross sales</TableHead><TableHead>Collected</TableHead><TableHead>Outstanding</TableHead><TableHead className="text-right">Transactions</TableHead></TableRow></TableHeader><TableBody>{paginatedRows.map(day => <TableRow key={day.date}><TableCell className="font-semibold">{formatAppDate(day.date)}</TableCell><TableCell>{money(day.bookingSales)}</TableCell><TableCell>{money(day.trainingSales)}</TableCell><TableCell>{money(day.paddleRentalSales)}</TableCell><TableCell>{money(day.customerCardSales)}</TableCell><TableCell className="text-rose-600">{money(-day.promoDiscounts)}</TableCell><TableCell className="font-semibold">{money(day.grossSales)}</TableCell><TableCell className="font-semibold text-emerald-600">{money(day.collectedRevenue)}</TableCell><TableCell className={cn('font-semibold', day.outstandingBalance > 0 ? 'text-amber-600' : 'text-muted-foreground')}>{money(day.outstandingBalance)}</TableCell><TableCell className="text-right">{day.transactionCount}</TableCell></TableRow>)}</TableBody></Table></div>}
               <TablePagination page={page} total={rows.length} onPageChange={setPage} />
             </CardContent>
           </Card>

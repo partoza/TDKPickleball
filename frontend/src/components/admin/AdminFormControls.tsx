@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatAppDate } from '@/lib/date-time';
 
 export type TimeOption = { value: string; label: string; disabled?: boolean; meta?: string };
 
@@ -60,11 +61,11 @@ export function AdminDatePicker({ value, onChange, minDate, maxDate, invalid, di
   let label = placeholder;
   if (value) {
     if (displayRange === 'week') {
-      label = `${format(startOfWeek(selected), 'MMM d')} - ${format(endOfWeek(selected), 'MMM d, yyyy')}`;
+      label = `${formatAppDate(startOfWeek(selected))} - ${formatAppDate(endOfWeek(selected))}`;
     } else if (displayRange === 'month') {
       label = format(selected, 'MMMM yyyy');
     } else {
-      label = format(selected, 'MMM d, yyyy');
+      label = formatAppDate(selected);
     }
   }
 

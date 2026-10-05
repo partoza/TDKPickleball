@@ -18,7 +18,14 @@ export enum BookingStatus {
 export enum RateType {
   Booking = 'Booking',
   Training = 'Training',
-  Internal = 'Internal'
+  Internal = 'Internal',
+  CustomerCard = 'CustomerCard'
+}
+
+export enum RateValidityUnit {
+  Day = 'Day',
+  Month = 'Month',
+  Year = 'Year'
 }
 
 export enum InternalCoachType {
@@ -124,6 +131,8 @@ export interface Customer {
   hasNfcCard: boolean;
   nfcIssuedAt?: string;
   nfcLastTappedAt?: string;
+  cardValidFrom?: string;
+  cardValidThrough?: string;
   createdAt: string;
   updatedAt: string;
   adminNotes?: string;
@@ -142,11 +151,13 @@ export interface CustomerCard {
   username: string;
   customerNumber: string;
   memberSince: string;
+  cardValidFrom?: string;
+  cardValidThrough?: string;
   upcoming: Booking[];
   pending: Booking[];
   past: Booking[];
   cancelled: Booking[];
-  eligiblePromos: { code: string; description: string; discountType: string; value: number }[];
+  eligiblePromos: { code: string; description: string; discountType: string; value: number; remainingUsesThisMonth?: number; resetsOn?: string }[];
 }
 
 export enum PromoAudience {
@@ -201,6 +212,7 @@ export interface PublicPromo {
   value: number;
   monthlyUsageLimitPerCustomer?: number;
   remainingUsesThisMonth?: number;
+  resetsOn?: string;
 }
 
 export interface PublicNfcPromoAvailability {
@@ -226,6 +238,8 @@ export interface Rate {
   pricePerHour: number;
   rateType: RateType;
   isActive: boolean;
+  validityDuration?: number;
+  validityUnit?: RateValidityUnit;
 }
 
 export interface TimeSlotDto {
@@ -332,6 +346,7 @@ export interface RevenueDaily {
   bookingSales: number;
   trainingSales: number;
   paddleRentalSales: number;
+  customerCardSales: number;
   promoDiscounts: number;
   promosAppliedCount: number;
   grossSales: number;
@@ -349,9 +364,11 @@ export interface RevenueSummary {
   bookingSales: number;
   trainingSales: number;
   paddleRentalSales: number;
+  customerCardSales: number;
   promoDiscounts: number;
   promosAppliedCount: number;
   paddleRentalCount: number;
+  customerCardTransactionCount: number;
   transactionCount: number;
   paidCount: number;
   reservedCount: number;

@@ -14,9 +14,12 @@ public class Customer
     public string? NfcTokenProtected { get; set; }
     public DateTime? NfcIssuedAt { get; set; }
     public DateTime? NfcLastTappedAt { get; set; }
+    public DateOnly? CardValidFrom { get; set; }
+    public DateOnly? CardValidThrough { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? AdminNotes { get; set; }
 
     public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+    public ICollection<CustomerCardTransaction> CardTransactions { get; set; } = new List<CustomerCardTransaction>();
 }

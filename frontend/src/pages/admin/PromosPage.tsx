@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PlusIcon as Plus, ReceiptPercentIcon as Percent, CalendarDaysIcon as Calendar, UsersIcon as Users, PencilIcon as Pencil, TrashIcon as Trash } from '@heroicons/react/24/solid';
-import { format } from 'date-fns';
+import { formatAppDate } from '@/lib/date-time';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
 import { TablePagination } from '@/components/admin/TablePagination';
@@ -159,13 +159,13 @@ export default function PromosPage() {
 
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue placeholder="Select rates" /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Global Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue placeholder="Select usage limit" /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Global Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
 
-            <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value: PromoAudience) => setForm({ ...form, audience: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={PromoAudience.Everyone}>Everyone</SelectItem><SelectItem value={PromoAudience.NfcCustomersOnly}>NFC Customers Only</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value: PromoAudience) => setForm({ ...form, audience: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={PromoAudience.Everyone}>Everyone</SelectItem><SelectItem value={PromoAudience.NfcCustomersOnly}>Customer Card Customers Only</SelectItem></SelectContent></Select></div>
 
             {form.audience === PromoAudience.NfcCustomersOnly && (
               <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3 animate-in fade-in slide-in-from-top-1">
                 <Label htmlFor="monthlyUsageLimitPerCustomer">Maximum Uses Per Customer / Month *</Label>
                 <Input id="monthlyUsageLimitPerCustomer" type="number" min="1" value={form.monthlyUsageLimitPerCustomer} onChange={(e) => setForm({ ...form, monthlyUsageLimitPerCustomer: e.target.value })} placeholder="e.g. 3" required />
-                <p className="text-xs text-muted-foreground">The promo can stay globally unlimited while each NFC customer receives this many uses every calendar month.</p>
+                <p className="text-xs text-muted-foreground">The promo can stay globally unlimited while each Customer Card holder receives this many uses every calendar month.</p>
               </div>
             )}
 
@@ -227,7 +227,7 @@ export default function PromosPage() {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100">{promo.code}</div>
                       <div className="text-xs text-muted-foreground">{promo.description}</div>
-                      {promo.audience === PromoAudience.NfcCustomersOnly && <div className="mt-1 text-[11px] font-semibold text-primary">NFC customers only · {promo.monthlyUsageLimitPerCustomer ?? 3} per customer/month</div>}
+                      {promo.audience === PromoAudience.NfcCustomersOnly && <div className="mt-1 text-[11px] font-semibold text-primary">Customer Card customers only · {promo.monthlyUsageLimitPerCustomer ?? 3} per customer/month</div>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -243,7 +243,7 @@ export default function PromosPage() {
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       {promo.startDate || promo.endDate ? (
                         <span>
-                          {promo.startDate ? format(new Date(promo.startDate), 'MMM d, yyyy') : 'Anytime'} - {promo.endDate ? format(new Date(promo.endDate), 'MMM d, yyyy') : 'Forever'}
+                          {promo.startDate ? formatAppDate(promo.startDate) : 'Anytime'} - {promo.endDate ? formatAppDate(promo.endDate) : 'Forever'}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">Always valid</span>
@@ -295,7 +295,7 @@ export default function PromosPage() {
                 <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y py-3 text-sm">
                   <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Discount</dt><dd className="mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{promo.type === DiscountType.Percentage ? `${promo.value}%` : `₱${promo.value.toFixed(2)}`}</dd></div>
                   <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Applies to</dt><dd className="mt-1 font-medium">{promo.appliesTo || 'All Rates'}</dd></div>
-                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Valid dates</dt><dd className="mt-1 text-xs">{promo.startDate ? format(new Date(promo.startDate), 'MMM d, yyyy') : 'Anytime'} – {promo.endDate ? format(new Date(promo.endDate), 'MMM d, yyyy') : 'Forever'}</dd></div>
+                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Valid dates</dt><dd className="mt-1 text-xs">{promo.startDate ? formatAppDate(promo.startDate) : 'Anytime'} – {promo.endDate ? formatAppDate(promo.endDate) : 'Forever'}</dd></div>
                   <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Usage</dt><dd className="mt-1 text-xs font-medium">{promo.currentUses} {promo.maxUses ? `/ ${promo.maxUses}` : 'used'}</dd></div>
                 </dl>
                 <div className="mt-3 flex items-center justify-between"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${validityClass}`}>{validity}</span></div>

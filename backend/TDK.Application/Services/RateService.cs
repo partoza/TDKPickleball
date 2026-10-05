@@ -20,7 +20,7 @@ public class RateService : IRateService
     public async Task<ApiResponse<IEnumerable<RateDto>>> GetAllAsync()
     {
         var rates = await _rateRepo.GetAllAsync();
-        return ApiResponse<IEnumerable<RateDto>>.Ok(rates.OrderBy(r => r.RateType).ThenBy(r => r.StartTime).Select(r => new RateDto(r.Id, r.StartTime, r.EndTime, r.PricePerHour, r.RateType, r.IsActive)));
+        return ApiResponse<IEnumerable<RateDto>>.Ok(rates.OrderBy(r => r.RateType).ThenBy(r => r.StartTime).Select(ToDto));
     }
 
     public async Task<ApiResponse<RateDto>> CreateAsync(CreateRateRequest request)
@@ -28,23 +28,25 @@ public class RateService : IRateService
         if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
         var allRates = (await _rateRepo.GetAllAsync()).ToList();
         if (allRates.Count >= MaximumRates) return ApiResponse<RateDto>.Fail("The maximum of 20 rates has been reached");
-        if (request.RateType != RateType.Internal && (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m)) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
-        if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
+        var validation = Validate(request.RateType, request.PricePerHour, request.StartTime, request.EndTime, request.ValidityDuration, request.ValidityUnit);
+        if (validation is not null) return ApiResponse<RateDto>.Fail(validation);
         var conflict = await HasConflictAsync(request.StartTime, request.EndTime, request.RateType);
-        if (conflict) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range");
+        if (conflict) return ApiResponse<RateDto>.Fail(request.RateType == RateType.CustomerCard ? "Only one active customer card rate is allowed" : "This rate overlaps an existing active time range");
         var rate = new Rate
         {
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
+            StartTime = request.RateType == RateType.CustomerCard ? TimeOnly.MinValue : request.StartTime,
+            EndTime = request.RateType == RateType.CustomerCard ? TimeOnly.MinValue : request.EndTime,
             PricePerHour = request.RateType == RateType.Internal ? 0 : request.PricePerHour,
             RateType = request.RateType,
+            ValidityDuration = request.RateType == RateType.CustomerCard ? request.ValidityDuration : null,
+            ValidityUnit = request.RateType == RateType.CustomerCard ? request.ValidityUnit : null,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         await _rateRepo.AddAsync(rate);
         await _rateRepo.SaveChangesAsync();
-        return ApiResponse<RateDto>.Ok(new RateDto(rate.Id, rate.StartTime, rate.EndTime, rate.PricePerHour, rate.RateType, rate.IsActive));
+        return ApiResponse<RateDto>.Ok(ToDto(rate));
     }
 
     public async Task<ApiResponse<RateDto>> UpdateAsync(int id, UpdateRateRequest request)
@@ -52,20 +54,22 @@ public class RateService : IRateService
         var rate = await _rateRepo.GetByIdAsync(id);
         if (rate == null) return ApiResponse<RateDto>.Fail("Rate not found");
         if (!Enum.IsDefined(request.RateType)) return ApiResponse<RateDto>.Fail("Choose a valid rate type");
-        if (request.RateType != RateType.Internal && (request.PricePerHour <= 0 || request.PricePerHour > 1_000_000m)) return ApiResponse<RateDto>.Fail("Hourly rate must be between ₱0.01 and ₱1,000,000");
-        if (!IsAtLeastOneHour(request.StartTime, request.EndTime)) return ApiResponse<RateDto>.Fail("End time must be at least 1 hour after start time");
-        if (request.IsActive && await HasConflictAsync(request.StartTime, request.EndTime, request.RateType, id)) return ApiResponse<RateDto>.Fail("This rate overlaps an existing active time range for the selected type");
+        var validation = Validate(request.RateType, request.PricePerHour, request.StartTime, request.EndTime, request.ValidityDuration, request.ValidityUnit);
+        if (validation is not null) return ApiResponse<RateDto>.Fail(validation);
+        if (request.IsActive && await HasConflictAsync(request.StartTime, request.EndTime, request.RateType, id)) return ApiResponse<RateDto>.Fail(request.RateType == RateType.CustomerCard ? "Only one active customer card rate is allowed" : "This rate overlaps an existing active time range for the selected type");
         
-        rate.StartTime = request.StartTime;
-        rate.EndTime = request.EndTime;
+        rate.StartTime = request.RateType == RateType.CustomerCard ? TimeOnly.MinValue : request.StartTime;
+        rate.EndTime = request.RateType == RateType.CustomerCard ? TimeOnly.MinValue : request.EndTime;
         rate.PricePerHour = request.RateType == RateType.Internal ? 0 : request.PricePerHour;
         rate.RateType = request.RateType;
+        rate.ValidityDuration = request.RateType == RateType.CustomerCard ? request.ValidityDuration : null;
+        rate.ValidityUnit = request.RateType == RateType.CustomerCard ? request.ValidityUnit : null;
         rate.IsActive = request.IsActive;
         rate.UpdatedAt = DateTime.UtcNow;
 
         _rateRepo.Update(rate);
         await _rateRepo.SaveChangesAsync();
-        return ApiResponse<RateDto>.Ok(new RateDto(rate.Id, rate.StartTime, rate.EndTime, rate.PricePerHour, rate.RateType, rate.IsActive));
+        return ApiResponse<RateDto>.Ok(ToDto(rate));
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -80,7 +84,7 @@ public class RateService : IRateService
 
     public async Task<decimal> CalculateRateAsync(TimeOnly startTime, TimeOnly endTime, RateType rateType = RateType.Booking)
     {
-        if (rateType == RateType.Internal) return 0;
+        if (rateType is RateType.Internal or RateType.CustomerCard) return 0;
         var rates = (await _rateRepo.GetAllAsync()).Where(r => r.IsActive && r.RateType == rateType).OrderBy(r => r.StartTime).ToList();
         decimal total = 0;
         var startMinutes = startTime.Hour * 60 + startTime.Minute;
@@ -100,6 +104,8 @@ public class RateService : IRateService
 
     private async Task<bool> HasConflictAsync(TimeOnly start, TimeOnly end, RateType rateType, int? excludedId = null)
     {
+        if (rateType == RateType.CustomerCard)
+            return (await _rateRepo.GetAllAsync()).Any(rate => rate.IsActive && rate.Id != excludedId && rate.RateType == RateType.CustomerCard);
         var newStart = start.Hour * 60 + start.Minute;
         var newEnd = end == TimeOnly.MinValue ? 1440 : end.Hour * 60 + end.Minute;
         if (newEnd - newStart < 60) return true;
@@ -110,4 +116,20 @@ public class RateService : IRateService
 
     private static bool IsAtLeastOneHour(TimeOnly start, TimeOnly end) =>
         start != end && (end == TimeOnly.MinValue ? 1440 : end.Hour * 60 + end.Minute) - (start.Hour * 60 + start.Minute) >= 60;
+
+    private static string? Validate(RateType type, decimal price, TimeOnly start, TimeOnly end, int? duration, RateValidityUnit? unit)
+    {
+        if (type != RateType.Internal && (price <= 0 || price > 1_000_000m))
+            return type == RateType.CustomerCard ? "Customer card price must be between ₱0.01 and ₱1,000,000" : "Hourly rate must be between ₱0.01 and ₱1,000,000";
+        if (type == RateType.CustomerCard)
+        {
+            if (!duration.HasValue || duration.Value is < 1 or > 3650) return "Validity duration must be between 1 and 3650";
+            if (!unit.HasValue || !Enum.IsDefined(unit.Value)) return "Choose a valid customer card validity unit";
+            return null;
+        }
+        return IsAtLeastOneHour(start, end) ? null : "End time must be at least 1 hour after start time";
+    }
+
+    private static RateDto ToDto(Rate rate) => new(rate.Id, rate.StartTime, rate.EndTime, rate.PricePerHour, rate.RateType,
+        rate.IsActive, rate.ValidityDuration, rate.ValidityUnit);
 }

@@ -29,15 +29,10 @@ import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 import { useCustomerAvailablePromos } from '@/hooks/useBookings';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 
 function getWeekRangeString(start: Date, end: Date) {
-  if (start.getFullYear() !== end.getFullYear()) {
-    return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
-  }
-  if (start.getMonth() !== end.getMonth()) {
-    return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
-  }
-  return `${format(start, 'MMM d')} - ${format(end, 'd, yyyy')}`;
+  return `${formatAppDate(start)} - ${formatAppDate(end)}`;
 }
 
 function getTimedStatus(slot: Schedule) {
@@ -706,7 +701,7 @@ export default function SchedulePage() {
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-primary/70">Selected Date</span>
                     <span className="break-words text-[13px] font-bold leading-snug text-primary sm:truncate">
-                      {format(new Date(bookingModalData.dateStr + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
+                      {formatAppDate(bookingModalData.dateStr)}
                     </span>
                   </div>
                 </div>}
@@ -900,7 +895,7 @@ export default function SchedulePage() {
             <DialogHeader>
               <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Delete schedule permanently?</DialogTitle>
               <DialogDescription className="text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                {deleteTarget ? <span className="font-medium text-slate-700 dark:text-slate-300 block mb-1">{format(new Date(`${deleteTarget.date}T00:00:00`), 'MMMM d, yyyy')} · {format(new Date(`2000-01-01T${deleteTarget.startTime}`), 'h:mm a')}–{format(new Date(`2000-01-01T${deleteTarget.endTime}`), 'h:mm a')}.</span> : ''}
+                {deleteTarget ? <span className="font-medium text-slate-700 dark:text-slate-300 block mb-1">{formatAppDate(deleteTarget.date)} · {formatAppTime(deleteTarget.startTime)}–{formatAppTime(deleteTarget.endTime)}.</span> : ''}
                 Confirm with the email and password of the administrator currently signed in. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
@@ -947,9 +942,9 @@ export default function SchedulePage() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date & Time</span>
                     <span className="text-[13px] font-bold text-slate-900">
-                      {format(new Date(viewModalData.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')} <br/>
+                      {formatAppDate(viewModalData.date)} <br/>
                       <span className="text-slate-500 font-medium">
-                        {format(new Date(`2000-01-01T${viewModalData.startTime}`), 'h:mm a')} - {format(new Date(`2000-01-01T${viewModalData.endTime}`), 'h:mm a')}
+                        {formatAppTime(viewModalData.startTime)} - {formatAppTime(viewModalData.endTime)}
                       </span>
                     </span>
                   </div>

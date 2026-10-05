@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
 import { CheckCircleIcon as CheckCircle2, ViewfinderCircleIcon as ScanLine } from '@heroicons/react/24/solid';
 import { BarcodeDetector as BarcodeDetectorPonyfill, prepareZXingModule } from 'barcode-detector/ponyfill';
 import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
@@ -9,6 +8,7 @@ import { useVerifyBooking, useVerifyBookingRequest } from '@/hooks/useBookings';
 import { Booking, PublicBookingRequestStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { formatAppDate, formatAppDateTime, formatAppTime } from '@/lib/date-time';
 
 const MAX_QR_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_QR_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -170,7 +170,7 @@ export default function VerifyPage() {
                 <Detail k="Reference" v={booking.bookingReference} />
                 <Detail k="Booked by" v={booking.customerName} />
                 <Detail k="Court" v={booking.courtName} />
-                <Detail k="Schedule" v={`${format(new Date(`${booking.bookingDate}T00:00:00`), 'MMM d, yyyy')} · ${format(new Date(`2000-01-01T${booking.startTime}`), 'h:mm a')}`} />
+                <Detail k="Schedule" v={`${formatAppDate(booking.bookingDate)} · ${formatAppTime(booking.startTime)}`} />
                 <Detail k="Status" v={booking.status} />
                 <Detail k="Balance" v={`₱${booking.remainingBalance.toLocaleString()}`} />
               </div>
@@ -188,7 +188,7 @@ export default function VerifyPage() {
               </div>
               <div className="grid gap-y-3 text-sm">
                 <Detail k="Request reference" v={request.requestReference} />
-                <Detail k="Submitted" v={format(new Date(request.submittedAt), 'MMM d, yyyy · h:mm a')} />
+                <Detail k="Submitted" v={formatAppDateTime(request.submittedAt)} />
                 <Detail k="Schedules" v={String(request.schedules.length)} />
                 <Detail k="Total" v={`₱${request.totalAmount.toLocaleString()}`} />
               </div>
@@ -196,8 +196,8 @@ export default function VerifyPage() {
                 {request.schedules.map((schedule, index) => (
                   <div key={schedule.bookingReference} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                     <div className="flex items-center justify-between gap-3"><strong className="text-slate-900">Schedule {index + 1}</strong><span className="text-xs font-semibold text-primary">{schedule.status}</span></div>
-                    <p className="mt-1 text-slate-600">{schedule.courtName} · {format(new Date(`${schedule.bookingDate}T00:00:00`), 'MMM d, yyyy')}</p>
-                    <p className="mt-0.5 text-slate-600">{format(new Date(`2000-01-01T${schedule.startTime}`), 'h:mm a')}–{format(new Date(`2000-01-01T${schedule.endTime}`), 'h:mm a')}</p>
+                    <p className="mt-1 text-slate-600">{schedule.courtName} · {formatAppDate(schedule.bookingDate)}</p>
+                    <p className="mt-0.5 text-slate-600">{formatAppTime(schedule.startTime)}–{formatAppTime(schedule.endTime)}</p>
                   </div>
                 ))}
               </div>

@@ -112,7 +112,7 @@ public sealed class BookingCustomerIntegrationTests
         var result = await fixture.Service.ValidatePublicPromoAsync(promo.Code, customer.Email);
 
         Assert.False(result.Success);
-        Assert.Contains("NFC promo list", result.Message);
+        Assert.Contains("Customer Card promo list", result.Message);
     }
 
     [Fact]
@@ -148,6 +148,27 @@ public sealed class BookingCustomerIntegrationTests
         Assert.Contains("1 use per customer each month", overLimit.Message);
         Assert.Single(fixture.Bookings.Items);
     }
+
+    [Fact]
+    public async Task Customer_card_purchases_are_included_in_revenue()
+    {
+        var fixture = new BookingFixture();
+        fixture.CardTransactions.Items.Add(new CustomerCardTransaction
+        {
+            Id = 1, CustomerId = 1, Amount = 1200m, Type = CustomerCardTransactionType.Purchase,
+            ValidFrom = new DateOnly(2026, 10, 5), ValidThrough = new DateOnly(2027, 1, 4),
+            ValidityDuration = 3, ValidityUnit = RateValidityUnit.Month,
+            CreatedAt = new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc)
+        });
+
+        var result = await fixture.Service.GetRevenueAsync(new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5));
+
+        Assert.True(result.Success);
+        Assert.Equal(1200m, result.Data!.CustomerCardSales);
+        Assert.Equal(1200m, result.Data.CollectedRevenue);
+        Assert.Equal(1, result.Data.CustomerCardTransactionCount);
+        Assert.Equal(1200m, Assert.Single(result.Data.Daily).CustomerCardSales);
+    }
 }
 
 internal sealed class BookingFixture
@@ -156,6 +177,7 @@ internal sealed class BookingFixture
     public MemoryRepository<Schedule> Schedules { get; } = new();
     public MemoryRepository<Promo> Promos { get; } = new();
     public MemoryRepository<Customer> Customers { get; } = new();
+    public MemoryRepository<CustomerCardTransaction> CardTransactions { get; } = new();
     public BookingService Service { get; }
     private long _customerId = 1;
 
@@ -164,13 +186,13 @@ internal sealed class BookingFixture
         var slots = new MemoryRepository<TimeSlot>(); slots.Items.Add(new() { Id = 1, StartTime = new(10, 0), EndTime = new(11, 0), DisplayName = "10-11", IsActive = true, SortOrder = 1 });
         var courts = new MemoryRepository<Court>(); courts.Items.Add(new() { Id = 1, Name = "Court 1", DisplayName = "Court 1", IsActive = true, OpenTime = new(6, 0), CloseTime = TimeOnly.MinValue });
         Service = new(Bookings, Schedules, slots, courts, new MemoryRepository<Notification>(), Promos,
-            new MemoryRepository<InternalCoachProfile>(), Customers, new FixedRateService(), new NullEmailService(), new FixedClock(), new OpenBookingWindow());
+            new MemoryRepository<InternalCoachProfile>(), Customers, CardTransactions, new FixedRateService(), new NullEmailService(), new FixedClock(), new OpenBookingWindow());
     }
 
     public Customer AddCustomer(bool active, bool issued)
     {
         var id = _customerId++;
-        var customer = new Customer { Id = id, FullName = $"Customer {id}", Username = $"customer-{id}", NormalizedUsername = $"CUSTOMER-{id}", Email = $"customer{id}@example.com", NormalizedEmail = $"CUSTOMER{ id }@EXAMPLE.COM".Replace(" ", ""), IsActive = active, NfcTokenHash = issued ? new byte[32] : null, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        var customer = new Customer { Id = id, FullName = $"Customer {id}", Username = $"customer-{id}", NormalizedUsername = $"CUSTOMER-{id}", Email = $"customer{id}@example.com", NormalizedEmail = $"CUSTOMER{ id }@EXAMPLE.COM".Replace(" ", ""), IsActive = active, NfcTokenHash = issued ? new byte[32] : null, CardValidFrom = new DateOnly(2026, 10, 1), CardValidThrough = new DateOnly(2027, 9, 30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
         Customers.Items.Add(customer); return customer;
     }
 
@@ -202,6 +224,7 @@ internal sealed class NullEmailService : IEmailService
     public Task SendPublicBookingRequestAsync(PublicBookingRequestEmailDto request, byte[] receiptBytes, string receiptFileName, string receiptContentType, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendTemporaryPasswordAsync(string email, string firstName, string temporaryPassword, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendInternalCoachWelcomeAsync(string email, string name, string profileType, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendLoyaltyCardPurchaseAsync(string email, string customerName, decimal amount, DateOnly validFrom, DateOnly validThrough, bool isRenewal, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendCancellationAsync(Booking booking, string courtName, string reason, bool isDeclinedRequest = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendStorageCleanupSummaryAsync(string deletedByName, string deletedByEmail, DateOnly fromDate, DateOnly throughDate, int scheduleCount, int bookingCount, int receiptCount, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

@@ -23,20 +23,27 @@ public sealed partial class CustomerService : ICustomerService
     private readonly IRepository<Court> _courts;
     private readonly IRepository<Schedule> _schedules;
     private readonly IRepository<Promo> _promos;
+    private readonly IRepository<Rate> _rates;
+    private readonly IRepository<CustomerCardTransaction> _cardTransactions;
     private readonly IBusinessClock _clock;
     private readonly INfcTokenProtector _tokenProtector;
+    private readonly IEmailService _email;
 
     public CustomerService(IRepository<Customer> customers, IRepository<Booking> bookings,
-        IRepository<Court> courts, IRepository<Schedule> schedules, IRepository<Promo> promos, IBusinessClock clock,
-        INfcTokenProtector tokenProtector)
+        IRepository<Court> courts, IRepository<Schedule> schedules, IRepository<Promo> promos, IRepository<Rate> rates,
+        IRepository<CustomerCardTransaction> cardTransactions, IBusinessClock clock, INfcTokenProtector tokenProtector,
+        IEmailService email)
     {
         _customers = customers;
         _bookings = bookings;
         _courts = courts;
         _schedules = schedules;
         _promos = promos;
+        _rates = rates;
+        _cardTransactions = cardTransactions;
         _clock = clock;
         _tokenProtector = tokenProtector;
+        _email = email;
     }
 
     public async Task<ApiResponse<IEnumerable<CustomerSummaryDto>>> GetAllAsync(string? query, bool includeInactive)
@@ -75,18 +82,59 @@ public sealed partial class CustomerService : ICustomerService
         var existing = await _customers.GetAllAsync();
         if (existing.Any(customer => customer.NormalizedUsername == normalizedUsername)) return ApiResponse<CreateCustomerDto>.Fail("Username is already in use");
         if (existing.Any(customer => customer.NormalizedEmail == normalizedEmail)) return ApiResponse<CreateCustomerDto>.Fail("Email is already in use");
+        var cardRate = await GetActiveCardRateAsync();
+        if (cardRate is null) return ApiResponse<CreateCustomerDto>.Fail("Configure an active customer card rate before adding a customer");
         var now = _clock.UtcNow.UtcDateTime;
+        var validFrom = _clock.ManilaToday;
+        var validThrough = CalculateValidThrough(validFrom, cardRate.ValidityDuration!.Value, cardRate.ValidityUnit!.Value);
         var customer = new Customer
         {
             FullName = request.FullName.Trim(), Username = request.Username.Trim().ToLowerInvariant(), NormalizedUsername = normalizedUsername,
             Email = request.Email.Trim(), NormalizedEmail = normalizedEmail, Phone = NullIfWhiteSpace(request.Phone),
-            AdminNotes = NullIfWhiteSpace(request.AdminNotes), IsActive = true, CreatedAt = now, UpdatedAt = now
+            AdminNotes = NullIfWhiteSpace(request.AdminNotes), IsActive = true, CardValidFrom = validFrom,
+            CardValidThrough = validThrough, CreatedAt = now, UpdatedAt = now
         };
         var card = CreateCredential(customer, frontendBaseUrl);
         await _customers.AddAsync(customer);
+        await _cardTransactions.AddAsync(new CustomerCardTransaction
+        {
+            Customer = customer, Type = CustomerCardTransactionType.Purchase, Amount = cardRate.PricePerHour,
+            ValidFrom = validFrom, ValidThrough = validThrough, ValidityDuration = cardRate.ValidityDuration.Value,
+            ValidityUnit = cardRate.ValidityUnit.Value, CreatedAt = now
+        });
         try { await _customers.SaveChangesAsync(); }
         catch { return ApiResponse<CreateCustomerDto>.Fail("Username or email is already in use"); }
+        await TrySendCardEmailAsync(customer, cardRate.PricePerHour, validFrom, validThrough, false);
         return ApiResponse<CreateCustomerDto>.Ok(new(ToSummary(customer, true), card), "Customer and NFC card created");
+    }
+
+    public async Task<ApiResponse<CustomerCardRenewalDto>> RenewAsync(long id)
+    {
+        var customer = await _customers.GetByIdAsync(id);
+        if (customer is null) return ApiResponse<CustomerCardRenewalDto>.Fail("Customer not found");
+        if (customer.NfcTokenHash is not { Length: 32 }) return ApiResponse<CustomerCardRenewalDto>.Fail("Customer does not have an NFC card");
+        var cardRate = await GetActiveCardRateAsync();
+        if (cardRate is null) return ApiResponse<CustomerCardRenewalDto>.Fail("Configure an active customer card rate before renewing a customer");
+
+        var today = _clock.ManilaToday;
+        var validFrom = customer.CardValidThrough.HasValue && customer.CardValidThrough.Value >= today
+            ? customer.CardValidThrough.Value.AddDays(1)
+            : today;
+        var validThrough = CalculateValidThrough(validFrom, cardRate.ValidityDuration!.Value, cardRate.ValidityUnit!.Value);
+        customer.CardValidFrom ??= validFrom;
+        customer.CardValidThrough = validThrough;
+        customer.UpdatedAt = _clock.UtcNow.UtcDateTime;
+        _customers.Update(customer);
+        await _cardTransactions.AddAsync(new CustomerCardTransaction
+        {
+            CustomerId = customer.Id, Customer = customer, Type = CustomerCardTransactionType.Renewal,
+            Amount = cardRate.PricePerHour, ValidFrom = validFrom, ValidThrough = validThrough,
+            ValidityDuration = cardRate.ValidityDuration.Value, ValidityUnit = cardRate.ValidityUnit.Value,
+            CreatedAt = _clock.UtcNow.UtcDateTime
+        });
+        await _customers.SaveChangesAsync();
+        await TrySendCardEmailAsync(customer, cardRate.PricePerHour, validFrom, validThrough, true);
+        return ApiResponse<CustomerCardRenewalDto>.Ok(new(ToSummary(customer, true), cardRate.PricePerHour, validFrom, validThrough), "Customer card renewed");
     }
 
     public async Task<ApiResponse<CustomerSummaryDto>> UpdateAsync(long id, UpdateCustomerRequest request)
@@ -159,7 +207,7 @@ public sealed partial class CustomerService : ICustomerService
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         var normalizedUsername = NormalizeUsername(username);
         var customer = (await _customers.FindAsync(item => item.NormalizedUsername == normalizedUsername)).SingleOrDefault();
-        if (customer is null || !customer.IsActive || customer.NfcTokenHash is not { Length: 32 })
+        if (customer is null || !HasUsableCard(customer, _clock.ManilaToday))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         if (!TokenMatches(customer, token))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
@@ -167,14 +215,31 @@ public sealed partial class CustomerService : ICustomerService
         _customers.Update(customer); await _customers.SaveChangesAsync();
         var groups = await GetBookingGroupsAsync(customer.Id);
         var today = _clock.ManilaToday;
-        var eligiblePromos = (await _promos.GetAllAsync())
+        var eligiblePromoEntities = (await _promos.GetAllAsync())
             .Where(promo => promo.IsActive && promo.Audience == PromoAudience.NfcCustomersOnly &&
                 (!promo.MaxUses.HasValue || promo.CurrentUses < promo.MaxUses.Value) &&
                 (!promo.StartDate.HasValue || DateOnly.FromDateTime(promo.StartDate.Value) <= today) &&
                 (!promo.EndDate.HasValue || DateOnly.FromDateTime(promo.EndDate.Value) >= today))
-            .Select(promo => new CustomerPromoDto(promo.Code, promo.Description, promo.Type.ToString(), promo.Value))
             .ToList();
-        return ApiResponse<CustomerCardDto>.Ok(new(customer.FullName, customer.Username, CustomerNumber(customer.Id), customer.CreatedAt,
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        var nextMonth = monthStart.AddMonths(1);
+        var customerBookings = (await _bookings.FindAsync(booking => booking.CustomerId == customer.Id &&
+            booking.Status != BookingStatus.Cancelled)).ToList();
+        var eligiblePromos = eligiblePromoEntities.Select(promo =>
+        {
+            int? remaining = null;
+            DateOnly? resetsOn = null;
+            if (promo.MonthlyUsageLimitPerCustomer.HasValue)
+            {
+                var used = customerBookings.Count(booking => booking.PromoId == promo.Id &&
+                    _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime >= monthStart &&
+                    _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime < nextMonth);
+                remaining = Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - used);
+                resetsOn = DateOnly.FromDateTime(nextMonth);
+            }
+            return new CustomerPromoDto(promo.Code, promo.Description, promo.Type.ToString(), promo.Value, remaining, resetsOn);
+        }).Where(promo => !promo.RemainingUsesThisMonth.HasValue || promo.RemainingUsesThisMonth.Value > 0).ToList();
+        return ApiResponse<CustomerCardDto>.Ok(new(customer.FullName, customer.Username, CustomerNumber(customer.Id), customer.CreatedAt, customer.CardValidFrom, customer.CardValidThrough,
             groups.Upcoming, groups.Pending, groups.Past, groups.Cancelled, eligiblePromos));
     }
 
@@ -209,7 +274,30 @@ public sealed partial class CustomerService : ICustomerService
 
     private static CustomerSummaryDto ToSummary(Customer customer, bool includeNotes) => new(customer.Id, CustomerNumber(customer.Id), customer.FullName, customer.Username,
         customer.Email, customer.Phone, customer.IsActive, customer.NfcTokenHash is { Length: 32 }, customer.NfcIssuedAt, customer.NfcLastTappedAt,
-        customer.CreatedAt, customer.UpdatedAt, includeNotes ? customer.AdminNotes : null);
+        customer.CreatedAt, customer.UpdatedAt, includeNotes ? customer.AdminNotes : null, customer.CardValidFrom, customer.CardValidThrough);
+
+    private async Task<Rate?> GetActiveCardRateAsync() => (await _rates.GetAllAsync())
+        .Where(rate => rate.IsActive && rate.RateType == RateType.CustomerCard && rate.ValidityDuration.HasValue && rate.ValidityUnit.HasValue)
+        .OrderBy(rate => rate.Id)
+        .FirstOrDefault();
+
+    private static DateOnly CalculateValidThrough(DateOnly validFrom, int duration, RateValidityUnit unit) => unit switch
+    {
+        RateValidityUnit.Day => validFrom.AddDays(duration).AddDays(-1),
+        RateValidityUnit.Month => validFrom.AddMonths(duration).AddDays(-1),
+        RateValidityUnit.Year => validFrom.AddYears(duration).AddDays(-1),
+        _ => throw new ArgumentOutOfRangeException(nameof(unit))
+    };
+
+    private static bool HasUsableCard(Customer customer, DateOnly today) => customer.IsActive &&
+        customer.NfcTokenHash is { Length: 32 } && customer.CardValidFrom.HasValue && customer.CardValidThrough.HasValue &&
+        customer.CardValidFrom.Value <= today && customer.CardValidThrough.Value >= today;
+
+    private async Task TrySendCardEmailAsync(Customer customer, decimal amount, DateOnly validFrom, DateOnly validThrough, bool isRenewal)
+    {
+        try { await _email.SendLoyaltyCardPurchaseAsync(customer.Email, customer.FullName, amount, validFrom, validThrough, isRenewal); }
+        catch { /* The paid customer record must remain valid even when SMTP is temporarily unavailable. */ }
+    }
     private static string CustomerNumber(long id) => $"TDK-{id:D6}";
     private static string NormalizeUsername(string value) => value.Trim().ToUpperInvariant();
     private static string NormalizeEmail(string value) => value.Trim().ToUpperInvariant();

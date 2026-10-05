@@ -12,6 +12,7 @@ public interface IEmailService
     Task SendPublicBookingRequestAsync(PublicBookingRequestEmailDto request, byte[] receiptBytes, string receiptFileName, string receiptContentType, CancellationToken cancellationToken = default);
     Task SendTemporaryPasswordAsync(string email, string firstName, string temporaryPassword, CancellationToken cancellationToken = default);
     Task SendInternalCoachWelcomeAsync(string email, string name, string profileType, CancellationToken cancellationToken = default);
+    Task SendLoyaltyCardPurchaseAsync(string email, string customerName, decimal amount, DateOnly validFrom, DateOnly validThrough, bool isRenewal, CancellationToken cancellationToken = default);
     Task SendCancellationAsync(Booking booking, string courtName, string reason, bool isDeclinedRequest = false, CancellationToken cancellationToken = default);
     Task SendStorageCleanupSummaryAsync(string deletedByName, string deletedByEmail, DateOnly fromDate, DateOnly throughDate, int scheduleCount, int bookingCount, int receiptCount, CancellationToken cancellationToken = default);
 }

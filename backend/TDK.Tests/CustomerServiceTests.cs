@@ -41,6 +41,39 @@ public sealed class CustomerServiceTests
         Assert.NotEqual(rawToken, Convert.ToBase64String(stored.NfcTokenHash));
         Assert.True(CryptographicOperations.FixedTimeEquals(stored.NfcTokenHash, SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))));
         Assert.Equal(created.Data.Card.Url, (await fixture.Service.GetNfcAsync(stored.Id, "https://example.com")).Data!.Url);
+        Assert.Equal(new DateOnly(2026, 10, 5), stored.CardValidFrom);
+        Assert.Equal(new DateOnly(2027, 1, 4), stored.CardValidThrough);
+        var purchase = Assert.Single(fixture.CardTransactions.Items);
+        Assert.Equal(1200m, purchase.Amount);
+        Assert.Equal(TDK.Domain.Enums.CustomerCardTransactionType.Purchase, purchase.Type);
+    }
+
+    [Fact]
+    public async Task Renewal_extends_validity_and_records_revenue_transaction()
+    {
+        var fixture = new Fixture();
+        var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
+
+        var renewal = await fixture.Service.RenewAsync(created.Data!.Customer.Id);
+
+        Assert.True(renewal.Success);
+        Assert.Equal(new DateOnly(2027, 1, 5), renewal.Data!.ValidFrom);
+        Assert.Equal(new DateOnly(2027, 4, 4), renewal.Data.ValidThrough);
+        Assert.Equal(new DateOnly(2026, 10, 5), fixture.Customers.Items.Single().CardValidFrom);
+        Assert.Equal(new DateOnly(2027, 4, 4), fixture.Customers.Items.Single().CardValidThrough);
+        Assert.Equal(2, fixture.CardTransactions.Items.Count);
+        Assert.Equal(TDK.Domain.Enums.CustomerCardTransactionType.Renewal, fixture.CardTransactions.Items.Last().Type);
+    }
+
+    [Fact]
+    public async Task Expired_card_is_not_publicly_available()
+    {
+        var fixture = new Fixture();
+        var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
+        var token = created.Data!.Card.Url.Split('/').Last();
+        fixture.Customers.Items.Single().CardValidThrough = new DateOnly(2026, 10, 4);
+
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
     }
 
     [Fact]
@@ -101,8 +134,14 @@ public sealed class CustomerServiceTests
     {
         public MemoryRepository<Customer> Customers { get; } = new();
         public MemoryRepository<Booking> Bookings { get; } = new();
+        public MemoryRepository<CustomerCardTransaction> CardTransactions { get; } = new();
         public CustomerService Service { get; }
-        public Fixture() => Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), new MemoryRepository<Promo>(), new FixedClock(), new TestTokenProtector());
+        public Fixture()
+        {
+            var rates = new MemoryRepository<Rate>();
+            rates.Items.Add(new Rate { Id = 1, RateType = TDK.Domain.Enums.RateType.CustomerCard, PricePerHour = 1200, ValidityDuration = 3, ValidityUnit = TDK.Domain.Enums.RateValidityUnit.Month, IsActive = true });
+            Service = new(Customers, Bookings, new MemoryRepository<Court>(), new MemoryRepository<Schedule>(), new MemoryRepository<Promo>(), rates, CardTransactions, new FixedClock(), new TestTokenProtector(), new NullEmailService());
+        }
     }
 }
 

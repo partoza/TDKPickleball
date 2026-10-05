@@ -1,5 +1,5 @@
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
@@ -102,7 +102,7 @@ function ScheduleGenerator() {
   }, [board, date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedSlots = availableSlots.filter(slot => selected.includes(slot.id));
-  const dateLabel = format(new Date(`${date}T00:00:00`), 'MMMM d, yyyy').toUpperCase();
+  const dateLabel = formatAppDate(date).toUpperCase();
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -362,7 +362,7 @@ function InlineError({ text }: { text: string }) {
 }
 
 function formatTimeRange(start: string, end: string) {
-  const formatOne = (value: string) => format(new Date(`2000-01-01T${value}`), 'h:mm a');
+  const formatOne = (value: string) => formatAppTime(value);
   return `${formatOne(start)} – ${formatOne(end)}`;
 }
 

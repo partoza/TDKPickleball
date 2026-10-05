@@ -168,6 +168,25 @@ public class SmtpEmailService : IEmailService
         return SendMessageAsync(email, $"Welcome to TDK - {profileType}", plainText, html, null, cancellationToken, true);
     }
 
+    public Task SendLoyaltyCardPurchaseAsync(string email, string customerName, decimal amount, DateOnly validFrom, DateOnly validThrough, bool isRenewal, CancellationToken cancellationToken = default)
+    {
+        var action = isRenewal ? "renewed" : "purchased";
+        var heading = isRenewal ? "Your Customer Card has been renewed." : "Welcome to the TDK Customer Card.";
+        var plainText = $"Hello {customerName},\n\nYour TDK Customer Card was {action}.\nAmount paid: PHP {amount:N2}\nValid from: {validFrom:MMMM d, yyyy}\nValid through: {validThrough:MMMM d, yyyy}\n\nPresent or tap your Customer Card to access eligible card promos.";
+        var html = WrapEmail($"""
+            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Customer Card {Encode(isRenewal ? "renewal" : "purchase")}</div>
+            <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">{Encode(heading)}</h1>
+            <p style="margin:0 0 24px;color:#666666;font-size:15px;line-height:1.7;">Hello {Encode(customerName)}, your payment has been recorded and your Customer Card validity is shown below.</p>
+            <div style="margin:0 0 24px;">
+              {DetailRow("Amount paid", $"PHP {amount:N2}")}
+              {DetailRow("Valid from", validFrom.ToString("MMMM d, yyyy"))}
+              {DetailRow("Valid through", validThrough.ToString("MMMM d, yyyy"), true)}
+            </div>
+            <p style="margin:0;color:#777777;font-size:13px;line-height:1.6;">Present or tap your Customer Card to access eligible card promos while the card is active.</p>
+            """, $"Customer Card valid through {validThrough:MMMM d, yyyy}");
+        return SendMessageAsync(email, isRenewal ? "Your TDK Customer Card was renewed" : "TDK Loyalty Card Purchase Confirmation", plainText, html, null, cancellationToken, true);
+    }
+
     public Task SendCancellationAsync(Booking booking, string courtName, string reason, bool isDeclinedRequest = false, CancellationToken cancellationToken = default)
     {
         var action = isDeclinedRequest ? "declined" : "cancelled";

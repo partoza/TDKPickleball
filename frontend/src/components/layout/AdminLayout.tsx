@@ -10,9 +10,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { formatDistanceToNow } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { AdminIconLoader } from '@/components/admin/AdminPageSkeleton';
+import { formatAppDateTime } from '@/lib/date-time';
 
 function notificationHref(title: string) {
   const normalized = title.toLowerCase();
@@ -174,7 +174,7 @@ export default function AdminLayout() {
                     return <DropdownMenuItem key={notification.id} asChild className="mb-0.5 cursor-pointer items-start rounded-lg p-0 focus:bg-accent">
                       <Link to={notificationHref(notification.title)} className="flex w-full items-start gap-3 px-3 py-3" onClick={() => markNotificationsSeen([notification.id])}>
                         <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} />
-                        <span className="min-w-0 flex-1"><span className={cn('block truncate text-xs', unread ? 'font-bold' : 'font-semibold')}>{notification.title}</span><span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{notification.message}</span><span className="mt-1.5 block text-[10px] text-muted-foreground/70">{formatDistanceToNow(new Date(notification.createdAtUtc), { addSuffix: true })}</span></span>
+                        <span className="min-w-0 flex-1"><span className={cn('block truncate text-xs', unread ? 'font-bold' : 'font-semibold')}>{notification.title}</span><span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">{notification.message}</span><span className="mt-1.5 block text-[10px] text-muted-foreground/70">{formatAppDateTime(notification.createdAtUtc)}</span></span>
                       </Link>
                     </DropdownMenuItem>;
                   })}

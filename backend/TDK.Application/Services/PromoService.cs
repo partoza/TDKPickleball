@@ -139,7 +139,7 @@ public class PromoService : IPromoService
     {
         if (maxUses is <= 0) return "Maximum uses must be greater than zero";
         if (audience == TDK.Domain.Enums.PromoAudience.NfcCustomersOnly && monthlyUsageLimitPerCustomer is null or <= 0)
-            return "Monthly uses per customer must be greater than zero for NFC customer promos";
+            return "Monthly uses per customer must be greater than zero for Customer Card promos";
         return null;
     }
 }

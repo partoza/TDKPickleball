@@ -1,3 +1,5 @@
+import { formatAppDateTime } from './date-time';
+
 const MANILA_TIME_ZONE = 'Asia/Manila';
 
 const manilaParts = (instant: Date = new Date()) => {
@@ -43,12 +45,5 @@ export const formatManilaDatabaseTime = (value?: string) => {
   const instant = new Date(includesOffset ? value : `${value}Z`);
   if (Number.isNaN(instant.getTime())) return '—';
 
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: includesOffset ? MANILA_TIME_ZONE : 'UTC',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(instant);
+  return formatAppDateTime(instant);
 };

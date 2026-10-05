@@ -9,6 +9,8 @@ public class Rate
     public TimeOnly EndTime { get; set; }
     public decimal PricePerHour { get; set; }
     public RateType RateType { get; set; }
+    public int? ValidityDuration { get; set; }
+    public RateValidityUnit? ValidityUnit { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

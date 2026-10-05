@@ -18,6 +18,8 @@ import { ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
+import { useRevenue } from '@/hooks/useRevenue';
 
 function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, bookings: Booking[], internalCoaches: any[] }) {
   const [now, setNow] = useState(new Date());
@@ -185,10 +187,11 @@ export default function DashboardPage() {
   const bookings = bookingResponse?.data || []; const courts = courtResponse?.data || [];
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const interval = range === 'day' ? { start: startOfDay(anchorDate), end: endOfDay(anchorDate) } : range === 'week' ? { start: startOfWeek(anchorDate), end: endOfWeek(anchorDate) } : { start: startOfMonth(anchorDate), end: endOfMonth(anchorDate) };
+  const revenueReport = useRevenue(format(interval.start, 'yyyy-MM-dd'), format(interval.end, 'yyyy-MM-dd'), user?.role === 'Admin');
   const filtered = bookings.filter(b => b.status !== 'Cancelled' && isWithinInterval(new Date(`${b.bookingDate}T00:00:00`), interval));
   const today = format(new Date(), 'yyyy-MM-dd');
   const upcoming = bookings.filter(b => b.status !== 'Cancelled' && `${b.bookingDate}T${b.startTime}` > new Date().toISOString().slice(0,19)).sort((a,b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
-  const revenue = filtered.reduce((sum, b) => sum + b.amountPaid, 0);
+  const revenue = revenueReport.data?.data.collectedRevenue ?? filtered.reduce((sum, b) => sum + b.amountPaid, 0);
   const points = useMemo(() => {
     const isBooked = (b: Booking) => b.bookingType !== RateType.Training && b.status !== 'Cancelled';
     const isTraining = (b: Booking) => b.bookingType === RateType.Training && b.status !== 'Cancelled';
@@ -200,7 +203,7 @@ export default function DashboardPage() {
         const bookedCount = dayB.filter(isBooked).length;
         const trainingCount = dayB.filter(isTraining).length;
         const value = bookedCount + trainingCount;
-        return { id: d.toISOString(), label: format(d, 'EEE'), subLabel: format(d, 'd'), value, bookedCount, trainingCount, tooltipSub: format(d, 'MMM d, yyyy') };
+        return { id: d.toISOString(), label: format(d, 'EEE'), subLabel: format(d, 'd'), value, bookedCount, trainingCount, tooltipSub: formatAppDate(d) };
       });
     }
     if (range === 'week') {
@@ -215,7 +218,7 @@ export default function DashboardPage() {
         const bookedCount = weekB.filter(isBooked).length;
         const trainingCount = weekB.filter(isTraining).length;
         const value = bookedCount + trainingCount;
-        wks.push({ id: `week-${weekNum}`, label: `W${weekNum}`, subLabel: format(current, 'MMM d'), value, bookedCount, trainingCount, tooltipSub: `${format(current, 'MMM d')} - ${format(wEnd, 'MMM d')}` });
+        wks.push({ id: `week-${weekNum}`, label: `W${weekNum}`, subLabel: format(current, 'MMM d'), value, bookedCount, trainingCount, tooltipSub: `${formatAppDate(current)} - ${formatAppDate(wEnd)}` });
         current = addDays(current, 7);
         weekNum++;
       }
@@ -273,9 +276,9 @@ export default function DashboardPage() {
       </div>
     ) : (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {user?.role === 'Admin' ? <Stat icon={CircleDollarSign} label={`${range} revenue`} value={`₱${revenue.toLocaleString()}`} note={`${format(interval.start, 'MMM d')} – ${format(interval.end, 'MMM d')}`} /> : <Stat icon={Ticket} label="Reservations" value={filtered.filter(b => b.status === 'Reserved').length.toString()} note="Needs payment follow-up" />}
-        {user?.role === 'Admin' ? <Stat icon={Dumbbell} label="Active courts" value={courts.filter(c => c.isActive).length.toString()} note={`${courts.length} configured`} /> : <Stat icon={CircleDollarSign} label="Paid bookings" value={filtered.filter(b => b.status === 'Paid').length.toString()} note={`${format(interval.start, 'MMM d')} – ${format(interval.end, 'MMM d')}`} />}
-        <Stat icon={CalendarDays} label="Today’s bookings" value={bookings.filter(b => b.bookingDate === today && b.status !== 'Cancelled').length.toString()} note={format(new Date(), 'MMMM d, yyyy')} />
+        {user?.role === 'Admin' ? <Stat icon={CircleDollarSign} label={`${range} revenue`} value={`₱${revenue.toLocaleString()}`} note={`${formatAppDate(interval.start)} – ${formatAppDate(interval.end)}`} /> : <Stat icon={Ticket} label="Reservations" value={filtered.filter(b => b.status === 'Reserved').length.toString()} note="Needs payment follow-up" />}
+        {user?.role === 'Admin' ? <Stat icon={Dumbbell} label="Active courts" value={courts.filter(c => c.isActive).length.toString()} note={`${courts.length} configured`} /> : <Stat icon={CircleDollarSign} label="Paid bookings" value={filtered.filter(b => b.status === 'Paid').length.toString()} note={`${formatAppDate(interval.start)} – ${formatAppDate(interval.end)}`} />}
+        <Stat icon={CalendarDays} label="Today’s bookings" value={bookings.filter(b => b.bookingDate === today && b.status !== 'Cancelled').length.toString()} note={formatAppDate(new Date())} />
         <Stat icon={Clock3} label="Upcoming" value={upcoming.length.toString()} note={upcoming[0] ? `${upcoming[0].courtName} · ${upcoming[0].customerName}` : 'No'} />
       </div>
     )}
@@ -389,7 +392,7 @@ function Upcoming({ booking: b }: { booking: Booking }) {
         <span className="text-[10px] font-bold uppercase tracking-wider bg-primary text-primary-foreground px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm">{b.courtName}</span>
       </div>
       <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-        {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM d, yyyy')} • {format(new Date(`2000-01-01T${b.startTime}`), 'h:mm a')}
+        {formatAppDate(b.bookingDate)} • {formatAppTime(b.startTime)}
       </p>
     </div>
   ); 

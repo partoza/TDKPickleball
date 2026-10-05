@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
 import { PencilSquareIcon as Edit2, PlusIcon as Plus, PowerIcon, NoSymbolIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { toast } from 'sonner';
 import { useCreateRate, useDeleteRate, useRates, useUpdateRate } from '@/hooks/useRates';
-import { Rate, RateType } from '@/types';
+import { Rate, RateType, RateValidityUnit } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -20,9 +19,10 @@ import { AdminTimeSelect, hourlyOptions } from '@/components/admin/AdminFormCont
 import { isValidTimeRange, minimumEndTime } from '@/lib/time-range';
 import { getApiErrorMessage } from '@/services/api';
 import { AdminCredentialDeleteDialog } from '@/components/admin/AdminCredentialDeleteDialog';
+import { formatAppTime } from '@/lib/date-time';
 
-type RateForm = { startTime: string; endTime: string; pricePerHour: number | ''; rateType: RateType };
-const defaultForm: RateForm = { startTime: '07:00', endTime: '17:00', pricePerHour: '', rateType: RateType.Booking };
+type RateForm = { startTime: string; endTime: string; pricePerHour: number | ''; rateType: RateType; validityDuration: number | ''; validityUnit: RateValidityUnit };
+const defaultForm: RateForm = { startTime: '07:00', endTime: '17:00', pricePerHour: '', rateType: RateType.Booking, validityDuration: 1, validityUnit: RateValidityUnit.Month };
 
 export default function RatesPage() {
   const { data, isLoading } = useRates();
@@ -44,13 +44,16 @@ export default function RatesPage() {
       endTime: rate.endTime.slice(0, 5),
       pricePerHour: rate.pricePerHour,
       rateType: rate.rateType || RateType.Booking,
+      validityDuration: rate.validityDuration || 1,
+      validityUnit: rate.validityUnit || RateValidityUnit.Month,
     } : defaultForm);
   };
 
   const save = () => {
     const nextErrors: Record<string, string> = {};
     if (form.rateType !== RateType.Internal && Number(form.pricePerHour) <= 0) nextErrors.pricePerHour = 'Rate must be greater than zero.';
-    if (!isValidTimeRange(form.startTime, form.endTime)) nextErrors.endTime = 'End time must be at least 1 hour after start time.';
+    if (form.rateType !== RateType.CustomerCard && !isValidTimeRange(form.startTime, form.endTime)) nextErrors.endTime = 'End time must be at least 1 hour after start time.';
+    if (form.rateType === RateType.CustomerCard && Number(form.validityDuration) <= 0) nextErrors.validityDuration = 'Validity must be at least 1.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     const options = {
@@ -61,7 +64,7 @@ export default function RatesPage() {
       },
       onError: (error: unknown) => toast.error(getApiErrorMessage(error, 'Unable to save rate')),
     };
-    const payload = { ...form, pricePerHour: form.rateType === RateType.Internal ? 0 : Number(form.pricePerHour) };
+    const payload = { ...form, pricePerHour: form.rateType === RateType.Internal ? 0 : Number(form.pricePerHour), validityDuration: form.rateType === RateType.CustomerCard ? Number(form.validityDuration) : undefined, validityUnit: form.rateType === RateType.CustomerCard ? form.validityUnit : undefined };
     if (editing) update.mutate({ id: editing.id, rate: { ...payload, isActive: editing.isActive } }, options);
     else create.mutate(payload, options);
   };
@@ -94,12 +97,12 @@ export default function RatesPage() {
     <Card className="rounded-2xl"><CardHeader><CardTitle>Pricing schedule</CardTitle></CardHeader><CardContent>
       <div className="space-y-4">
           <div className="rounded-xl border dark:border-white/10 hidden md:block"><Table><TableHeader><TableRow>
-            <TableHead>Pricing ID</TableHead><TableHead>Rate type</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Rate / hour</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+            <TableHead>Pricing ID</TableHead><TableHead>Rate type</TableHead><TableHead>Start</TableHead><TableHead>End / Validity</TableHead><TableHead>Price</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
           </TableRow></TableHeader><TableBody>{rates.slice(page * 10, (page + 1) * 10).map(rate => <TableRow key={rate.id}>
             <TableCell className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</TableCell>
             <TableCell><RateTypeBadge type={rate.rateType || RateType.Booking} /></TableCell>
-            <TableCell>{time(rate.startTime)}</TableCell><TableCell>{time(rate.endTime)}</TableCell>
-            <TableCell className="font-semibold">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</TableCell>
+            <TableCell>{rate.rateType === RateType.CustomerCard ? '—' : time(rate.startTime)}</TableCell><TableCell>{rate.rateType === RateType.CustomerCard ? validityLabel(rate) : time(rate.endTime)}</TableCell>
+            <TableCell className="font-semibold">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}${rate.rateType === RateType.CustomerCard ? '' : '/hr'}`}</TableCell>
             <TableCell><Badge className={rate.isActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''} variant={rate.isActive ? 'default' : 'secondary'}>{rate.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
             <TableCell><div className="flex justify-end gap-1"><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => open(rate)}><Edit2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">Edit</TooltipContent></Tooltip></TooltipProvider><TooltipProvider><Tooltip delayDuration={200}><TooltipTrigger asChild><Button size="icon" variant="ghost" onClick={() => toggle(rate)} disabled={update.isPending}>{rate.isActive ? <NoSymbolIcon className="h-4 w-4 text-red-600" /> : <PowerIcon className="h-4 w-4 text-emerald-600" />}</Button></TooltipTrigger><TooltipContent className="bg-primary text-primary-foreground font-semibold rounded-lg px-2.5 py-1.5">{rate.isActive ? 'Disable' : 'Enable'}</TooltipContent></Tooltip></TooltipProvider>{!rate.isActive && <Button size="icon" variant="ghost" aria-label="Delete inactive rate" className="text-red-600" onClick={() => setDeleteTarget(rate)}><TrashIcon className="h-4 w-4" /></Button>}</div></TableCell>
           </TableRow>)}</TableBody></Table></div>
@@ -109,10 +112,10 @@ export default function RatesPage() {
               <div key={rate.id} className="rounded-xl border dark:border-white/10 p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-primary">{pricingId(rate, rates)}</span><RateTypeBadge type={rate.rateType || RateType.Booking} /></div>
-                  <span className="font-semibold text-lg">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}`}</span>
+                  <span className="font-semibold text-lg">{rate.rateType === RateType.Internal ? 'Free' : `₱${rate.pricePerHour.toLocaleString()}${rate.rateType === RateType.CustomerCard ? '' : '/hr'}`}</span>
                 </div>
                 <div className="text-sm text-muted-foreground flex justify-between">
-                  <span>{time(rate.startTime)} - {time(rate.endTime)}</span>
+                  <span>{rate.rateType === RateType.CustomerCard ? validityLabel(rate) : `${time(rate.startTime)} - ${time(rate.endTime)}`}</span>
                   <Badge className={rate.isActive ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''} variant={rate.isActive ? 'default' : 'secondary'}>{rate.isActive ? 'Active' : 'Inactive'}</Badge>
                 </div>
                 <div className="flex gap-2 pt-2 border-t dark:border-white/10">
@@ -140,10 +143,10 @@ export default function RatesPage() {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader><DialogTitle>{editing ? 'Edit rate' : 'Add rate'}</DialogTitle><DialogDescription>Choose who this price applies to, its time range, and hourly amount.</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
-          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value, pricePerHour: value === RateType.Internal ? 0 : form.pricePerHour })}><SelectTrigger><SelectValue placeholder="Select rate type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div>
-          <div><Label>Start time</Label><AdminTimeSelect value={form.startTime} options={hourlyOptions(0, 23)} onChange={value => { setForm({ ...form, startTime: value, endTime: isValidTimeRange(value, form.endTime) ? form.endTime : minimumEndTime(value) }); setErrors(e => ({...e, endTime: ''})); }} /></div>
-          <div><Label>End time</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} options={endTimeOptions} onChange={value => { setForm({ ...form, endTime: value }); setErrors(e => ({...e, endTime: ''})); }} />{errors.endTime && <p className="field-error" role="alert">{errors.endTime}</p>}</div>
-          <div className="sm:col-span-2"><Label>Hourly rate (₱)</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="0" step="0.01" value={form.rateType === RateType.Internal ? 0 : form.pricePerHour} disabled={form.rateType === RateType.Internal} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder={form.rateType === RateType.Internal ? 'Free' : 'Enter hourly rate'} />{form.rateType === RateType.Internal && <p className="mt-1 text-xs text-muted-foreground">Internal schedules are always free.</p>}{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
+          <div className="sm:col-span-2"><Label>Rate type *</Label><Select value={form.rateType} onValueChange={(value: RateType) => setForm({ ...form, rateType: value, pricePerHour: value === RateType.Internal ? 0 : form.pricePerHour })}><SelectTrigger><SelectValue placeholder="Select rate type" /></SelectTrigger><SelectContent><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem><SelectItem value={RateType.CustomerCard}>Customer Card</SelectItem></SelectContent></Select></div>
+          {form.rateType !== RateType.CustomerCard && <><div><Label>Start time</Label><AdminTimeSelect value={form.startTime} options={hourlyOptions(0, 23)} onChange={value => { setForm({ ...form, startTime: value, endTime: isValidTimeRange(value, form.endTime) ? form.endTime : minimumEndTime(value) }); setErrors(e => ({...e, endTime: ''})); }} /></div><div><Label>End time</Label><AdminTimeSelect invalid={!!errors.endTime} value={form.endTime} options={endTimeOptions} onChange={value => { setForm({ ...form, endTime: value }); setErrors(e => ({...e, endTime: ''})); }} />{errors.endTime && <p className="field-error" role="alert">{errors.endTime}</p>}</div></>}
+          <div className="sm:col-span-2"><Label>{form.rateType === RateType.CustomerCard ? 'Customer card price (₱)' : 'Hourly rate (₱)'}</Label><Input aria-invalid={!!errors.pricePerHour} className={cn(errors.pricePerHour && 'field-invalid')} type="number" min="0" step="0.01" value={form.rateType === RateType.Internal ? 0 : form.pricePerHour} disabled={form.rateType === RateType.Internal} onChange={event => { setForm({ ...form, pricePerHour: event.target.value === '' ? '' : Number(event.target.value) }); setErrors(e => ({...e, pricePerHour: ''})); }} placeholder={form.rateType === RateType.Internal ? 'Free' : form.rateType === RateType.CustomerCard ? 'Enter card price' : 'Enter hourly rate'} />{form.rateType === RateType.Internal && <p className="mt-1 text-xs text-muted-foreground">Internal schedules are always free.</p>}{errors.pricePerHour && <p className="field-error" role="alert">{errors.pricePerHour}</p>}</div>
+          {form.rateType === RateType.CustomerCard && <><div><Label>Validity duration *</Label><Input aria-invalid={!!errors.validityDuration} type="number" min="1" max="3650" value={form.validityDuration} onChange={event => { setForm({...form, validityDuration: event.target.value === '' ? '' : Number(event.target.value)}); setErrors(e => ({...e, validityDuration: ''})); }} placeholder="e.g. 3" />{errors.validityDuration && <p className="field-error" role="alert">{errors.validityDuration}</p>}</div><div><Label>Validity unit *</Label><Select value={form.validityUnit} onValueChange={(validityUnit: RateValidityUnit) => setForm({...form, validityUnit})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={RateValidityUnit.Day}>Day(s)</SelectItem><SelectItem value={RateValidityUnit.Month}>Month(s)</SelectItem><SelectItem value={RateValidityUnit.Year}>Year(s)</SelectItem></SelectContent></Select></div></>}
         </div>
         <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(undefined)}>Cancel</Button><Button disabled={pending} onClick={save}>Save Rate{pending && <LoadingIndicator label="Saving rate" />}</Button></DialogFooter>
       </DialogContent>
@@ -153,15 +156,16 @@ export default function RatesPage() {
 }
 
 function RateTypeBadge({ type }: { type: RateType }) {
-  const colors = type === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : type === RateType.Internal ? 'border-violet-700 bg-violet-600 text-white' : 'border-primary bg-primary text-primary-foreground';
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold border ${colors}`}>{type === RateType.Internal ? 'Internal' : type}</span>;
+  const colors = type === RateType.Training ? 'border-orange-700 bg-orange-600 text-white' : type === RateType.Internal ? 'border-violet-700 bg-violet-600 text-white' : type === RateType.CustomerCard ? 'border-emerald-700 bg-emerald-600 text-white' : 'border-primary bg-primary text-primary-foreground';
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold border ${colors}`}>{type === RateType.CustomerCard ? 'Customer Card' : type}</span>;
 }
 
-function time(value: string) { return format(new Date(`2000-01-01T${value}`), 'h:mm a'); }
+function time(value: string) { return formatAppTime(value); }
 function pricingId(rate: Rate, rates: Rate[]) {
   const type = rate.rateType || RateType.Booking;
-  const prefix = type === RateType.Booking ? 'BK' : type === RateType.Training ? 'TR' : 'FP';
+  const prefix = type === RateType.Booking ? 'BK' : type === RateType.Training ? 'TR' : type === RateType.CustomerCard ? 'CC' : 'FP';
   const siblings = rates.filter(item => (item.rateType || RateType.Booking) === type).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.id - b.id);
   return `${prefix}-${siblings.findIndex(item => item.id === rate.id) + 1}`;
 }
+function validityLabel(rate: Rate) { const value = rate.validityDuration || 0; const unit = (rate.validityUnit || RateValidityUnit.Month).toLowerCase(); return `${value} ${unit}${value === 1 ? '' : 's'} validity`; }
 

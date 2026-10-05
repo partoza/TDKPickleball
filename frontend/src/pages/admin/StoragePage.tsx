@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { formatAppDate, formatAppDateTime } from '@/lib/date-time';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -143,5 +143,5 @@ function formatStorage(megabytes: number) {
   if (kilobytes >= 1) return `${kilobytes.toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
   return `${Math.max(0, Math.round(kilobytes * 1024)).toLocaleString()} bytes`;
 }
-function formatDate(value: string) { return format(new Date(`${value}T00:00:00`), 'MMM d, yyyy'); }
-function formatDateTime(value: string) { return format(new Date(value), 'MMM d, yyyy · h:mm a'); }
+function formatDate(value: string) { return formatAppDate(value); }
+function formatDateTime(value: string) { return formatAppDateTime(value); }
