@@ -256,16 +256,13 @@ public sealed partial class CustomerService : ICustomerService
         return new(CardUrl(frontendBaseUrl, customer.Username, token), now);
     }
 
-    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token, string authenticatedEmail)
+    public async Task<ApiResponse<CustomerCardDto>> ValidateCardAsync(string username, string token)
     {
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200 ||
-            string.IsNullOrWhiteSpace(authenticatedEmail))
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(token) || token.Length > 200)
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         var normalizedUsername = NormalizeUsername(username);
         var customer = (await _customers.FindAsync(item => item.NormalizedUsername == normalizedUsername)).SingleOrDefault();
         if (customer is null || !HasUsableCard(customer, _clock.ManilaToday))
-            return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
-        if (!string.Equals(customer.NormalizedEmail, NormalizeEmail(authenticatedEmail), StringComparison.Ordinal))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);
         if (!TokenMatches(customer, token))
             return ApiResponse<CustomerCardDto>.Fail(UnavailableMessage);

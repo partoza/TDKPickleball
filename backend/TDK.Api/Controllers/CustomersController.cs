@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Security.Claims;
 using TDK.Application.DTOs.Customers;
 using TDK.Application.Interfaces;
 using TDK.Api.Validation;
@@ -92,7 +91,7 @@ public sealed class CustomersController : ControllerBase
     public async Task<IActionResult> Delete(long id) => Result(await _customers.DeleteAsync(id));
 
     [HttpGet("api/customer/card/{username}/{token}")]
-    [Authorize(Roles = "Customer")]
+    [AllowAnonymous]
     [EnableRateLimiting("NfcValidation")]
     public async Task<IActionResult> Card(string username, string token)
     {
@@ -100,14 +99,7 @@ public sealed class CustomersController : ControllerBase
         Response.Headers.Pragma = "no-cache";
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
-        if (!string.Equals(User.FindFirstValue("auth_provider"), "google_email_verification", StringComparison.Ordinal))
-            return NotFound(TDK.Application.DTOs.Common.ApiResponse<CustomerCardDto>.Fail(
-                "This loyalty card is currently unavailable. Please contact The Dirty Kitchen for assistance."));
-
-        var result = await _customers.ValidateCardAsync(
-            username,
-            token,
-            User.FindFirstValue(ClaimTypes.Email) ?? "");
+        var result = await _customers.ValidateCardAsync(username, token);
         return result.Success ? Ok(result) : NotFound(result);
     }
 

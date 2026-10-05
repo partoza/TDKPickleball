@@ -73,7 +73,7 @@ public sealed class CustomerServiceTests
         var token = created.Data!.Card.Url.Split('/').Last();
         fixture.Customers.Items.Single().CardValidThrough = new DateOnly(2026, 10, 4);
 
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
     }
 
     [Fact]
@@ -82,9 +82,8 @@ public sealed class CustomerServiceTests
         var fixture = new Fixture();
         var created = await fixture.Service.CreateAsync(NewCustomer(), "https://example.com");
         var token = created.Data!.Card.Url.Split('/').Last();
-        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token + "x", "juan@example.com")).Success);
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "someone-else@example.com")).Success);
+        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token + "x")).Success);
     }
 
     [Fact]
@@ -96,7 +95,7 @@ public sealed class CustomerServiceTests
         await using var content = new MemoryStream([1, 2, 3]);
 
         var uploaded = await fixture.Service.UpdateProfileImageAsync(created.Data.Customer.Id, content, "profile.jpg", "image/jpeg");
-        var publicCard = await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com");
+        var publicCard = await fixture.Service.ValidateCardAsync("juan-delacruz", token);
 
         Assert.True(uploaded.Success);
         Assert.Equal("https://res.cloudinary.com/test/image/upload/v1/customers/profile.jpg", uploaded.Data!.ProfilePictureUrl);
@@ -111,9 +110,9 @@ public sealed class CustomerServiceTests
         var token = created.Data!.Card.Url.Split('/').Last();
         await fixture.Service.SetActiveAsync(created.Data.Customer.Id, false);
         Assert.Empty((await fixture.Service.SearchAsync("juan")).Data!);
-        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
+        Assert.False((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
         await fixture.Service.SetActiveAsync(created.Data.Customer.Id, true);
-        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com")).Success);
+        Assert.True((await fixture.Service.ValidateCardAsync("juan-delacruz", token)).Success);
     }
 
     [Fact]
@@ -136,7 +135,7 @@ public sealed class CustomerServiceTests
         var second = await fixture.Service.CreateAsync(NewCustomer("maria-santos", "maria@example.com"), "https://example.com");
         fixture.Bookings.Items.Add(new Booking { Id = 1, CustomerId = second.Data!.Customer.Id, BookingReference = "TDK-OTHER", CourtId = 1, CustomerName = "Maria", Email = "maria@example.com", BookingDate = new DateOnly(2026, 10, 8), StartTime = new(10, 0), EndTime = new(11, 0), Status = TDK.Domain.Enums.BookingStatus.Reserved });
         var token = first.Data!.Card.Url.Split('/').Last();
-        var card = await fixture.Service.ValidateCardAsync("juan-delacruz", token, "juan@example.com");
+        var card = await fixture.Service.ValidateCardAsync("juan-delacruz", token);
         Assert.True(card.Success);
         Assert.Empty(card.Data!.Upcoming);
         Assert.Empty(card.Data.Pending);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { customerService } from '@/services/customers';
 import type { CustomerCard } from '@/types';
@@ -11,13 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CustomerBookingCard } from '@/components/customer/CustomerBookingCard';
 import NotFoundPage from '@/pages/public/NotFoundPage';
 import { formatAppDate } from '@/lib/date-time';
-import { useAuth } from '@/hooks/useAuth';
-import { ROUTES } from '@/lib/constants';
 
 export default function CustomerCardPage() {
   const { username = '', token = '' } = useParams();
-  const location = useLocation();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<CustomerCard | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -32,18 +28,11 @@ export default function CustomerCardPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !isAuthenticated || user?.role !== 'Customer') return;
     if (!username || !token) { setFailed(true); return; }
     let active = true;
     customerService.card(username, token).then(value => active && setProfile(value)).catch(() => active && setFailed(true));
     return () => { active = false; };
-  }, [authLoading, isAuthenticated, user?.role, username, token]);
-
-  if (authLoading) return <CardLoading />;
-  if (!isAuthenticated || user?.role !== 'Customer') {
-    const returnTo = `${location.pathname}${location.search}`;
-    return <Navigate to={`${ROUTES.LOGIN}?returnTo=${encodeURIComponent(returnTo)}`} replace />;
-  }
+  }, [username, token]);
 
   if (failed) return <NotFoundPage />;
   if (!profile) return <CardLoading />;
