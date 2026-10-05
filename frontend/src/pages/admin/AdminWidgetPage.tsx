@@ -7,21 +7,16 @@ import { useCourts } from '@/hooks/useCourts';
 import { useAdminSchedules } from '@/hooks/useSchedule';
 import { useInternalCoaches } from '@/hooks/useInternalCoaches';
 import { ROUTES } from '@/lib/constants';
-import { getManilaNow } from '@/lib/manila-time';
+import { getManilaNow, isActiveManilaTimeRange, secondsFromManilaTime } from '@/lib/manila-time';
 import { Booking, BookingStatus, Court, RateType, Schedule, ScheduleStatus } from '@/types';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminIconLoader, AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
-import { formatAppDate, formatAppTime } from '@/lib/date-time';
+import { formatAppDate, formatAppTime, formatAppTimeWithSeconds } from '@/lib/date-time';
 
 const minutesFromTime = (value: string) => {
   const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
   return hours * 60 + minutes;
-};
-
-const secondsFromTime = (value: string) => {
-  const [hours, minutes, seconds = 0] = value.slice(0, 8).split(':').map(Number);
-  return hours * 3600 + minutes * 60 + seconds;
 };
 
 const displayCountdown = (totalSeconds: number) => {
@@ -56,28 +51,28 @@ function PersonBadge({ name, label, profilePictureUrl }: { name: string; label: 
 function CourtWidget({ court, bookings, schedules, internalCoaches, now }: { court: Court; bookings: Booking[]; schedules: Schedule[]; internalCoaches: any[]; now: ReturnType<typeof getManilaNow> }) {
   const todaysBookings = bookings.filter(booking => booking.courtId === court.id && booking.bookingDate === now.date && booking.status !== 'Cancelled');
   const todaysSchedules = schedules.filter(schedule => Number(schedule.courtId) === court.id && schedule.date === now.date && schedule.status !== ScheduleStatus.Available);
-  const activeSchedule = todaysSchedules.find(schedule => secondsFromTime(schedule.startTime) <= now.seconds && secondsFromTime(schedule.endTime) > now.seconds);
+  const activeSchedule = todaysSchedules.find(schedule => isActiveManilaTimeRange(schedule.startTime, schedule.endTime, now.seconds));
   const activeBooking = activeSchedule?.bookingId
     ? todaysBookings.find(booking => booking.id === activeSchedule.bookingId)
-    : todaysBookings.find(booking => secondsFromTime(booking.startTime) <= now.seconds && secondsFromTime(booking.endTime) > now.seconds);
+    : todaysBookings.find(booking => isActiveManilaTimeRange(booking.startTime, booking.endTime, now.seconds));
   const activeStatus = activeSchedule?.status || (activeBooking?.status === BookingStatus.Requested ? ScheduleStatus.Requested : activeBooking?.bookingType === RateType.Training ? ScheduleStatus.Training : activeBooking?.bookingType === RateType.Internal ? ScheduleStatus.Internal : activeBooking ? ScheduleStatus.Booked : undefined);
   const activeStartTime = activeBooking?.startTime || activeSchedule?.startTime;
   const activeEndTime = activeBooking?.endTime || activeSchedule?.endTime;
   const isActive = Boolean(activeStatus && activeStartTime && activeEndTime);
-  const next = todaysBookings.find(booking => secondsFromTime(booking.startTime) > now.seconds);
-  const remainingSeconds = isActive ? secondsFromTime(activeEndTime!) - now.seconds : 0;
-  const sessionSeconds = isActive ? secondsFromTime(activeEndTime!) - secondsFromTime(activeStartTime!) : 0;
+  const next = todaysBookings.filter(booking => secondsFromManilaTime(booking.startTime) > now.seconds).sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
+  const remainingSeconds = isActive ? secondsFromManilaTime(activeEndTime!, true) - now.seconds : 0;
+  const sessionSeconds = isActive ? secondsFromManilaTime(activeEndTime!, true) - secondsFromManilaTime(activeStartTime!) : 0;
   const remainingPercent = isActive && sessionSeconds > 0 ? Math.min(100, Math.max(0, remainingSeconds / sessionSeconds * 100)) : 0;
   const assignedProfile = internalCoaches.find(profile => profile.id === (activeBooking?.internalCoachProfileId || activeSchedule?.internalCoachProfileId));
 
-  return <section className="relative flex min-h-[330px] flex-col overflow-hidden rounded-[34px] border border-white/40 bg-white/70 p-6 text-[#1c1c1e] shadow-[0_30px_60px_-20px_rgba(0,0,0,.3)] backdrop-blur-2xl sm:p-8">
+  return <section className={`relative flex min-h-[330px] flex-col overflow-hidden rounded-[34px] border bg-white/80 p-6 text-[#1c1c1e] shadow-[0_30px_60px_-20px_rgba(0,0,0,.38)] backdrop-blur-2xl sm:p-8 ${isActive ? 'border-[#851923]/45 ring-1 ring-[#851923]/20' : 'border-white/60'}`}>
     <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-[#88cc22] opacity-[0.15] blur-[50px]" />
     <div className="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[#851923] opacity-[0.12] blur-[50px]" />
     <div className="relative z-10 flex items-start justify-between gap-3">
       <div><p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8e8e93]">Live court</p><h2 className="mt-1 text-[28px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[34px]">{court.displayName || court.name}</h2></div>
-      <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold tracking-[-0.01em] shadow-sm ${now.seconds < 8 * 3600 ? 'bg-slate-600 text-white' : activeStatus ? statusStyles[activeStatus] : statusStyles[ScheduleStatus.Available]}`}>{now.seconds < 8 * 3600 ? 'Closed' : activeStatus || 'Available'}</span>
+      <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold tracking-[-0.01em] shadow-sm ${now.seconds < 8 * 3600 ? 'bg-slate-600 text-white' : activeStatus ? statusStyles[activeStatus] : next ? 'bg-blue-600 text-white' : statusStyles[ScheduleStatus.Available]}`}>{now.seconds < 8 * 3600 ? 'Closed' : activeStatus ? `Ongoing ${activeStatus}` : next ? 'Upcoming' : 'Available'}</span>
     </div>
-    <div className="relative z-10 mt-7 flex flex-1 flex-col justify-center rounded-[26px] border border-white/60 bg-white/50 px-5 py-6 shadow-sm backdrop-blur-md sm:px-7">
+    <div className="relative z-10 mt-7 flex flex-1 flex-col justify-center rounded-[26px] border border-white/80 bg-white/75 px-5 py-6 shadow-[0_12px_30px_-24px_rgba(0,0,0,.5)] backdrop-blur-md sm:px-7">
       {now.seconds < 8 * 3600 ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Currently Closed</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">8:00 AM</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court opens in the morning</p></> : isActive ? <><p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#851923]">Time remaining</p><p className="mt-2 tabular-nums text-[48px] font-bold leading-none tracking-[-0.06em] text-[#1c1c1e] sm:text-[64px]">{displayCountdown(remainingSeconds)}</p><div className="mt-6 h-2.5 overflow-hidden rounded-full bg-black/[0.07]"><div className="h-full rounded-full bg-[#851923] transition-[width] duration-1000 ease-linear" style={{ width: `${remainingPercent}%` }} /></div><p className="mt-3 text-[14px] font-medium text-[#6e6e73]">Session ends at {displayTime(activeEndTime!)}</p>{activeStatus !== ScheduleStatus.Unavailable && <div className="mt-4 grid gap-2 sm:grid-cols-2">{activeStatus === ScheduleStatus.Booked && activeBooking && <PersonBadge name={activeBooking.customerName} label="Player" />}{activeStatus === ScheduleStatus.Requested && activeBooking && <PersonBadge name={activeBooking.customerName} label="Requested by" />}{activeStatus === ScheduleStatus.Training && activeBooking && <PersonBadge name={activeBooking.customerName} label="Trainee" />}{activeStatus === ScheduleStatus.Training && <PersonBadge name={assignedProfile?.name || 'Coach not assigned'} label="Coach" profilePictureUrl={assignedProfile?.profilePictureUrl} />}{activeStatus === ScheduleStatus.Internal && <PersonBadge name={assignedProfile?.name || 'Internal'} label="Internal" profilePictureUrl={assignedProfile?.profilePictureUrl} />}</div>}{activeBooking && activeBooking.paddleRentalQuantity > 0 && <div className="mt-3 flex items-center justify-between rounded-2xl border border-black/[0.06] bg-white/65 px-3 py-2 text-[12px] font-semibold text-[#1c1c1e] shadow-sm"><span className="flex items-center gap-2"><PaddleIcon className="h-5 w-5" forceLight />Paddles rented</span><span className="grid min-w-7 place-items-center rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">{activeBooking.paddleRentalQuantity}</span></div>}</> : next ? <><p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">Next session</p><p className="mt-2 text-[36px] font-bold tracking-[-0.045em] text-[#1c1c1e] sm:text-[44px]">{displayTime(next.startTime)}</p><p className="mt-2 text-[14px] text-[#6e6e73]">Court is available until then</p></> : <><p className="text-[24px] font-bold tracking-[-0.035em] text-[#1c1c1e]">Available</p><p className="mt-2 text-[14px] text-[#6e6e73]">Open until 12:00 AM</p></>}
     </div>
   </section>;
@@ -125,17 +120,17 @@ export default function AdminWidgetPage() {
 
   const loading = bookingsLoading || courtsLoading || schedulesLoading;
   return <main className="min-h-screen relative p-4 sm:p-6 lg:px-8 lg:py-10 text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif', backgroundImage: 'url("/assets/images/widget-bg.jpg")', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-0"></div>
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-[3px] z-0"></div>
     <div className="mx-auto max-w-[1320px] relative z-10">
       <header className="mb-7 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div className="flex items-center gap-3.5"><div className="grid h-[58px] w-[58px] place-items-center overflow-hidden rounded-[18px] border border-white/20 bg-white/20 shadow-[0_8px_32px_rgba(0,0,0,.2)] backdrop-blur-xl"><img src="/assets/images/tdk-icon.png" alt="TDK" className="h-[46px] w-[46px] object-contain drop-shadow-md" /></div><div><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>TDK Live</p><h1 className="mt-0.5 text-[28px] font-bold leading-none tracking-[-0.045em] text-white sm:text-[36px]" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Court Schedule</h1></div></div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end justify-center text-right hidden sm:flex mr-2">
             <div className="text-[16px] font-bold tracking-[-0.015em] text-white tabular-nums leading-none mb-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-              {formatAppTime(new Date())}
+              {formatAppTimeWithSeconds(now.instant)}
             </div>
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-white/90 leading-none" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-              {formatAppDate(new Date())}
+              {formatAppDate(now.instant)}
             </div>
           </div>
           <Link to={ROUTES.ADMIN.DASHBOARD} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/20 text-white shadow-sm backdrop-blur-xl transition hover:bg-black/40 active:scale-95" aria-label="Back to Dashboard"><ArrowLeftIcon className="h-5 w-5 drop-shadow-md" /></Link>

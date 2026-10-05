@@ -19,11 +19,21 @@ const manilaParts = (instant: Date = new Date()) => {
 export const getManilaNow = (instant: Date = new Date()) => {
   const parts = manilaParts(instant);
   return {
+    instant,
     date: `${parts.year}-${parts.month}-${parts.day}`,
     minutes: Number(parts.hour) * 60 + Number(parts.minute),
     seconds: Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second),
   };
 };
+
+export const secondsFromManilaTime = (value: string, midnightAsEnd = false) => {
+  const [hour = 0, minute = 0, second = 0] = value.slice(0, 8).split(':').map(Number);
+  const total = hour * 3600 + minute * 60 + second;
+  return midnightAsEnd && total === 0 ? 24 * 3600 : total;
+};
+
+export const isActiveManilaTimeRange = (startTime: string, endTime: string, nowSeconds: number) =>
+  secondsFromManilaTime(startTime) <= nowSeconds && secondsFromManilaTime(endTime, true) > nowSeconds;
 
 export const getManilaDate = (instant: Date = new Date()) => getManilaNow(instant).date;
 
@@ -42,7 +52,10 @@ export const isPastManilaStart = (date: string, startTime: string, instant: Date
 export const formatManilaDatabaseTime = (value?: string) => {
   if (!value) return '—';
   const includesOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  const instant = new Date(includesOffset ? value : `${value}Z`);
+  // Booking audit timestamps are stored as Manila wall-clock values in MySQL.
+  // Attach the Manila offset when the API returns a timezone-less DateTime so
+  // the browser's own timezone cannot shift the displayed date or time.
+  const instant = new Date(includesOffset ? value : `${value}+08:00`);
   if (Number.isNaN(instant.getTime())) return '—';
 
   return formatAppDateTime(instant);

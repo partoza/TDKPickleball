@@ -231,9 +231,11 @@ public sealed partial class CustomerService : ICustomerService
             DateOnly? resetsOn = null;
             if (promo.MonthlyUsageLimitPerCustomer.HasValue)
             {
-                var used = customerBookings.Count(booking => booking.PromoId == promo.Id &&
-                    _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime >= monthStart &&
-                    _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime < nextMonth);
+                var used = customerBookings.Count(booking =>
+                {
+                    var createdAt = DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Unspecified);
+                    return booking.PromoId == promo.Id && createdAt >= monthStart && createdAt < nextMonth;
+                });
                 remaining = Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - used);
                 resetsOn = DateOnly.FromDateTime(nextMonth);
             }

@@ -8,7 +8,8 @@ import { useVerifyBooking, useVerifyBookingRequest } from '@/hooks/useBookings';
 import { Booking, PublicBookingRequestStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatAppDate, formatAppDateTime, formatAppTime } from '@/lib/date-time';
+import { formatAppDate, formatAppTime } from '@/lib/date-time';
+import { formatManilaDatabaseTime } from '@/lib/manila-time';
 
 const MAX_QR_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_QR_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -188,7 +189,7 @@ export default function VerifyPage() {
               </div>
               <div className="grid gap-y-3 text-sm">
                 <Detail k="Request reference" v={request.requestReference} />
-                <Detail k="Submitted" v={formatAppDateTime(request.submittedAt)} />
+                <Detail k="Submitted" v={formatManilaDatabaseTime(request.submittedAt)} />
                 <Detail k="Schedules" v={String(request.schedules.length)} />
                 <Detail k="Total" v={`₱${request.totalAmount.toLocaleString()}`} />
               </div>

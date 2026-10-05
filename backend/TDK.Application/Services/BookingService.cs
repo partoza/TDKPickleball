@@ -950,7 +950,7 @@ public class BookingService : IBookingService
                 (!excludedBookingId.HasValue || booking.Id != excludedBookingId.Value)))
             .Count(booking =>
             {
-                var createdAt = _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime;
+                var createdAt = DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Unspecified);
                 return createdAt >= monthStart && createdAt < nextMonth;
             });
         return uses + requestedUses <= promo.MonthlyUsageLimitPerCustomer.Value;
@@ -977,7 +977,7 @@ public class BookingService : IBookingService
                 booking.Status != BookingStatus.Cancelled))
             .Count(booking =>
             {
-                var createdAt = _clock.ToManilaTime(new DateTimeOffset(DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Utc))).DateTime;
+                var createdAt = DateTime.SpecifyKind(booking.CreatedAt, DateTimeKind.Unspecified);
                 return createdAt >= monthStart && createdAt < nextMonth;
             });
         return Math.Max(0, promo.MonthlyUsageLimitPerCustomer.Value - uses);

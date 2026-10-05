@@ -15,6 +15,9 @@ export const useBookings = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.BOOKINGS],
     queryFn: () => bookingsService.getBookings(),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 };
 

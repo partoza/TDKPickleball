@@ -20,43 +20,28 @@ import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
 import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import { useRevenue } from '@/hooks/useRevenue';
+import { getManilaNow, isActiveManilaTimeRange, secondsFromManilaTime } from '@/lib/manila-time';
 
-function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, bookings: Booking[], internalCoaches: any[] }) {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 10000);
-    return () => clearInterval(timer);
-  }, []);
+function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, bookings: Booking[], internalCoaches: any[], now: ReturnType<typeof getManilaNow> }) {
+  const todayStr = now.date;
+  const timeStr = `${String(Math.floor(now.seconds / 3600)).padStart(2, '0')}:${String(Math.floor((now.seconds % 3600) / 60)).padStart(2, '0')}:${String(now.seconds % 60).padStart(2, '0')}`;
+  const courtBookings = bookings
+    .filter(b => b.courtId === court.id && b.bookingDate === todayStr && b.status !== BookingStatus.Cancelled)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  const todayStr = format(now, 'yyyy-MM-dd');
-  const timeStr = now.toTimeString().slice(0, 8);
+  const activeBooking = courtBookings.find(b => isActiveManilaTimeRange(b.startTime, b.endTime, now.seconds));
+  const nextBooking = courtBookings.find(b => secondsFromManilaTime(b.startTime) > now.seconds);
 
-  const activeBooking = bookings.find(b => 
-    b.courtId === court.id && 
-    b.bookingDate === todayStr && 
-    b.startTime <= timeStr && 
-    b.endTime > timeStr && 
-    b.status !== 'Cancelled'
-  );
-
-  const formatHour = (hStr: string) => {
-    const [h, m] = hStr.split(':');
-    let hour = parseInt(h);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12 || 12;
-    return `${hour}:${m} ${ampm}`;
-  };
+  const formatHour = (hStr: string) => formatAppTime(hStr);
 
   const getRemainingTime = (end: string) => {
-    const [eh, em] = end.split(':');
-    const endT = new Date(now);
-    endT.setHours(parseInt(eh), parseInt(em), 0, 0);
-    const diff = endT.getTime() - now.getTime();
+    const diff = (secondsFromManilaTime(end, true) - now.seconds) * 1000;
     if (diff <= 0) return 'Ending soon';
-    const mins = Math.floor(diff / 60000);
-    const hrs = Math.floor(mins / 60);
-    if (hrs > 0) return `${hrs}h ${mins % 60}m left`;
-    return `${mins} min left`;
+    const totalSeconds = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
   };
 
   let activeStatus = ScheduleStatus.Available;
@@ -97,14 +82,19 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
   const getAvatarInitials = (name: string) => name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?';
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm relative overflow-hidden transition-all flex flex-col h-full group">
+    <div className={cn('relative flex h-full min-h-[190px] flex-col overflow-hidden rounded-3xl border bg-card p-5 shadow-sm transition-all group hover:-translate-y-0.5 hover:shadow-lg', activeBooking ? 'border-primary/35 ring-1 ring-primary/10' : 'hover:border-primary/25')}>
+      <div className={cn('pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full blur-3xl', activeBooking ? 'bg-primary/15' : 'bg-emerald-500/10')} />
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-lg leading-none m-0">{court.name}</h3>
         {timeStr < '08:00:00' ? (
           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">Closed</span>
         ) : activeBooking ? (
           <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", STATUS_COLORS[activeStatus])}>
-             {STATUS_LABELS[activeStatus]}
+             Ongoing {STATUS_LABELS[activeStatus]}
+          </span>
+        ) : nextBooking ? (
+          <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-300">
+            Upcoming
           </span>
         ) : (
           <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", STATUS_COLORS[ScheduleStatus.Available])}>
@@ -128,7 +118,8 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
                    </div>
                 </div>
                 <div className="text-right flex flex-col items-end">
-                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400 animate-pulse">{getRemainingTime(activeBooking.endTime)}</span>
+                  <span className="tabular-nums text-base font-extrabold tracking-tight text-primary">{getRemainingTime(activeBooking.endTime)}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">remaining</span>
                   <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{formatHour(activeBooking.startTime)} - {formatHour(activeBooking.endTime)}</span>
                 </div>
              </div>
@@ -164,12 +155,9 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
              )}
           </div>
         ) : (
-          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-100 dark:border-white/5 text-center text-sm text-muted-foreground h-full flex items-center justify-center min-h-[80px]">
-            {(() => {
-              const nextBooking = bookings.find(b => b.courtId === court.id && b.bookingDate === todayStr && b.startTime > timeStr && b.status !== 'Cancelled');
-              if (nextBooking) return `Next booking at ${formatHour(nextBooking.startTime)}`;
-              return 'No upcoming bookings today';
-            })()}
+          <div className="flex h-full min-h-[104px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/25 p-4 text-center">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Clock3 className="h-5 w-5" /></span>
+            {nextBooking ? <><p className="mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Next booking</p><p className="mt-1 text-lg font-bold text-foreground">{formatHour(nextBooking.startTime)}</p><p className="mt-1 text-xs text-muted-foreground">{nextBooking.customerName}</p></> : <><p className="mt-3 text-sm font-semibold text-foreground">Court is available</p><p className="mt-1 text-xs text-muted-foreground">No more bookings today</p></>}
           </div>
         )}
       </div>
@@ -182,15 +170,18 @@ function LiveCourtCard({ court, bookings, internalCoaches }: { court: any, booki
 type Range = 'day'|'week'|'month';
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [range, setRange] = useState<Range>('month'); const [anchor, setAnchor] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [clock, setClock] = useState(Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 1_000); return () => window.clearInterval(timer); }, []);
+  const now = getManilaNow(new Date(clock));
+  const [range, setRange] = useState<Range>('month'); const [anchor, setAnchor] = useState(() => getManilaNow().date);
   const { data: bookingResponse, isLoading } = useBookings(); const { data: courtResponse } = useCourts(); const { internalCoaches } = useInternalCoaches();
   const bookings = bookingResponse?.data || []; const courts = courtResponse?.data || [];
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const interval = range === 'day' ? { start: startOfDay(anchorDate), end: endOfDay(anchorDate) } : range === 'week' ? { start: startOfWeek(anchorDate), end: endOfWeek(anchorDate) } : { start: startOfMonth(anchorDate), end: endOfMonth(anchorDate) };
   const revenueReport = useRevenue(format(interval.start, 'yyyy-MM-dd'), format(interval.end, 'yyyy-MM-dd'), user?.role === 'Admin');
   const filtered = bookings.filter(b => b.status !== 'Cancelled' && isWithinInterval(new Date(`${b.bookingDate}T00:00:00`), interval));
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const upcoming = bookings.filter(b => b.status !== 'Cancelled' && `${b.bookingDate}T${b.startTime}` > new Date().toISOString().slice(0,19)).sort((a,b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
+  const today = now.date;
+  const upcoming = bookings.filter(b => b.status !== BookingStatus.Cancelled && (b.bookingDate > now.date || (b.bookingDate === now.date && secondsFromManilaTime(b.startTime) > now.seconds))).sort((a,b) => `${a.bookingDate}${a.startTime}`.localeCompare(`${b.bookingDate}${b.startTime}`));
   const revenue = revenueReport.data?.data.collectedRevenue ?? filtered.reduce((sum, b) => sum + b.amountPaid, 0);
   const points = useMemo(() => {
     const isBooked = (b: Booking) => b.bookingType !== RateType.Training && b.status !== 'Cancelled';
@@ -278,13 +269,13 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {user?.role === 'Admin' ? <Stat icon={CircleDollarSign} label={`${range} revenue`} value={`₱${revenue.toLocaleString()}`} note={`${formatAppDate(interval.start)} – ${formatAppDate(interval.end)}`} /> : <Stat icon={Ticket} label="Reservations" value={filtered.filter(b => b.status === 'Reserved').length.toString()} note="Needs payment follow-up" />}
         {user?.role === 'Admin' ? <Stat icon={Dumbbell} label="Active courts" value={courts.filter(c => c.isActive).length.toString()} note={`${courts.length} configured`} /> : <Stat icon={CircleDollarSign} label="Paid bookings" value={filtered.filter(b => b.status === 'Paid').length.toString()} note={`${formatAppDate(interval.start)} – ${formatAppDate(interval.end)}`} />}
-        <Stat icon={CalendarDays} label="Today’s bookings" value={bookings.filter(b => b.bookingDate === today && b.status !== 'Cancelled').length.toString()} note={formatAppDate(new Date())} />
+        <Stat icon={CalendarDays} label="Today’s bookings" value={bookings.filter(b => b.bookingDate === today && b.status !== BookingStatus.Cancelled).length.toString()} note={formatAppDate(now.instant)} />
         <Stat icon={Clock3} label="Upcoming" value={upcoming.length.toString()} note={upcoming[0] ? `${upcoming[0].courtName} · ${upcoming[0].customerName}` : 'No'} />
       </div>
     )}
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 mb-6">
       {courts.filter(c => c.isActive).map(court => (
-        <LiveCourtCard key={court.id} court={court} bookings={bookings} internalCoaches={internalCoaches} />
+        <LiveCourtCard key={court.id} court={court} bookings={bookings} internalCoaches={internalCoaches} now={now} />
       ))}
     </div>
     <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">

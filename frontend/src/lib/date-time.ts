@@ -25,6 +25,13 @@ export function formatAppTime(value?: string | Date | null) {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: MANILA_TIME_ZONE }).format(date);
 }
 
+export function formatAppTimeWithSeconds(value?: string | Date | null) {
+  if (!value) return '—';
+  const date = dateValue(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZone: MANILA_TIME_ZONE }).format(date);
+}
+
 export function formatAppDateTime(value?: string | Date | null) {
   if (!value) return '—';
   const date = dateValue(value);
