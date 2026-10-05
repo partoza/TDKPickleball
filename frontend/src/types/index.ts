@@ -186,6 +186,7 @@ export interface Promo {
   startDate?: string;
   endDate?: string;
   maxUses?: number;
+  monthlyUsageLimitPerCustomer?: number;
   currentUses: number;
   appliesTo?: RateType;
   audience: PromoAudience;
@@ -197,6 +198,8 @@ export interface PublicPromo {
   description: string;
   type: DiscountType;
   value: number;
+  monthlyUsageLimitPerCustomer?: number;
+  remainingUsesThisMonth?: number;
 }
 
 export interface Rate {

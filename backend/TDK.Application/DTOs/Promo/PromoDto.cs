@@ -11,6 +11,7 @@ public record PromoDto(
     DateTime? StartDate,
     DateTime? EndDate,
     int? MaxUses,
+    int? MonthlyUsageLimitPerCustomer,
     int CurrentUses,
     RateType? AppliesTo,
     PromoAudience Audience,
@@ -25,6 +26,7 @@ public record CreatePromoRequest(
     DateTime? StartDate,
     DateTime? EndDate,
     int? MaxUses,
+    int? MonthlyUsageLimitPerCustomer,
     RateType? AppliesTo,
     PromoAudience Audience = PromoAudience.Everyone
 );
@@ -37,6 +39,7 @@ public record UpdatePromoRequest(
     DateTime? StartDate,
     DateTime? EndDate,
     int? MaxUses,
+    int? MonthlyUsageLimitPerCustomer,
     RateType? AppliesTo,
     bool IsActive,
     PromoAudience Audience = PromoAudience.Everyone

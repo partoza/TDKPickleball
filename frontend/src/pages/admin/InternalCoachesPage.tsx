@@ -160,7 +160,7 @@ export default function InternalCoachesPage() {
           <h2 className="text-3xl font-bold tracking-tight">Internal &amp; Coaches</h2>
           <p className="text-muted-foreground mt-1">Manage internal and coach profiles</p>
         </div>
-        <Button onClick={() => handleOpen()} disabled={limitReached} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-10 px-6 shrink-0 shadow-sm transition-all">
+        <Button onClick={() => handleOpen()} disabled={limitReached} className="h-10 w-full shrink-0 bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Add Profile
         </Button>
       </div>
@@ -243,7 +243,7 @@ export default function InternalCoachesPage() {
         <Button type="button" variant="ghost" aria-pressed={activeTab === InternalCoachType.Coach} className={`flex-1 h-8 rounded-md px-3 text-xs font-semibold shadow-none ${activeTab === InternalCoachType.Coach ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90' : 'text-muted-foreground'}`} onClick={() => setActiveTab(InternalCoachType.Coach)}>Coach</Button>
       </div>
       <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Filter className="h-4 w-4" /></span><div><p className="font-semibold">Find a profile</p><p className="text-xs text-muted-foreground">Search and filter Internal &amp; Coaches.</p></div></div><span className="text-xs text-muted-foreground">{typeCount}/20 {activeTab === InternalCoachType.Internal ? 'internal' : 'coach'} profiles</span></div>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Filter className="h-4 w-4" /></span><div><p className="font-semibold">Find a profile</p><p className="text-xs text-muted-foreground">Search and filter Internal &amp; Coaches.</p></div></div><span className="pl-11 text-xs text-muted-foreground sm:pl-0">{typeCount}/20 {activeTab === InternalCoachType.Internal ? 'internal' : 'coach'} profiles</span></div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Search name, email, or phone" /></div><Select value={statusFilter} onValueChange={(value: 'all' | 'active' | 'inactive') => { setStatusFilter(value); setPage(0); }}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
       </div>
         <div className="mt-6 rounded-xl border dark:border-white/10 bg-card text-card-foreground shadow-sm">
@@ -256,7 +256,8 @@ export default function InternalCoachesPage() {
               <p className="text-muted-foreground mt-1 max-w-sm">You haven't added any {activeTab === InternalCoachType.Internal ? 'internal' : 'coach'} profiles yet.</p>
             </div>
           ) : (
-            <Table>
+            <>
+            <div className="hidden md:block"><Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Name</TableHead>
@@ -292,7 +293,30 @@ export default function InternalCoachesPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
+            <div className="grid gap-3 p-3 md:hidden">
+              {paginatedProfiles.map(profile => (
+                <article key={profile.id} className="rounded-xl border bg-background p-4 shadow-sm dark:border-white/10 dark:bg-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar className="h-12 w-12 shrink-0 border border-border shadow-sm">
+                        {profile.profilePictureUrl && <AvatarImage src={profile.profilePictureUrl} alt={profile.name} className="object-cover" />}
+                        <AvatarFallback className="bg-primary/5 text-sm font-semibold tracking-widest text-primary">{getInitials(profile.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0"><h3 className="font-semibold leading-tight">{profile.name}</h3><p className="mt-1 text-xs font-medium text-muted-foreground">{profile.type}</p></div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${profile.isActive ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'}`}>{profile.isActive ? 'Active' : 'Inactive'}</span>
+                  </div>
+                  <div className="mt-4 space-y-1 border-y py-3 text-sm text-muted-foreground"><p className="break-all">{profile.email || 'No email provided'}</p><p>{profile.phone || 'No phone provided'}</p></div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button size="sm" variant="outline" className="h-9 w-full" onClick={() => setViewing(profile)}><Eye className="h-4 w-4" />View</Button>
+                    <Button size="sm" variant="outline" className={`h-9 w-full ${profile.isActive ? 'text-amber-600' : 'text-emerald-600'}`} onClick={() => setProfileStatus(profile)}>{profile.isActive ? <Disable className="h-4 w-4" /> : <Enable className="h-4 w-4" />}{profile.isActive ? 'Disable' : 'Enable'}</Button>
+                    {!profile.isActive && <Button size="sm" variant="outline" className="h-9 w-full text-red-600 hover:text-red-700" onClick={() => setDeleteTarget(profile)}><Trash className="h-4 w-4" />Delete</Button>}
+                  </div>
+                </article>
+              ))}
+            </div>
+            </>
           )}
           <div className="px-4 pb-4"><TablePagination page={page} total={filteredProfiles.length} onPageChange={setPage} /></div>
       </div>

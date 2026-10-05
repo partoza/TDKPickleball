@@ -13,6 +13,7 @@ public class Promo
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public int? MaxUses { get; set; }
+    public int? MonthlyUsageLimitPerCustomer { get; set; }
     public int CurrentUses { get; set; }
     public RateType? AppliesTo { get; set; }
     public PromoAudience Audience { get; set; } = PromoAudience.Everyone;

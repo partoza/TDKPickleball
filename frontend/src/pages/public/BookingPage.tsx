@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import { useSubmitPublicBookingRequest, useValidatePublicPromo } from '@/hooks/useBookings';
+import { useAvailablePublicPromos, useSubmitPublicBookingRequest } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
 import { useRates } from '@/hooks/useRates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { EXTERNAL_LINKS, ROUTES } from '@/lib/constants';
 import { BookingBlocksEditor } from '@/components/booking/BookingBlocksEditor';
 import { BookingBlockValue, createBookingBlock, hasBookingBlockErrors, validateBookingBlocks } from '@/lib/booking-blocks';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { usePublicBookingWindow } from '@/hooks/useSchedule';
 
@@ -91,7 +92,8 @@ export default function BookingPage() {
   const { data: publicBookingWindowResponse } = usePublicBookingWindow();
   const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
   const submitBookingRequest = useSubmitPublicBookingRequest();
-  const validatePromo = useValidatePublicPromo();
+  const { data: availablePromosResponse, isLoading: promosLoading } = useAvailablePublicPromos(isGoogleCustomer);
+  const availablePromos = availablePromosResponse?.data || [];
   const courtBookingTotal = blocks.reduce((total, block) => {
     const quote = calculateRateQuote(rates, block.startTime, block.endTime, RateType.Booking);
     return total + (quote.covered ? quote.total : 0);
@@ -106,6 +108,14 @@ export default function BookingPage() {
   }, 0) : 0;
   const paddleRentalFee = paddleQuantity * PADDLE_RENTAL_PRICE;
   const checkoutTotal = Math.max(0, courtBookingTotal - promoDiscount) + paddleRentalFee;
+
+  useEffect(() => {
+    if (appliedPromo?.remainingUsesThisMonth != null && appliedPromo.remainingUsesThisMonth < blocks.length) {
+      setAppliedPromo(null);
+      setPromoName('');
+      setPromoError(`That promo has fewer than ${blocks.length} uses remaining for this month.`);
+    }
+  }, [blocks.length, appliedPromo]);
 
   useEffect(() => {
     let savedBlocks: any[] = [];
@@ -245,28 +255,6 @@ export default function BookingPage() {
       return;
     }
     setReceipt(file);
-  };
-
-  const handleApplyPromo = async () => {
-    const exactName = promoName.trim();
-    setPromoError('');
-    setAppliedPromo(null);
-    if (!exactName) {
-      setPromoError('Enter the exact promo name.');
-      return;
-    }
-
-    try {
-      const result = await validatePromo.mutateAsync(exactName);
-      if (!result.success || !result.data) {
-        setPromoError(result.message || 'Promo name is invalid or unavailable.');
-        return;
-      }
-      setAppliedPromo(result.data);
-      setPromoName(result.data.code);
-    } catch (error: any) {
-      setPromoError(error.response?.data?.message || 'Promo name is invalid or unavailable. Enter the exact promo name.');
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -534,23 +522,37 @@ export default function BookingPage() {
                     <h4 id="promo-title" className="font-semibold">Promo</h4>
                     <span className="text-xs text-muted-foreground">Optional</span>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Enter the exact promo name provided by The Dirty Kitchen. Promo names are case-sensitive.</p>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      aria-label="Exact promo name"
-                      value={promoName}
-                      maxLength={100}
-                      placeholder="Enter exact promo name"
-                      onChange={event => {
-                        setPromoName(event.target.value);
-                        setAppliedPromo(null);
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Choose from the promos currently available for your signed-in Gmail account.</p>
+                  <div className="mt-3">
+                    <Select
+                      value={promoName || 'none'}
+                      onValueChange={value => {
                         setPromoError('');
+                        if (value === 'none') {
+                          setPromoName('');
+                          setAppliedPromo(null);
+                          return;
+                        }
+                        const promo = availablePromos.find(candidate => candidate.code === value) || null;
+                        setPromoName(promo?.code || '');
+                        setAppliedPromo(promo);
                       }}
-                      className={cn('sm:flex-1', promoError && 'border-red-500 ring-red-500')}
-                    />
-                    <Button type="button" className="sm:px-6" onClick={handleApplyPromo} disabled={validatePromo.isPending || !promoName.trim()}>
-                      {validatePromo.isPending ? <LoadingIndicator label="Checking promo" /> : 'Apply Promo'}
-                    </Button>
+                      disabled={promosLoading}
+                    >
+                      <SelectTrigger aria-label="Available promo" className={cn(promoError && 'border-red-500 ring-red-500')}>
+                        <SelectValue placeholder={promosLoading ? 'Loading available promos…' : 'Select a promo'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No promo</SelectItem>
+                        {availablePromos.map(promo => {
+                          const insufficientUses = promo.remainingUsesThisMonth != null && promo.remainingUsesThisMonth < blocks.length;
+                          const discount = promo.type === DiscountType.Percentage ? `${promo.value}% off` : `₱${promo.value.toLocaleString()} off`;
+                          const remaining = promo.remainingUsesThisMonth != null ? ` · ${promo.remainingUsesThisMonth} use${promo.remainingUsesThisMonth === 1 ? '' : 's'} left this month` : '';
+                          return <SelectItem key={promo.code} value={promo.code} disabled={insufficientUses}>{promo.code} · {discount}{remaining}</SelectItem>;
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {!promosLoading && availablePromos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No promos are available for this account right now.</p>}
                   </div>
                   <FieldError message={promoError} />
                   {appliedPromo && (

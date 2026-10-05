@@ -11,6 +11,10 @@ export const bookingsService = {
     const { data } = await api.post('/api/booking-requests/promo/validate', { promoCode });
     return data;
   },
+  getAvailablePublicPromos: async (): Promise<ApiResponse<PublicPromo[]>> => {
+    const { data } = await api.get('/api/booking-requests/promos/available');
+    return data;
+  },
   createBooking: async (payload: any): Promise<ApiResponse<Booking>> => {
     const mapped = {
       courtId: Number(payload.courtId), bookingDate: payload.bookingDate || payload.date,

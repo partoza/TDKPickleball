@@ -6,7 +6,8 @@ export const QUERY_KEYS = {
   BOOKINGS: 'bookings',
   RATES: 'rates',
   AVAILABILITY: 'availability',
-  PUBLIC_BOOKING_WINDOW: 'public-booking-window',
+    PUBLIC_BOOKING_WINDOW: 'public-booking-window',
+    AVAILABLE_PROMOS: 'available-promos',
   USER: 'user',
   NOTIFICATIONS: 'notifications',
 };

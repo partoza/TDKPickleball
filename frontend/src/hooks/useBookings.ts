@@ -69,12 +69,23 @@ export const useCreateBooking = () => {
   });
 };
 
-export const useSubmitPublicBookingRequest = () => useMutation({
-  mutationFn: bookingsService.submitPublicBookingRequest,
-});
+export const useSubmitPublicBookingRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bookingsService.submitPublicBookingRequest,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.AVAILABLE_PROMOS] }),
+  });
+};
 
 export const useValidatePublicPromo = () => useMutation({
   mutationFn: bookingsService.validatePublicPromo,
+});
+
+export const useAvailablePublicPromos = (enabled = true) => useQuery({
+  queryKey: [QUERY_KEYS.AVAILABLE_PROMOS],
+  queryFn: bookingsService.getAvailablePublicPromos,
+  enabled,
+  staleTime: 60_000,
 });
 
 export const useConfirmBooking = () => {

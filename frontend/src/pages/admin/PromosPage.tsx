@@ -36,6 +36,7 @@ export default function PromosPage() {
     audience: PromoAudience.Everyone,
     isLimitedUses: false,
     maxUses: '' as string | number,
+    monthlyUsageLimitPerCustomer: 3 as string | number,
     isActive: true,
   });
 
@@ -57,6 +58,7 @@ export default function PromosPage() {
         audience: promo.audience || PromoAudience.Everyone,
         isLimitedUses: promo.maxUses != null,
         maxUses: promo.maxUses != null ? promo.maxUses.toString() : '',
+        monthlyUsageLimitPerCustomer: promo.monthlyUsageLimitPerCustomer?.toString() || 3,
         isActive: promo.isActive,
       });
     } else {
@@ -72,6 +74,7 @@ export default function PromosPage() {
         audience: PromoAudience.Everyone,
         isLimitedUses: false,
         maxUses: '',
+        monthlyUsageLimitPerCustomer: 3,
         isActive: true,
       });
     }
@@ -87,6 +90,7 @@ export default function PromosPage() {
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
       maxUses: form.isLimitedUses && form.maxUses ? Number(form.maxUses) : undefined,
+      monthlyUsageLimitPerCustomer: form.audience === PromoAudience.NfcCustomersOnly ? Number(form.monthlyUsageLimitPerCustomer) : undefined,
       appliesTo: form.appliesTo === 'All' ? undefined : form.appliesTo,
     };
 
@@ -111,7 +115,7 @@ export default function PromosPage() {
           <h2 className="text-3xl font-bold tracking-tight">Promos & Discounts</h2>
           <p className="text-muted-foreground mt-1">Manage promotional codes, discounts, and usage limits</p>
         </div>
-        <Button onClick={() => handleOpen()} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-10 px-6 shrink-0 shadow-sm transition-all">
+        <Button onClick={() => handleOpen()} className="h-10 w-full shrink-0 bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Create Promo
         </Button>
       </div>
@@ -130,8 +134,8 @@ export default function PromosPage() {
               <Input id="code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="e.g. SUMMER20" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
-              <Input id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="e.g. 20% off for Summer" required />
+              <Label htmlFor="description">Description (optional)</Label>
+              <Input id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="e.g. 20% off for Summer" maxLength={255} />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -153,9 +157,17 @@ export default function PromosPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue placeholder="Select rates" /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue placeholder="Select usage limit" /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Applies To</Label><Select value={form.appliesTo} onValueChange={(val: any) => setForm({ ...form, appliesTo: val })}><SelectTrigger><SelectValue placeholder="Select rates" /></SelectTrigger><SelectContent><SelectItem value="All">All Rates</SelectItem><SelectItem value={RateType.Booking}>Booking</SelectItem><SelectItem value={RateType.Training}>Training</SelectItem><SelectItem value={RateType.Internal}>Internal</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Global Usage Limit</Label><Select value={form.isLimitedUses ? 'Limited' : 'Unlimited'} onValueChange={(val) => setForm({ ...form, isLimitedUses: val === 'Limited', maxUses: val === 'Unlimited' ? '' : form.maxUses })}><SelectTrigger><SelectValue placeholder="Select usage limit" /></SelectTrigger><SelectContent><SelectItem value="Unlimited">Unlimited</SelectItem><SelectItem value="Limited">Limited Uses</SelectItem></SelectContent></Select></div></div>{form.isLimitedUses && (<div className="space-y-2 animate-in fade-in slide-in-from-top-1"><Label htmlFor="maxUses">Maximum Global Uses *</Label><Input id="maxUses" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} placeholder="e.g. 50" required /></div>)}
 
             <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value: PromoAudience) => setForm({ ...form, audience: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={PromoAudience.Everyone}>Everyone</SelectItem><SelectItem value={PromoAudience.NfcCustomersOnly}>NFC Customers Only</SelectItem></SelectContent></Select></div>
+
+            {form.audience === PromoAudience.NfcCustomersOnly && (
+              <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3 animate-in fade-in slide-in-from-top-1">
+                <Label htmlFor="monthlyUsageLimitPerCustomer">Maximum Uses Per Customer / Month *</Label>
+                <Input id="monthlyUsageLimitPerCustomer" type="number" min="1" value={form.monthlyUsageLimitPerCustomer} onChange={(e) => setForm({ ...form, monthlyUsageLimitPerCustomer: e.target.value })} placeholder="e.g. 3" required />
+                <p className="text-xs text-muted-foreground">The promo can stay globally unlimited while each NFC customer receives this many uses every calendar month.</p>
+              </div>
+            )}
 
             {editing && (
               <div className="flex items-center gap-2">
@@ -185,7 +197,8 @@ export default function PromosPage() {
             <p className="text-muted-foreground mt-1 max-w-sm">Create a promotional code to offer discounts.</p>
           </div>
         ) : (
-          <Table>
+          <>
+          <div className="hidden md:block"><Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Code</TableHead>
@@ -214,7 +227,7 @@ export default function PromosPage() {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100">{promo.code}</div>
                       <div className="text-xs text-muted-foreground">{promo.description}</div>
-                      {promo.audience === PromoAudience.NfcCustomersOnly && <div className="mt-1 text-[11px] font-semibold text-primary">NFC customers only</div>}
+                      {promo.audience === PromoAudience.NfcCustomersOnly && <div className="mt-1 text-[11px] font-semibold text-primary">NFC customers only · {promo.monthlyUsageLimitPerCustomer ?? 3} per customer/month</div>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -259,7 +272,41 @@ export default function PromosPage() {
                 </TableRow>
               );})}
             </TableBody>
-          </Table>
+          </Table></div>
+          <div className="grid gap-3 p-3 md:hidden">
+            {promos.slice(page * 10, (page + 1) * 10).map(promo => {
+              const validity = getPromoValidity(promo);
+              const validityClass = validity === 'Available'
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : validity === 'Expired'
+                  ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                  : validity === 'Scheduled'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
+              return <article key={promo.id} className="rounded-xl border bg-background p-4 shadow-sm dark:border-white/10 dark:bg-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="break-words font-bold text-foreground">{promo.code}</h3>
+                    {promo.description && <p className="mt-0.5 text-xs text-muted-foreground">{promo.description}</p>}
+                    {promo.audience === PromoAudience.NfcCustomersOnly && <p className="mt-1 text-[11px] font-semibold text-primary">NFC only · {promo.monthlyUsageLimitPerCustomer ?? 3} per customer/month</p>}
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${promo.isActive ? 'bg-primary/10 text-primary dark:bg-primary/20' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{promo.isActive ? 'Active' : 'Inactive'}</span>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y py-3 text-sm">
+                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Discount</dt><dd className="mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{promo.type === DiscountType.Percentage ? `${promo.value}%` : `₱${promo.value.toFixed(2)}`}</dd></div>
+                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Applies to</dt><dd className="mt-1 font-medium">{promo.appliesTo || 'All Rates'}</dd></div>
+                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Valid dates</dt><dd className="mt-1 text-xs">{promo.startDate ? format(new Date(promo.startDate), 'MMM d, yyyy') : 'Anytime'} – {promo.endDate ? format(new Date(promo.endDate), 'MMM d, yyyy') : 'Forever'}</dd></div>
+                  <div><dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Usage</dt><dd className="mt-1 text-xs font-medium">{promo.currentUses} {promo.maxUses ? `/ ${promo.maxUses}` : 'used'}</dd></div>
+                </dl>
+                <div className="mt-3 flex items-center justify-between"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${validityClass}`}>{validity}</span></div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button size="sm" variant="outline" className="h-9 w-full" onClick={() => handleOpen(promo)}><Pencil className="h-4 w-4" />Edit</Button>
+                  {!promo.isActive && <Button size="sm" variant="outline" className="h-9 w-full text-red-600 hover:text-red-700" onClick={() => setDeleteTarget(promo)}><Trash className="h-4 w-4" />Delete</Button>}
+                </div>
+              </article>;
+            })}
+          </div>
+          </>
         )}
       </div>
       <TablePagination page={page} total={promos.length} onPageChange={setPage} />

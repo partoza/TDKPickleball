@@ -43,17 +43,81 @@ public sealed class BookingCustomerIntegrationTests
     }
 
     [Fact]
-    public async Task Public_booking_does_not_create_or_auto_link_customer_by_email()
+    public async Task Public_booking_links_only_an_existing_active_issued_customer_by_authenticated_email()
     {
         var fixture = new BookingFixture();
-        var customer = fixture.AddCustomer(active: true, issued: false);
+        var customer = fixture.AddCustomer(active: true, issued: true);
         var result = await fixture.Service.SubmitPublicRequestAsync(new(
             "Public Name", customer.Email, "09123456789", null, 0,
             new[] { new PublicBookingRequestBlockDto(1, new DateOnly(2026, 10, 9), new TimeOnly(10, 0), new TimeOnly(11, 0)) }, null),
-            new byte[] { 1, 2, 3 }, "receipt.png", "image/png");
+            new byte[] { 1, 2, 3 }, "receipt.png", "image/png", customer.Email);
         Assert.True(result.Success);
-        Assert.Null(fixture.Bookings.Items.Single().CustomerId);
+        Assert.Equal(customer.Id, fixture.Bookings.Items.Single().CustomerId);
         Assert.Single(fixture.Customers.Items);
+    }
+
+    [Fact]
+    public async Task Nfc_promo_enforces_monthly_customer_limit_but_can_remain_globally_unlimited()
+    {
+        var fixture = new BookingFixture();
+        var customer = fixture.AddCustomer(active: true, issued: true);
+        var promo = fixture.AddPromo(PromoAudience.NfcCustomersOnly);
+        promo.MonthlyUsageLimitPerCustomer = 3;
+        promo.MaxUses = null;
+
+        for (var index = 0; index < 3; index++)
+        {
+            fixture.Schedules.Items.Clear();
+            var created = await fixture.Service.CreateAsync(fixture.Request(customer.Id, courtId: 1, promoId: promo.Id), false);
+            Assert.True(created.Success);
+        }
+
+        fixture.Schedules.Items.Clear();
+        var rejected = await fixture.Service.CreateAsync(fixture.Request(customer.Id, courtId: 1, promoId: promo.Id), false);
+        Assert.False(rejected.Success);
+        Assert.Contains("3 uses per customer each month", rejected.Message);
+        Assert.Equal(3, promo.CurrentUses);
+    }
+
+    [Fact]
+    public async Task Available_promos_only_include_nfc_offer_for_matching_active_issued_email()
+    {
+        var fixture = new BookingFixture();
+        var customer = fixture.AddCustomer(active: true, issued: true);
+        var nfcPromo = fixture.AddPromo(PromoAudience.NfcCustomersOnly);
+        nfcPromo.MonthlyUsageLimitPerCustomer = 3;
+
+        var eligible = await fixture.Service.GetAvailablePublicPromosAsync(customer.Email);
+        var unmatched = await fixture.Service.GetAvailablePublicPromosAsync("someone-else@example.com");
+        customer.IsActive = false;
+        var inactive = await fixture.Service.GetAvailablePublicPromosAsync(customer.Email);
+
+        Assert.Single(eligible.Data!);
+        Assert.Equal(3, eligible.Data!.Single().RemainingUsesThisMonth);
+        Assert.Empty(unmatched.Data!);
+        Assert.Empty(inactive.Data!);
+    }
+
+    [Fact]
+    public async Task Public_nfc_promo_uses_authenticated_email_and_rejects_batch_over_monthly_limit()
+    {
+        var fixture = new BookingFixture();
+        var customer = fixture.AddCustomer(active: true, issued: true);
+        var promo = fixture.AddPromo(PromoAudience.NfcCustomersOnly);
+        promo.MonthlyUsageLimitPerCustomer = 1;
+        var schedules = new[] { new PublicBookingRequestBlockDto(1, new DateOnly(2026, 10, 9), new TimeOnly(10, 0), new TimeOnly(11, 0)) };
+        var request = new PublicBookingRequestSubmissionDto("Public Name", customer.Email, "09123456789", null, 0, schedules, promo.Code);
+
+        var wrongIdentity = await fixture.Service.SubmitPublicRequestAsync(request, [1, 2, 3], "receipt.png", "image/png", "someone-else@example.com");
+        var first = await fixture.Service.SubmitPublicRequestAsync(request, [1, 2, 3], "receipt.png", "image/png", customer.Email);
+        fixture.Schedules.Items.Clear();
+        var overLimit = await fixture.Service.SubmitPublicRequestAsync(request, [1, 2, 3], "receipt.png", "image/png", customer.Email);
+
+        Assert.False(wrongIdentity.Success);
+        Assert.True(first.Success);
+        Assert.False(overLimit.Success);
+        Assert.Contains("1 use per customer each month", overLimit.Message);
+        Assert.Single(fixture.Bookings.Items);
     }
 }
 

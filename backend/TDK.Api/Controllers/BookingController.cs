@@ -37,6 +37,18 @@ public class BookingController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    [HttpGet("api/booking-requests/promos/available")]
+    [Authorize(Roles = "Customer")]
+    [EnableRateLimiting("PublicRead")]
+    public async Task<IActionResult> GetAvailablePublicPromos()
+    {
+        var email = User.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(email))
+            return Unauthorized(new { success = false, message = "A verified customer email is required" });
+
+        return Ok(await _bookingService.GetAvailablePublicPromosAsync(email));
+    }
+
     [HttpPost("api/bookings")]
     [EnableRateLimiting("Email")]
     [Authorize(Roles = "Admin")]
@@ -133,6 +145,7 @@ public class BookingController : ControllerBase
             receiptStream.ToArray(),
             $"payment-receipt{detected.Value.Extension}",
             detected.Value.ContentType,
+            verifiedEmail,
             cancellationToken);
 
         return result.Success ? Ok(result) : BadRequest(result);
