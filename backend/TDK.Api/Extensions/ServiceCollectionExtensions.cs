@@ -30,6 +30,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IProfileImageService, CloudinaryProfileImageService>();
         services.AddSingleton<IBusinessClock, ManilaBusinessClock>();
         services.AddHttpClient<IPayMongoService, PayMongoService>();
+        services.AddHttpClient(GoogleSheetsExportHostedService.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://sheets.googleapis.com/v4/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHostedService<GoogleSheetsExportHostedService>();
         services.AddHostedService<MaintenanceHostedService>();
 
         services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();

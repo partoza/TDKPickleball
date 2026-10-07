@@ -130,3 +130,20 @@ If the API does not start, inspect **Websites → Manage website → Logs → AS
 ## Storage note
 
 Application records are stored in TiDB. Profile images are stored in Cloudinary. Booking receipt images are currently stored on the MonsterASP.NET website disk under `App_Data/receipts`; keep website backups enabled and do not treat TiDB backups as receipt-file backups.
+
+## Google Sheets record mirror
+
+The API can mirror every booking and customer record into separate `Bookings` and `Customers` tabs. The database is the source of truth: every configured interval the tabs are rewritten, so database additions, edits, and deletions appear in Google Sheets. NFC tokens and token hashes are intentionally never exported.
+
+1. In Google Cloud, create or select a project and enable **Google Sheets API**.
+2. Create a **service account**, then create and download a JSON key for it.
+3. Create the destination Google spreadsheet and share it with the JSON key's `client_email` as **Editor**.
+4. Copy the spreadsheet ID from `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`.
+5. Add these MonsterASP.NET environment variables:
+   - `GoogleSheets__Enabled=true`
+   - `GoogleSheets__SpreadsheetId` = the spreadsheet ID
+   - `GoogleSheets__ServiceAccountEmail` = `client_email` from the JSON key
+   - `GoogleSheets__PrivateKey` = `private_key` from the JSON key (literal `\n` line breaks are accepted)
+   - Optional: `GoogleSheets__BookingsTabName`, `GoogleSheets__CustomersTabName`, and `GoogleSheets__SyncIntervalSeconds` (minimum 15; default 60)
+
+The application creates either tab if it is missing. Do not edit these two tabs manually because the next synchronization replaces their contents. Keep the JSON key out of source control; only its email and private key fields are needed by the application.
