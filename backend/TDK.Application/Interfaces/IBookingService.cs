@@ -24,7 +24,7 @@ public interface IBookingService
     Task<ApiResponse<bool>> ConfirmAsync(long id, string userId, string userName);
     Task<ApiResponse<bool>> CancelAsync(long id, string userId, string userName, string reason);
     Task<ApiResponse<bool>> CompleteAsync(long id);
-    Task<ApiResponse<bool>> DeleteAsync(long id);
+    Task<ApiResponse<bool>> DeleteAsync(long id, bool requireCancelled = true);
     Task<ApiResponse<bool>> AttachReceiptAsync(long id, string fileName, string contentType);
     Task<ApiResponse<bool>> SendReceiptConfirmationAsync(long id, byte[] receiptBytes, string receiptFileName, string receiptContentType, CancellationToken cancellationToken = default);
     Task<ApiResponse<ReceiptInfoDto>> GetReceiptInfoAsync(long id);

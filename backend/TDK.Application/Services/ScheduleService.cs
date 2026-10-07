@@ -175,11 +175,15 @@ public class ScheduleService : IScheduleService
     public async Task<ApiResponse<bool>> DeleteAsync(long id)
     {
         var s = await _scheduleRepo.GetByIdAsync(id);
-        if (s != null)
-        {
-            _scheduleRepo.Delete(s);
-            await _scheduleRepo.SaveChangesAsync();
-        }
+        if (s == null) return ApiResponse<bool>.Ok(true);
+
+        // A booking can occupy multiple schedule slots. Delete the authoritative
+        // booking so every linked slot and the Bookings-page record disappear together.
+        if (s.BookingId.HasValue)
+            return await _bookingService.DeleteAsync(s.BookingId.Value, requireCancelled: false);
+
+        _scheduleRepo.Delete(s);
+        await _scheduleRepo.SaveChangesAsync();
         return ApiResponse<bool>.Ok(true);
     }
 

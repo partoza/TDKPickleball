@@ -119,13 +119,13 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bookingModalData, setBookingModalData] = useState<{ id?: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number; customerId: number | null } | null>(null);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; bookingId?: number | null; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number; customerId: number | null } | null>(null);
   const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
   const [scheduleBlocks, setScheduleBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [scheduleBlockErrors, setScheduleBlockErrors] = useState<BookingBlockErrors[]>([]);
   const [savingBatch, setSavingBatch] = useState(false);
   const [viewModalData, setViewModalData] = useState<Schedule | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; date: string; startTime: string; endTime: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; date: string; startTime: string; endTime: string; hasLinkedBooking: boolean } | null>(null);
   const [deleteCredentials, setDeleteCredentials] = useState({ email: '', password: '' });
   const [deleteError, setDeleteError] = useState('');
   const bulkUpdateMutation = useBulkUpdate();
@@ -230,7 +230,7 @@ export default function SchedulePage() {
 
   const openDeleteConfirmation = () => {
     if (!bookingModalData?.id || user?.role !== 'Admin') return;
-    setDeleteTarget({ id: bookingModalData.id, date: bookingModalData.dateStr, startTime: bookingModalData.startTimeStr, endTime: bookingModalData.endTimeStr });
+    setDeleteTarget({ id: bookingModalData.id, date: bookingModalData.dateStr, startTime: bookingModalData.startTimeStr, endTime: bookingModalData.endTimeStr, hasLinkedBooking: !!bookingModalData.bookingId });
     setDeleteCredentials({ email: '', password: '' });
     setDeleteError('');
     setBookingModalData(null);
@@ -248,7 +248,7 @@ export default function SchedulePage() {
           setDeleteError(response.message || 'The administrator credentials could not be verified.');
           return;
         }
-        toast.success('Schedule deleted');
+        toast.success(deleteTarget.hasLinkedBooking ? 'Schedule and linked booking deleted' : 'Schedule deleted');
         setDeleteTarget(null);
         setDeleteCredentials({ email: '', password: '' });
       },
@@ -896,7 +896,7 @@ export default function SchedulePage() {
               <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Delete schedule permanently?</DialogTitle>
               <DialogDescription className="text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
                 {deleteTarget ? <span className="font-medium text-slate-700 dark:text-slate-300 block mb-1">{formatAppDate(deleteTarget.date)} · {formatAppTime(deleteTarget.startTime)}–{formatAppTime(deleteTarget.endTime)}.</span> : ''}
-                Confirm with the email and password of the administrator currently signed in. This cannot be undone.
+                {deleteTarget?.hasLinkedBooking && 'The linked booking will also be permanently removed from the Bookings page. '}Confirm with the email and password of the administrator currently signed in. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -1025,7 +1025,7 @@ export default function SchedulePage() {
           </div>
           
           <div data-slot="dialog-footer" className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-2">
-            {!isStaff && viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0, customerId: viewModalData.customerId || null }); setViewModalData(null); }}>Edit Details</button>}
+            {!isStaff && viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, bookingId: viewModalData.bookingId, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0, customerId: viewModalData.customerId || null }); setViewModalData(null); }}>Edit Details</button>}
             <button
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}

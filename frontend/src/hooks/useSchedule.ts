@@ -61,7 +61,10 @@ export const useDeleteSchedule = () => {
     mutationFn: ({ id, email, password }: { id: string; email: string; password: string }) =>
       schedulesService.deleteSchedule(id, { email, password }),
     onSuccess: response => {
-      if (response.success) queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULES] });
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULES] });
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.BOOKINGS] });
+      }
     },
   });
 };

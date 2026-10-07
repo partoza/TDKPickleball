@@ -701,11 +701,13 @@ public class BookingService : IBookingService
         return ApiResponse<bool>.Ok(true, message);
     }
 
-    public async Task<ApiResponse<bool>> DeleteAsync(long id)
+    public async Task<ApiResponse<bool>> DeleteAsync(long id, bool requireCancelled = true)
     {
         var booking = await _bookings.GetByIdAsync(id);
         if (booking is null) return ApiResponse<bool>.Fail("Booking not found");
-        if (booking.Status != BookingStatus.Cancelled) return ApiResponse<bool>.Fail("Only cancelled bookings can be deleted");
+        if (requireCancelled && booking.Status != BookingStatus.Cancelled) return ApiResponse<bool>.Fail("Only cancelled bookings can be deleted");
+        if (booking.Status != BookingStatus.Cancelled && await ReturnPromoUseAsync(booking))
+            await _promos.SaveChangesAsync();
         await ReleaseScheduleAsync(id);
         foreach (var notification in await _notifications.FindAsync(x => x.BookingId == id)) _notifications.Delete(notification);
         await _notifications.SaveChangesAsync();

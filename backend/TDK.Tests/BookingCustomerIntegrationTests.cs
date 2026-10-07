@@ -13,6 +13,33 @@ namespace TDK.Tests;
 public sealed class BookingCustomerIntegrationTests
 {
     [Fact]
+    public async Task Deleting_a_booked_schedule_also_deletes_its_booking_and_all_linked_slots()
+    {
+        var fixture = new BookingFixture();
+        var promo = fixture.AddPromo(PromoAudience.Everyone);
+        var created = await fixture.Service.CreateAsync(fixture.Request(null, promoId: promo.Id), false);
+        var schedule = Assert.Single(fixture.Schedules.Items);
+        var scheduleService = new ScheduleService(
+            fixture.Schedules,
+            new MemoryRepository<Court>(),
+            new MemoryRepository<TimeSlot>(),
+            new MemoryRepository<Rate>(),
+            fixture.Bookings,
+            fixture.Customers,
+            fixture.Service,
+            new FixedRateService(),
+            new FixedClock());
+
+        var deleted = await scheduleService.DeleteAsync(schedule.Id);
+
+        Assert.True(created.Success);
+        Assert.True(deleted.Success);
+        Assert.Empty(fixture.Schedules.Items);
+        Assert.Empty(fixture.Bookings.Items);
+        Assert.Equal(0, promo.CurrentUses);
+    }
+
+    [Fact]
     public async Task Admin_linked_booking_uses_authoritative_customer_snapshots_and_manual_still_works()
     {
         var fixture = new BookingFixture();
