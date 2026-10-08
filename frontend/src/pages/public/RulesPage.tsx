@@ -13,6 +13,7 @@ import {
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
+import { PickleballAccent } from '@/components/public/PickleballAccent';
 import { ROUTES } from '@/lib/constants';
 
 const courtRules = [
@@ -107,10 +108,14 @@ export default function RulesPage() {
         </div>
         <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.15fr_.85fr] lg:items-end lg:px-10 lg:py-28">
           <div className="relative z-10 max-w-3xl">
+            <div className="mb-7 flex items-center gap-4">
+              <PickleballAccent className="h-16 w-16 drop-shadow-[0_8px_18px_rgba(114,21,29,0.12)] sm:h-20 sm:w-20" />
+              <span className="h-px w-16 bg-[#72151d]/25" aria-hidden="true" />
+            </div>
             <p className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.26em] text-[#72151d]">
               <span className="h-px w-10 bg-[#72151d]" /> Before you step on court
             </p>
-            <h1 className="text-[clamp(3.5rem,9vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.065em] text-[#72151d]">
+            <h1 className="text-[clamp(2.75rem,6vw,5rem)] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#72151d]">
               Play fair.<br />Play safe.
             </h1>
             <p className="mt-8 max-w-2xl text-base leading-7 text-[#5e5651] sm:text-lg sm:leading-8">

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import { formatManilaDatabaseTime } from '@/lib/manila-time';
 import { CustomerBookingCard } from '@/components/customer/CustomerBookingCard';
+import { PickleballAccent } from '@/components/public/PickleballAccent';
 
 const MAX_QR_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_QR_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -20,18 +21,6 @@ prepareZXingModule({
     locateFile: (path, prefix) => path.endsWith('.wasm') ? zxingReaderWasmUrl : `${prefix}${path}`,
   },
 });
-
-function PickleballDecoration() {
-  return (
-    <svg viewBox="0 0 320 320" className="h-full w-full" aria-hidden="true">
-      <circle cx="160" cy="160" r="154" fill="#d9f900" />
-      {[
-        [100, 58], [188, 38], [252, 92], [110, 142], [200, 130],
-        [270, 190], [154, 228], [76, 238], [228, 266],
-      ].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="16" fill="#72151d" opacity=".12" />)}
-    </svg>
-  );
-}
 
 export default function VerifyPage() {
   const [searchParams] = useSearchParams();
@@ -110,17 +99,16 @@ export default function VerifyPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f4efe5] text-[#241f1d]">
       <section className="relative overflow-hidden border-b border-[#72151d]/15">
-        <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 opacity-[0.1] sm:-right-36 sm:-top-36 sm:h-[34rem] sm:w-[34rem]">
-          <PickleballDecoration />
-        </div>
-
         <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[.86fr_1.14fr] lg:items-center lg:px-10 lg:py-24">
           <div className="relative z-10 max-w-xl">
-            <img src="/assets/images/tdk-logo.png" alt="The Dirty Kitchen Pickleball Court" className="mb-10 h-auto w-52 object-contain sm:w-64" />
+            <div className="mb-10 flex items-center justify-between gap-6">
+              <img src="/assets/images/tdk-logo.png" alt="The Dirty Kitchen Pickleball Court" className="h-auto w-52 object-contain sm:w-64" />
+              <PickleballAccent className="h-16 w-16 drop-shadow-[0_8px_18px_rgba(114,21,29,0.12)] sm:h-20 sm:w-20" />
+            </div>
             <p className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.26em] text-[#72151d]">
               <span className="h-px w-10 bg-[#72151d]" /> Booking lookup
             </p>
-            <h1 className="text-[clamp(3.35rem,7vw,6.5rem)] font-black uppercase leading-[0.84] tracking-[-0.065em] text-[#72151d]">
+            <h1 className="text-[clamp(2.75rem,6vw,5rem)] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#72151d]">
               Verify your<br />booking.
             </h1>
             <p className="mt-7 max-w-lg text-base leading-7 text-[#5e5651] sm:text-lg sm:leading-8">
