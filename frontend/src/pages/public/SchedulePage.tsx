@@ -119,7 +119,7 @@ export default function SchedulePage() {
     setPickedSlots(current => current.some(slot => slot.key === key) ? current.filter(slot => slot.key !== key) : [...current, { key, courtId, date: selectedDate, startTime, endTime }]);
   };
 
-  const timeColumnWidth = 148;
+  const timeColumnWidth = 220;
   const gridTemplateColumns = `${timeColumnWidth}px repeat(${Math.max(displayCourts.length, 1)}, minmax(200px, 1fr))`;
   const gridMinWidth = timeColumnWidth + Math.max(displayCourts.length, 1) * 200;
   const totalAmount = pickedSlots.length * 320;
@@ -134,7 +134,7 @@ export default function SchedulePage() {
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court availability for ${formatAppDate(currentDate)}`}>
       <div className="flex flex-col gap-4 border-b border-slate-200 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Schedule date</span>
+          <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.14em] text-primary">Schedule date</span>
           <div className="flex min-w-0 items-center gap-2">
             <button type="button" onClick={() => canGoBack && setCurrentDate(addDays(currentDate, -1))} disabled={!canGoBack} aria-label="Previous date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-200"><ChevronLeft className="h-5 w-5" /></button>
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><button type="button" className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-bold text-slate-800 transition hover:bg-slate-50 sm:min-w-[280px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{isToday && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger><PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} bookingThroughDate={bookingThroughDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent></Popover>
@@ -156,7 +156,7 @@ export default function SchedulePage() {
             const startTime = `${String(hour).padStart(2, '0')}:00:00`;
             const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
             return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns }}>
-              <div className="sticky left-0 z-10 flex min-h-[88px] flex-col justify-center border-r border-slate-200 bg-white px-4 sm:px-5"><span className="text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)}</span><span className="mt-1 text-xs font-medium text-slate-500">to {formatHourLabel(hour + 1)}</span></div>
+              <div className="sticky left-0 z-10 flex min-h-[88px] items-center border-r border-slate-200 bg-white px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
               {displayCourts.map(court => {
                 const courtId = String(court.id);
                 const record = scheduleAtHour(schedulesByCourt.get(courtId) || [], selectedDate, startTime);

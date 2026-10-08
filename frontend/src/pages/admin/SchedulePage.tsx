@@ -195,7 +195,7 @@ export default function SchedulePage() {
   const { data: schedulesResponse, isLoading: scheduleLoading } = useAdminSchedules(selectedDate);
   const isLoading = courtsLoading || scheduleLoading;
   const daySchedules = schedulesResponse?.data || [];
-  const timeColumnWidth = 148;
+  const timeColumnWidth = 220;
   const scheduleGridTemplate = `${timeColumnWidth}px repeat(${Math.max(courts.length, 1)}, minmax(210px, 1fr))`;
   const scheduleGridMinWidth = timeColumnWidth + Math.max(courts.length, 1) * 210;
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
@@ -393,7 +393,7 @@ export default function SchedulePage() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court schedules for ${formatAppDate(currentDate)}`}>
         <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Schedule date</span>
+            <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.14em] text-primary">Schedule date</span>
             <div className="flex min-w-0 items-center gap-2">
               <button type="button" onClick={prevDay} aria-label="Previous date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronLeft className="h-5 w-5" /></button>
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -425,7 +425,7 @@ export default function SchedulePage() {
               const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
               const isPastStart = isPastManilaStart(selectedDate, startTime, new Date(clock));
               return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns: scheduleGridTemplate }}>
-                <div className="sticky left-0 z-10 flex min-h-[90px] flex-col justify-center border-r border-slate-200 bg-white px-4 sm:px-5"><span className="text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)}</span><span className="mt-1 text-xs font-medium text-slate-500">to {formatHourLabel(hour + 1)}</span></div>
+                <div className="sticky left-0 z-10 flex min-h-[90px] items-center border-r border-slate-200 bg-white px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
                 {courts.map(court => {
                   const courtId = court.id.toString();
                   const record = scheduleAtHour(daySchedules, courtId, selectedDate, startTime);

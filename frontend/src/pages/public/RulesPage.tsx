@@ -119,6 +119,13 @@ export default function RulesPage() {
           </div>
 
           <div className="relative z-10 lg:justify-self-end">
+            <div className="mb-9 w-full max-w-sm">
+              <img
+                src="/assets/images/tdk-logo.png"
+                alt="The Dirty Kitchen Pickleball Court"
+                className="h-auto w-full object-contain"
+              />
+            </div>
             <div className="relative w-full max-w-md border-l-2 border-[#72151d] pl-6 sm:pl-8">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#72151d]">Quick read</p>
               <p className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl">Respect the slot. Protect the court. Look after each other.</p>
