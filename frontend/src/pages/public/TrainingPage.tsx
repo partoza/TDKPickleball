@@ -57,7 +57,7 @@ const trainers = [
     position: '50% center',
   },
   {
-    name: 'Coach — name to confirm',
+    name: 'Coach Nelvin',
     image: '/assets/images/players.png',
     position: '82% center',
   },
@@ -66,8 +66,15 @@ const trainers = [
 export default function TrainingPage() {
   return (
     <div className="bg-[#f4efe5] text-[#241f1d]">
-      <section className="relative overflow-hidden border-b border-[#72151d]/15">
-        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-10 lg:py-24">
+      <section className="relative min-h-[680px] overflow-hidden border-b border-[#72151d]/15">
+        <img
+          src="/assets/images/players.png"
+          alt="Players enjoying pickleball at The Dirty Kitchen"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#f4efe5]/95 via-[#f4efe5]/90 to-[#f4efe5]/70 sm:from-[#f4efe5] sm:via-[#f4efe5]/95 sm:to-[#f4efe5]/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#f4efe5]/45 via-transparent to-[#f4efe5]/25" />
+        <div className="relative mx-auto flex min-h-[680px] max-w-7xl items-center px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
           <div className="relative z-10 max-w-3xl">
             <div className="mb-10 flex max-w-xl items-center justify-between gap-6">
               <img src="/assets/images/tdk-logo.png" alt="The Dirty Kitchen Pickleball Court" className="h-auto w-52 object-contain sm:w-64" />
@@ -93,21 +100,10 @@ export default function TrainingPage() {
               </Button>
             </div>
           </div>
-
-          <div className="relative z-10 lg:justify-self-end">
-            <div className="relative mx-auto max-w-xl lg:mx-0">
-              <div className="absolute -left-4 -top-4 h-full w-full border border-[#72151d]/25 sm:-left-6 sm:-top-6" aria-hidden="true" />
-              <img
-                src="/assets/images/players.png"
-                alt="Players enjoying pickleball at The Dirty Kitchen"
-                className="relative aspect-[4/5] w-full object-cover object-center grayscale-[15%]"
-              />
-              <div className="absolute bottom-0 left-0 bg-[#d9f900] px-5 py-4 text-[#241f1d] sm:px-7 sm:py-5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Focused court time</p>
-                <p className="mt-1 text-lg font-bold">Built around your game.</p>
-              </div>
-            </div>
-          </div>
+        </div>
+        <div className="absolute bottom-0 right-0 hidden bg-[#d9f900] px-7 py-5 text-[#241f1d] sm:block lg:px-10 lg:py-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Focused court time</p>
+          <p className="mt-1 text-lg font-bold">Built around your game.</p>
         </div>
       </section>
 

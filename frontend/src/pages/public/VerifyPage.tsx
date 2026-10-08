@@ -30,6 +30,7 @@ export default function VerifyPage() {
   const [request, setRequest] = useState<PublicBookingRequestStatus | null>(null);
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const resultRef = useRef<HTMLElement>(null);
   const verify = useVerifyBooking();
   const verifyRequest = useVerifyBookingRequest();
   const isPending = verify.isPending || verifyRequest.isPending;
@@ -66,6 +67,16 @@ export default function VerifyPage() {
     initialLookupStarted.current = true;
     check(queryReference);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!booking && !request) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [booking, request]);
 
   const scan = async (file?: File) => {
     if (!file) return;
@@ -173,8 +184,15 @@ export default function VerifyPage() {
       </section>
 
       {(booking || request) && (
-        <section className="bg-[#fffdf8] py-14 sm:py-20" aria-live="polite">
+        <section ref={resultRef} className="scroll-mt-16 bg-[#fffdf8] py-14 sm:scroll-mt-20 sm:py-20" aria-live="polite">
           <div className="mx-auto max-w-4xl px-5 sm:px-8">
+            <div className="mb-7 flex items-start gap-3 border border-emerald-700/20 bg-emerald-50 px-4 py-3.5 text-emerald-900" role="status">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+              <div>
+                <p className="text-sm font-bold">Valid {booking ? 'booking' : 'request'} reference</p>
+                <p className="mt-0.5 text-sm leading-5 text-emerald-800">We found your reservation. The latest details are shown below.</p>
+              </div>
+            </div>
             <div className="mb-8 flex items-end justify-between gap-5 border-b border-[#241f1d]/15 pb-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#72151d]">Lookup result</p>
