@@ -20,6 +20,13 @@ function getWeekRangeString(start: Date, end: Date) {
   return `${formatAppDate(start)} - ${formatAppDate(end)}`;
 }
 
+function getCompactWeekRangeString(start: Date, end: Date) {
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  return sameMonth
+    ? `${format(start, 'MMM d')}–${format(end, 'd, yyyy')}`
+    : `${format(start, 'MMM d')}–${format(end, 'MMM d, yyyy')}`;
+}
+
 function getTimedStatus(slot: Schedule) {
   const base = STATUS_LABELS[slot.status];
   if (slot.status === ScheduleStatus.Unavailable || slot.status === ScheduleStatus.Available) return { label: base, phase: 'scheduled' as const };
@@ -190,20 +197,20 @@ export default function SchedulePage() {
   const totalAmount = pickedSlots.length * RATE_PER_HOUR;
 
   return (
-    <div className="space-y-6 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pt-12 md:pt-16 pb-12">
+    <div className="mx-auto w-full max-w-[1600px] space-y-4 overflow-x-hidden px-3 pb-12 pt-6 sm:space-y-6 sm:px-6 sm:pt-12 md:pt-16">
       
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-5 pl-1 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4 flex flex-col gap-4 px-1 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p>
-          <h1 className="mt-2 text-[28px] font-bold tracking-tight text-slate-900">Court Schedule</h1>
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:mt-2 sm:text-[28px]">Court Schedule</h1>
           <p className="mt-2 max-w-[600px] text-[14px] leading-relaxed text-slate-500">
             A clear, real-time view of every court and session for the entire week.
           </p>
         </div>
         <Link
           to={ROUTES.TRAINING}
-          className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg sm:w-auto"
+          className="group inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg sm:h-11 sm:w-auto"
         >
           <PaddleIcon className="h-5 w-5" white />
           Become a Trainee
@@ -212,32 +219,32 @@ export default function SchedulePage() {
       </div>
 
       {bookingThroughDate && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] font-semibold leading-5 text-amber-800 sm:px-4 sm:text-sm">
           Online bookings are open through {formatAppDate(bookingThroughDate)}.
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 md:p-6">
         
         {/* Navigation & Filters Toolbar */}
-        <div className="grid gap-5 border-b border-slate-100 pb-5 mb-6 md:mb-8 md:pb-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+        <div className="mb-4 grid min-w-0 gap-4 border-b border-slate-100 pb-4 md:mb-8 md:gap-5 md:pb-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
           
-          <div className="flex flex-col sm:flex-row flex-wrap items-end gap-4 md:gap-5 w-full">
+          <div className="flex min-w-0 w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end md:gap-5">
             
-            <div className="flex flex-row items-end gap-3 sm:gap-4 md:gap-5 w-full sm:w-auto overflow-hidden">
+            <div className="grid min-w-0 w-full grid-cols-[72px_minmax(0,1fr)] items-end gap-2 sm:flex sm:w-auto sm:gap-4 md:gap-5">
               {/* Quick Jump */}
-              <div className="flex min-w-0 flex-col gap-1.5 shrink-0">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <label className="text-[10px] font-extrabold text-primary uppercase tracking-widest pl-0.5 block">Quick Jump</label>
                 <button 
                   onClick={today} 
-                  className="h-10 sm:h-9 px-4 sm:px-5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-bold text-slate-700 shadow-sm transition-all"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 sm:h-9 sm:px-5 sm:text-[13px]"
                 >
                   Today
                 </button>
               </div>
 
               {/* Date Navigation */}
-              <div className="flex min-w-0 flex-col gap-1.5 flex-1 sm:flex-none sm:shrink-0">
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-none sm:shrink-0">
                 <label className="text-[10px] font-extrabold text-primary uppercase tracking-widest pl-0.5 block">Week View</label>
                 <div className="flex w-full items-center gap-1.5 sm:gap-2 sm:justify-start">
                   <button 
@@ -251,14 +258,17 @@ export default function SchedulePage() {
                         : "hover:bg-slate-50 text-slate-500"
                     )}
                   >
-                    <ChevronLeft className="h-4 w-4 sm:h-4 sm:w-4" />
+                    <ChevronLeft className="h-4 w-4" />
                   </button>
 
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
-                      <button className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-lg border border-slate-200 bg-white px-2 shadow-sm transition-colors hover:bg-slate-50 sm:h-9 sm:flex-none sm:px-4">
+                      <button className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-1.5 shadow-sm transition-colors hover:bg-slate-50 sm:h-9 sm:flex-none sm:gap-2 sm:px-4">
                         <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400 hidden sm:block" />
-                        <span className="truncate text-[12px] sm:text-[13px] font-bold text-slate-700">
+                        <span className="truncate text-[11px] font-bold text-slate-700 sm:hidden">
+                          {getCompactWeekRangeString(weekDays[0], weekDays[6])}
+                        </span>
+                        <span className="hidden text-[13px] font-bold text-slate-700 sm:inline">
                           {getWeekRangeString(weekDays[0], weekDays[6])}
                         </span>
                       </button>
@@ -277,7 +287,7 @@ export default function SchedulePage() {
                     title="Next week" 
                     className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center shrink-0 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
                   >
-                    <ChevronRight className="h-4 w-4 sm:h-4 sm:w-4" />
+                    <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -292,14 +302,17 @@ export default function SchedulePage() {
                   <span className="h-7 flex-1 animate-pulse rounded-md bg-white/60" />
                 </div>
               ) : courts.length > 0 ? (
-                <div className="flex w-full sm:inline-flex sm:w-auto h-10 max-w-full items-center gap-1 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200 bg-slate-100/80 p-1 custom-scrollbar sm:h-9">
+                <div
+                  className="grid h-10 w-full max-w-full items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 p-1 sm:inline-grid sm:h-9 sm:w-auto"
+                  style={{ gridTemplateColumns: `repeat(${courts.length}, minmax(0, 1fr))` }}
+                >
                   {courts.map(c => (
                     <button 
                       key={c.id} 
                       type="button"
                       onClick={() => setSelectedCourt(c.id.toString())}
                       className={cn(
-                        "h-8 flex-1 sm:flex-none sm:min-w-[88px] whitespace-nowrap rounded-md px-2 sm:px-4 text-[13px] font-bold transition-all sm:h-7",
+                        "h-8 min-w-0 truncate rounded-md px-1.5 text-[12px] font-bold transition-all sm:h-7 sm:min-w-[88px] sm:px-4 sm:text-[13px]",
                         selectedCourt === c.id.toString()
                           ? "bg-primary text-white shadow-sm ring-1 ring-primary"
                           : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
@@ -323,7 +336,7 @@ export default function SchedulePage() {
         </div>
 
         {/* Mobile Day Selector */}
-        <div className="md:hidden flex overflow-x-auto gap-2 mb-4 snap-x custom-scrollbar pb-2">
+        <div className="mb-4 grid grid-cols-7 gap-1 md:hidden" aria-label="Select day">
           {weekDays.map(date => {
             const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
             const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
@@ -332,7 +345,7 @@ export default function SchedulePage() {
                 key={date.toISOString()}
                 onClick={() => setCurrentDate(date)}
                 className={cn(
-                  "flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl border snap-center transition-all",
+                  "flex h-14 min-w-0 flex-col items-center justify-center rounded-lg border transition-all",
                   isSelectedDay 
                     ? "bg-primary text-primary-foreground border-primary shadow-sm" 
                     : isToday 
@@ -340,8 +353,8 @@ export default function SchedulePage() {
                       : "bg-white border-slate-200 text-slate-600"
                 )}
               >
-                <span className={cn("text-[10px] font-bold uppercase tracking-wider mb-0.5", isSelectedDay ? "text-primary-foreground/80" : isToday ? "text-primary/70" : "text-slate-400")}>{format(date, 'EEE')}</span>
-                <span className="text-xl font-medium leading-none">{format(date, 'd')}</span>
+                <span className={cn("mb-0.5 text-[8px] font-bold uppercase tracking-wide", isSelectedDay ? "text-primary-foreground/80" : isToday ? "text-primary/70" : "text-slate-400")}>{format(date, 'EEEEE')}</span>
+                <span className="text-base font-semibold leading-none">{format(date, 'd')}</span>
               </button>
             )
           })}
@@ -357,11 +370,11 @@ export default function SchedulePage() {
               </div>
             </div>
           )}
-          <div className="overflow-x-auto custom-scrollbar">
+          <div className="min-w-0 overflow-hidden md:overflow-x-auto md:custom-scrollbar">
             <div className="min-w-full md:min-w-[950px] border border-slate-300 rounded-xl overflow-hidden bg-white">
             
             {/* Header Row */}
-            <div className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] border-b border-slate-300 bg-slate-50/50">
+            <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-slate-300 bg-slate-50/50 sm:grid-cols-[110px_minmax(0,1fr)] md:grid-cols-[140px_repeat(7,1fr)]">
               <div className="flex items-center justify-center pb-2 pt-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</span>
               </div>
@@ -408,11 +421,11 @@ export default function SchedulePage() {
                   };
                   const displayTime = `${formatHourLabel(hour)} - ${formatHourLabel(hour + 1)}`;
                   return (
-                    <div key={timeStr} className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] group/row border-b border-slate-300 last:border-b-0">
+                    <div key={timeStr} className="group/row grid grid-cols-[92px_minmax(0,1fr)] border-b border-slate-300 last:border-b-0 sm:grid-cols-[110px_minmax(0,1fr)] md:grid-cols-[140px_repeat(7,1fr)]">
                       
                       {/* Time Label */}
                       <div className="flex items-center justify-center border-r border-slate-300 bg-white p-1 px-2">
-                        <span className="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-black dark:text-white transition-colors tracking-tight text-center">
+                        <span className="text-center text-[9px] font-bold leading-tight tracking-tight text-black transition-colors dark:text-white sm:text-[11px] md:text-[12px]">
                           {displayTime}
                         </span>
                       </div>
@@ -507,30 +520,31 @@ export default function SchedulePage() {
 
       {/* ── Floating Selected Slots Bar ── */}
       {pickedSlots.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-in slide-in-from-bottom-3 duration-300">
-          <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 px-7 py-6 flex items-center justify-between gap-4 relative">
+        <div className="fixed bottom-3 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 animate-in px-3 duration-300 slide-in-from-bottom-3 sm:bottom-6 sm:px-4">
+          <div className="relative flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:gap-4 sm:px-7 sm:py-6">
             <button
               onClick={() => setPickedSlots([])}
-              className="absolute right-4 top-4 cursor-pointer rounded-lg p-1.5 text-muted-foreground opacity-70 ring-offset-background transition-all duration-200 hover:opacity-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 active:scale-95 focus:outline-none"
+              className="absolute right-2 top-2 cursor-pointer rounded-lg p-1.5 text-muted-foreground opacity-70 ring-offset-background transition-all duration-200 hover:bg-red-50 hover:text-red-600 hover:opacity-100 focus:outline-none active:scale-95 dark:hover:bg-red-950/40 dark:hover:text-red-400 sm:right-4 sm:top-4"
             >
               <XIcon className="h-4 w-4 stroke-[2]" />
             </button>
             
             <div className="flex flex-col gap-1">
               <p className="text-[10.5px] font-bold text-slate-400/90 uppercase tracking-[0.1em] mb-0.5">Selected Slots</p>
-              <div className="flex items-baseline mb-1">
-                <span className="text-[26px] font-bold text-[#111827] leading-none tracking-tight">{pickedSlots.length}</span>
-                <span className="text-[13px] text-[#8a99a8] font-medium ml-1.5">slots &nbsp;/ 6 max</span>
+              <div className="mb-1 flex items-baseline">
+                <span className="text-xl font-bold leading-none tracking-tight text-[#111827] sm:text-[26px]">{pickedSlots.length}</span>
+                <span className="ml-1.5 text-[11px] font-medium text-[#8a99a8] sm:text-[13px]">slots / 6</span>
               </div>
               <p className="text-[13.5px] font-semibold text-[#111827]">
                 Total: ₱{totalAmount.toLocaleString()}
               </p>
             </div>
             
-            <div className="flex items-center shrink-0 pr-1 md:pr-2 mt-2">
+            <div className="mt-3 flex shrink-0 items-center pr-1 md:pr-2">
               <Link to="/booking" state={{ pickedSlots }}>
-                <button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-[38px] px-5 rounded-[8px] text-[13.5px] flex items-center gap-1.5 whitespace-nowrap transition-colors shadow-sm">
-                  Proceed to Pay
+                <button className="flex h-10 items-center gap-1 whitespace-nowrap rounded-lg bg-primary px-3 text-[12px] font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:h-[38px] sm:px-5 sm:text-[13.5px]">
+                  <span className="sm:hidden">Continue</span>
+                  <span className="hidden sm:inline">Proceed to Pay</span>
                   <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
                 </button>
               </Link>
