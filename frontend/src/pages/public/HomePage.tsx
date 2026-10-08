@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { CheckCircleIcon, MapPinIcon, ClockIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
+import { CalendarDaysIcon, CheckBadgeIcon, Squares2X2Icon, UserIcon } from '@heroicons/react/24/outline';
 
 const COOKIE_CONSENT_KEY = 'tdk-cookie-consent';
 
@@ -58,6 +59,35 @@ export default function HomePage() {
                 View Schedule
               </Link>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Booking Steps */}
+      <section className="bg-white py-14 text-[#17213f] sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-500">Booking</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] sm:text-4xl">How booking works</h2>
+          <p className="mt-3 text-base text-slate-500 sm:text-lg">Four steps, from an open court to a confirmed booking.</p>
+
+          <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:mt-10 lg:grid-cols-4 lg:gap-5">
+            {[
+              { title: 'Choose your date', description: 'Pick the day you want to play.', icon: CalendarDaysIcon },
+              { title: 'Choose a court and time', description: 'See which courts are available and select the slots you want.', icon: Squares2X2Icon },
+              { title: 'Sign in', description: 'So your booking is in your name and you can find it later.', icon: UserIcon },
+              { title: 'Confirm', description: 'Review your booking and confirm your reservation.', icon: CheckBadgeIcon },
+            ].map(({ title, description, icon: Icon }, index) => (
+              <article key={title} className="relative min-h-52 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-7">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="grid h-13 w-13 place-items-center rounded-2xl bg-[#293f91] text-white">
+                    <Icon className="h-6 w-6" />
+                  </span>
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-amber-400 text-base font-bold text-[#17213f]">{index + 1}</span>
+                </div>
+                <h3 className="mt-6 text-lg font-bold tracking-[-0.02em]">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">{description}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>

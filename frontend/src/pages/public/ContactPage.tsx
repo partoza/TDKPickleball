@@ -38,7 +38,7 @@ export default function ContactPage() {
             <div className="relative mx-auto max-w-2xl lg:mx-0">
               <div className="absolute -left-4 -top-4 h-full w-full border border-[#72151d]/25 sm:-left-6 sm:-top-6" aria-hidden="true" />
               <img src="/assets/images/contact-image.png" alt="The Dirty Kitchen Facebook page and court location in Davao City" className="relative h-auto w-full" />
-              <a href={EXTERNAL_LINKS.FACEBOOK_PAGE} target="_blank" rel="noopener noreferrer" className="absolute bottom-0 right-0 inline-flex items-center gap-2 rounded-xl bg-[#d9f900] px-5 py-4 text-sm font-bold text-[#241f1d] transition hover:bg-[#e4ff3b] sm:px-7">
+              <a href={EXTERNAL_LINKS.FACEBOOK_PAGE} target="_blank" rel="noopener noreferrer" className="absolute bottom-0 right-0 inline-flex items-center gap-2 rounded-none bg-[#d9f900] px-5 py-4 text-sm font-bold text-[#241f1d] transition hover:bg-[#e4ff3b] sm:px-7">
                 Visit our Facebook page <ArrowUpRightIcon className="h-4 w-4" />
               </a>
             </div>
