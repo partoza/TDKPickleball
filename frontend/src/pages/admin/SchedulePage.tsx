@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
-import { useAdminSchedules, useBulkUpdate, useDeleteSchedule, usePublicBookingWindow, useUpdatePublicBookingWindow, useUpdateSchedule } from '@/hooks/useSchedule';
+import { useAdminWeeklySchedules, useBulkUpdate, useDeleteSchedule, usePublicBookingWindow, useUpdatePublicBookingWindow, useUpdateSchedule } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
 import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, PlusIcon as Plus, MinusIcon as Minus, TrashIcon as Trash } from '@heroicons/react/24/solid';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
@@ -31,6 +31,10 @@ import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 import { useCustomerAvailablePromos } from '@/hooks/useBookings';
 import { formatAppDate, formatAppTime } from '@/lib/date-time';
 
+function getWeekRangeString(start: Date, end: Date) {
+  return `${formatAppDate(start)} - ${formatAppDate(end)}`;
+}
+
 function getTimedStatus(slot: Schedule) {
   const base = STATUS_LABELS[slot.status];
   if (slot.status === ScheduleStatus.Unavailable || slot.status === ScheduleStatus.Available) return { label: base, phase: 'scheduled' as const };
@@ -41,29 +45,6 @@ function getTimedStatus(slot: Schedule) {
   if (now >= end) return { label: `Completed ${base}`, phase: 'completed' as const };
   if (now >= start) return { label: `Ongoing ${base}`, phase: 'ongoing' as const };
   return { label: base, phase: 'scheduled' as const };
-}
-
-function formatHourLabel(hour: number) {
-  if (hour === 12) return '12:00 NN';
-  if (hour === 24 || hour === 0) return '12:00 MN';
-  if (hour < 12) return `${hour}:00 AM`;
-  return `${hour - 12}:00 PM`;
-}
-
-function toMinutes(value: string) {
-  const [hours, minutes] = value.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function scheduleAtHour(schedules: Schedule[], courtId: string, date: string, time: string) {
-  const minute = toMinutes(time);
-  return schedules.find(schedule => {
-    if (String(schedule.courtId) !== courtId || schedule.date !== date) return false;
-    const start = toMinutes(schedule.startTime);
-    const rawEnd = toMinutes(schedule.endTime);
-    const end = rawEnd <= start ? rawEnd + 1440 : rawEnd;
-    return minute >= start && minute < end;
-  });
 }
 
 const MiniCalendar = ({ currentDate, onSelect }: { currentDate: Date, onSelect: (d: Date) => void }) => {
@@ -138,7 +119,7 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [bookingModalData, setBookingModalData] = useState<{ id?: string; bookingId?: number | null; courtId: string; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number; customerId: number | null } | null>(null);
+  const [bookingModalData, setBookingModalData] = useState<{ id?: string; bookingId?: number | null; dateStr: string; startTimeStr: string; endTimeStr: string; status: string; notes: string; bookedBy: string; email: string; phone: string; paymentStatus: BookingStatus; amountPaid: number | ''; internalCoachProfileId: number | null; promoId: number | null; paddleRentalQuantity: number; customerId: number | null } | null>(null);
   const [scheduleErrors, setScheduleErrors] = useState<Record<string, string>>({});
   const [scheduleBlocks, setScheduleBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [scheduleBlockErrors, setScheduleBlockErrors] = useState<BookingBlockErrors[]>([]);
@@ -161,6 +142,7 @@ export default function SchedulePage() {
   const { internalCoaches, fetchInternalCoaches } = useInternalCoaches(); 
   const { promos, fetchPromos } = usePromos();
   useEffect(() => { fetchInternalCoaches(); fetchPromos(); }, [fetchInternalCoaches, fetchPromos]);
+  const [selectedCourt, setSelectedCourt] = useState<string>('');
 
   useEffect(() => {
     setPublicBookingThroughDate(publicBookingWindowResponse?.data?.bookingThroughDate || '');
@@ -182,8 +164,16 @@ export default function SchedulePage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const prevDay = () => setCurrentDate(addDays(currentDate, -1));
-  const nextDay = () => setCurrentDate(addDays(currentDate, 1));
+  useEffect(() => {
+    if (courts.length > 0 && !selectedCourt) {
+      setSelectedCourt(courts[0].id.toString());
+    }
+  }, [courts, selectedCourt]);
+
+  const activeCourtId = selectedCourt;
+
+  const prevWeek = () => setCurrentDate(addDays(currentDate, -7));
+  const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
   const today = () => setCurrentDate(new Date());
   const getInitials = (name: string) => {
     const parts = name.split(' ').filter(Boolean);
@@ -191,13 +181,13 @@ export default function SchedulePage() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const selectedDate = format(currentDate, 'yyyy-MM-dd');
-  const { data: schedulesResponse, isLoading: scheduleLoading } = useAdminSchedules(selectedDate);
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
+  const weekDaysStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+
+  const { data: schedules, isLoading: scheduleLoading } = useAdminWeeklySchedules(weekDaysStrs, activeCourtId);
   const isLoading = courtsLoading || scheduleLoading;
-  const daySchedules = schedulesResponse?.data || [];
-  const timeColumnWidth = 220;
-  const scheduleGridTemplate = `${timeColumnWidth}px repeat(${Math.max(courts.length, 1)}, minmax(210px, 1fr))`;
-  const scheduleGridMinWidth = timeColumnWidth + Math.max(courts.length, 1) * 210;
+  const weekSchedules = schedules || [];
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
   const isAddingCustomerSchedule = !!bookingModalData && !bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training');
   const { data: customerPromosResponse, isFetching: customerPromosLoading } = useCustomerAvailablePromos(
@@ -316,7 +306,7 @@ export default function SchedulePage() {
       return;
     }
 
-    if (!bookingModalData.courtId) return;
+    if (!activeCourtId) return;
     if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && Number(bookingModalData.amountPaid) < 0) errors.amountPaid = 'Reservation amount cannot be negative.';
     else if (needsContact && bookingModalData.paymentStatus === BookingStatus.Reserved && modalQuote?.covered && Number(bookingModalData.amountPaid) > modalQuote.total) errors.amountPaid = `Reservation amount cannot exceed the total of ₱${modalQuote.total.toLocaleString()}.`;
     if (needsContact && !modalQuote?.covered) errors.rate = 'No active rate covers the complete selected schedule.';
@@ -324,7 +314,7 @@ export default function SchedulePage() {
     setScheduleErrors(errors);
     if (Object.keys(errors).length) return;
     const payload = {
-      courtId: parseInt(bookingModalData.courtId),
+      courtId: parseInt(activeCourtId),
       date: bookingModalData.dateStr,
       startTime: bookingModalData.startTimeStr,
       endTime: bookingModalData.endTimeStr,
@@ -390,68 +380,289 @@ export default function SchedulePage() {
         </div>
       </section>}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court schedules for ${formatAppDate(currentDate)}`}>
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.14em] text-primary">Schedule date</span>
-            <div className="flex min-w-0 items-center gap-2">
-              <button type="button" onClick={prevDay} aria-label="Previous date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronLeft className="h-5 w-5" /></button>
-              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                <PopoverTrigger asChild><button type="button" className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-bold text-slate-800 shadow-sm hover:bg-slate-50 sm:min-w-[290px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{selectedDate === getManilaDate(new Date(clock)) && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger>
-                <PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
-              </Popover>
-              <button type="button" onClick={nextDay} aria-label="Next date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronRight className="h-5 w-5" /></button>
-              {selectedDate !== getManilaDate(new Date(clock)) && <button type="button" onClick={today} className="hidden h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:block">Today</button>}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6">
+        
+        {/* Navigation & Filters Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6 md:mb-8 border-b border-slate-100 pb-5 md:pb-6">
+          
+          <div className="flex flex-wrap items-end gap-3 sm:gap-5">
+            {/* Date Navigation */}
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto order-1 sm:order-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Week View</label>
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full justify-between sm:justify-start">
+                <button 
+                  onClick={prevWeek} 
+                  title="Previous week" 
+                  className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:h-4 sm:w-4" />
+                </button>
+
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 h-10 sm:h-9 px-3.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm">
+                      <CalendarIcon className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-[13px] font-semibold text-slate-700">
+                        {getWeekRangeString(weekDays[0], weekDays[6])}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="center" sideOffset={8}>
+                    <MiniCalendar 
+                      currentDate={currentDate} 
+                      onSelect={(d) => { setCurrentDate(d); setIsCalendarOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <button 
+                  onClick={nextWeek} 
+                  title="Next week" 
+                  className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 sm:h-4 sm:w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Jump */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-2 sm:order-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Quick Jump</label>
+              <button 
+                onClick={today} 
+                className="h-10 sm:h-9 px-4 w-full rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-semibold text-slate-700 shadow-sm transition-all"
+              >
+                Today
+              </button>
+            </div>
+
+            {/* Court Selection */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none order-3">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5 block">Court</label>
+              {courts.length > 0 && (
+                <div className="grid h-10 w-full auto-cols-fr grid-flow-col items-center gap-1 overflow-hidden rounded-lg border border-slate-200 bg-slate-100/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/10 sm:h-9 sm:w-[200px]">
+                  {courts.map(c => <button key={c.id} type="button" aria-pressed={selectedCourt === c.id.toString()} onClick={() => setSelectedCourt(c.id.toString())} className={cn("h-8 min-w-0 whitespace-nowrap rounded-md px-3 text-[13px] font-bold transition-all sm:h-7", selectedCourt === c.id.toString() ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white")}>{c.name}</button>)}
+                </div>
+              )}
             </div>
           </div>
 
-          {!isStaff && <button type="button" disabled={!courts.length} onClick={() => {
-            const courtId = courts[0]?.id.toString() || '';
-            setScheduleBlocks([createBookingBlock({ courtId, date: selectedDate })]);
-            setScheduleBlockErrors([]);
-            setBookingModalData({ courtId, dateStr: selectedDate, startTimeStr: '07:00:00', endTimeStr: '08:00:00', status: 'Booked', notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null });
-          }} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-50 sm:w-auto"><Plus className="h-4 w-4" />Add Schedule</button>}
+          {/* Add Schedule Button */}
+          {!isStaff && <div className="w-full lg:w-auto mt-2 lg:mt-0">
+            <button 
+              onClick={() => {
+                setScheduleBlocks([createBookingBlock({ courtId: activeCourtId, date: format(currentDate, 'yyyy-MM-dd') })]);
+                setScheduleBlockErrors([]);
+                setBookingModalData({
+                  dateStr: format(currentDate, 'yyyy-MM-dd'),
+                  startTimeStr: '07:00:00',
+                  endTimeStr: '08:00:00',
+                  status: 'Booked',
+                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null
+                });
+              }}
+              className="h-11 sm:h-9 w-full sm:px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-[14px] sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Schedule
+            </button>
+          </div>}
         </div>
 
-        {!courts.length && !isLoading ? <div className="grid min-h-64 place-items-center text-center"><div><p className="font-bold text-slate-800">No active courts available</p><p className="mt-1 text-sm text-slate-500">Add or activate a court to manage its schedule.</p></div></div> : <div className="relative">
-          {isLoading && <div className="pointer-events-none absolute left-1/2 top-6 z-50 -translate-x-1/2"><div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-5 py-2.5 shadow-lg backdrop-blur"><LoadingIndicator size="sm" className="text-primary" /><span className="text-xs font-bold text-slate-700">Loading schedule</span></div></div>}
-          <div className="overflow-x-auto custom-scrollbar"><div style={{ minWidth: `${scheduleGridMinWidth}px` }}>
-            <div className="sticky top-0 z-20 grid border-b border-slate-200 bg-slate-50" style={{ gridTemplateColumns: scheduleGridTemplate }}>
-              <div className="sticky left-0 z-30 flex min-h-20 items-center border-r border-slate-200 bg-slate-50 px-4 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time</div>
-              {courts.map(court => <div key={court.id} className="flex min-h-20 flex-col items-center justify-center border-r border-slate-200 px-4 text-center last:border-r-0"><span className="text-base font-bold text-slate-900">{court.displayName || court.name}</span><span className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Indoor court</span></div>)}
+        {/* Mobile Day Selector */}
+        <div className="md:hidden flex overflow-x-auto gap-2 mb-4 snap-x custom-scrollbar pb-2">
+          {weekDays.map(date => {
+            const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
+            const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
+            return (
+              <button 
+                key={date.toISOString()}
+                onClick={() => setCurrentDate(date)}
+                className={cn(
+                  "flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl border snap-center transition-all",
+                  isSelectedDay 
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                    : isToday 
+                      ? "bg-primary/5 border-primary/20 text-primary"
+                      : "bg-white border-slate-200 text-slate-600"
+                )}
+              >
+                <span className={cn("text-[10px] font-bold uppercase tracking-wider mb-0.5", isSelectedDay ? "text-primary-foreground/80" : isToday ? "text-primary/70" : "text-slate-400")}>{format(date, 'EEE')}</span>
+                <span className="text-xl font-medium leading-none">{format(date, 'd')}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Flush Schedule Grid */}
+        <div className="relative">
+          {isLoading && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+              <div className="bg-white/95 dark:bg-[#2c2c2e]/95 backdrop-blur-sm shadow-[0_4px_20px_rgb(0,0,0,0.1)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] border border-slate-200 dark:border-white/10 px-5 py-2.5 rounded-full flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+                <LoadingIndicator size="sm" className="text-primary" />
+                <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Loading Schedule...</span>
+              </div>
             </div>
-            <div className="max-h-[680px] overflow-y-auto custom-scrollbar">{Array.from({ length: 17 }, (_, index) => index + 7).map(hour => {
-              const startTime = `${String(hour).padStart(2, '0')}:00:00`;
-              const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
-              const isPastStart = isPastManilaStart(selectedDate, startTime, new Date(clock));
-              return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns: scheduleGridTemplate }}>
-                <div className="sticky left-0 z-10 flex min-h-[90px] items-center border-r border-slate-200 bg-white px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
-                {courts.map(court => {
-                  const courtId = court.id.toString();
-                  const record = scheduleAtHour(daySchedules, courtId, selectedDate, startTime);
-                  const slot = record?.status === ScheduleStatus.Available ? undefined : record;
-                  return <div key={`${courtId}-${startTime}`} className={cn('group/cell min-h-[86px] border-r border-slate-200 p-2 last:border-r-0', !slot && isPastStart && 'bg-slate-50', !isStaff && !slot && !isPastStart && 'cursor-pointer hover:bg-primary/[0.025]')} onClick={() => {
-                    if (isStaff || slot || isPastStart) return;
-                    setScheduleBlocks([createBookingBlock({ courtId, date: selectedDate, startTime: startTime.slice(0, 5), endTime: endTime.slice(0, 5) })]);
-                    setScheduleBlockErrors([]);
-                    setBookingModalData({ courtId, dateStr: selectedDate, startTimeStr: startTime, endTimeStr: endTime, status: 'Booked', notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null });
-                  }}>
-                    {isLoading ? <Skeleton className="h-full min-h-[68px] w-full rounded-lg" /> : slot ? (() => {
-                      const timedStatus = getTimedStatus(slot);
-                      return <button type="button" onClick={event => { event.stopPropagation(); setViewModalData(slot); }} className={cn('group/booked relative flex h-full min-h-[68px] w-full flex-col items-center justify-center overflow-hidden rounded-lg border p-2.5 text-center shadow-sm', STATUS_COLORS[slot.status], timedStatus.phase === 'ongoing' && 'ring-2 ring-emerald-500 ring-offset-1', timedStatus.phase === 'completed' && 'brightness-75 saturate-50')}>
-                        <span className="w-full text-[11px] font-bold uppercase tracking-wider">{timedStatus.label}</span>
-                        {slot.status === ScheduleStatus.Training ? <span className="mt-1 flex w-full flex-col overflow-hidden text-[11px] font-medium opacity-90"><span className="truncate">{slot.bookedBy || 'No Trainee'}</span>{slot.internalCoachProfileId && (() => { const coach = internalCoaches.find(item => item.id === slot.internalCoachProfileId); return coach ? <span className="truncate text-[9px] opacity-75">w/ {coach.name}</span> : null; })()}</span> : slot.status === ScheduleStatus.Internal ? <span className="mt-1 w-full truncate text-[11px] font-medium opacity-90">{internalCoaches.find(profile => profile.id === slot.internalCoachProfileId)?.name || 'No internal assigned'}</span> : (slot.bookedBy || slot.notes) && <span className="mt-1 w-full truncate text-[11px] font-medium opacity-90">{slot.bookedBy || slot.notes}</span>}
-                        <span className="absolute inset-0 grid place-items-center bg-black/60 text-[11px] font-bold text-white opacity-0 backdrop-blur-[1px] transition-opacity group-hover/booked:opacity-100">View details</span>
-                      </button>;
-                    })() : isPastStart ? <div className="flex min-h-[68px] items-center justify-center text-[10px] font-bold uppercase tracking-wider text-slate-400">Past</div> : !isStaff ? <div className="flex min-h-[68px] items-center justify-center"><span className="grid h-8 w-8 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary opacity-0 transition-opacity group-hover/cell:opacity-100"><Plus className="h-4 w-4" /></span></div> : <div className="flex min-h-[68px] items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">Available</div>}
-                  </div>;
+          )}
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-full md:min-w-[950px] border border-slate-200 rounded-xl overflow-hidden bg-white">
+            
+            {/* Header Row */}
+            <div className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] border-b border-slate-200 bg-slate-50/50">
+              <div className="flex items-center justify-center pb-2 pt-4">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</span>
+              </div>
+              
+              {weekDays.map(date => {
+                const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
+                const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
+                return (
+                  <div 
+                    key={date.toISOString()} 
+                    className={cn(
+                      "flex-col items-center py-4 border-l border-slate-200 relative transition-colors",
+                      isToday ? "bg-primary/5" : "",
+                      isSelectedDay ? "flex" : "hidden md:flex"
+                    )}
+                  >
+                    {isToday && <div className="absolute top-0 left-0 right-0 h-1 bg-primary rounded-t-sm" />}
+                    <span className={cn("text-[11px] font-bold uppercase tracking-widest mb-1", isToday ? "text-primary/70" : "text-slate-400")}>
+                      {format(date, 'EEEE')}
+                    </span>
+                    <span className={cn("text-3xl font-light tracking-tight leading-none mb-1", isToday ? "text-primary font-medium" : "text-slate-900")}>
+                      {format(date, 'd')}
+                    </span>
+                    <span className={cn("text-[11px] font-semibold", isToday ? "text-primary" : "text-slate-500")}>
+                      {format(date, 'MMMM')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Time Rows */}
+            <div className="overflow-y-auto max-h-[650px] custom-scrollbar bg-white">
+              <div className="flex flex-col">
+                {Array.from({ length: 17 }).map((_, i) => {
+                  const hour = i + 7; // 7 AM to 12 MN
+                  const timeStr = `${hour.toString().padStart(2, '0')}:00:00`;
+                  
+                  const formatHourLabel = (h: number) => {
+                    if (h === 12) return '12:00 NN';
+                    if (h === 24 || h === 0) return '12:00 MN';
+                    if (h < 12) return `${h}:00 AM`;
+                    return `${h - 12}:00 PM`;
+                  };
+                  const displayTime = `${formatHourLabel(hour)} - ${formatHourLabel(hour + 1)}`;
+                  return (
+                    <div key={timeStr} className="grid grid-cols-[120px_1fr] md:grid-cols-[140px_repeat(7,1fr)] group/row border-b border-slate-200 last:border-b-0">
+                      
+                      {/* Time Label */}
+                      <div className="flex items-center justify-center border-r border-slate-200 bg-white p-1 px-2">
+                        <span className="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-black dark:text-white transition-colors tracking-tight text-center">
+                          {displayTime}
+                        </span>
+                      </div>
+                      
+                      {/* Slots for each day */}
+                      {weekDays.map(date => {
+                        const dStr = format(date, 'yyyy-MM-dd');
+                         const scheduleRecord = weekSchedules.find(s => s.date === dStr && s.startTime === timeStr);
+                         const slot = scheduleRecord?.status === ScheduleStatus.Available ? undefined : scheduleRecord;
+                        const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
+                        const isToday = dStr === getManilaDate(new Date(clock));
+                        const isPastStart = isPastManilaStart(dStr, timeStr, new Date(clock));
+                        
+                        return (
+                          <div 
+                            key={`${dStr}-${timeStr}`} 
+                            className={cn(
+                              "border-l border-slate-200 p-1.5 h-[90px] relative group/cell transition-colors",
+                              isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
+                              !isStaff && !slot && !isPastStart && "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer",
+                              !slot && isPastStart && "cursor-not-allowed bg-slate-100/70 dark:bg-white/[0.03]",
+                              isSelectedDay ? "block" : "hidden md:block"
+                            )}
+                            onClick={() => {
+                               if (!isStaff && !slot && !isPastStart) {
+                                setScheduleBlocks([createBookingBlock({
+                                  courtId: activeCourtId,
+                                  date: dStr,
+                                  startTime: timeStr.slice(0, 5),
+                                  endTime: hour + 1 === 24 ? '00:00' : `${(hour + 1).toString().padStart(2, '0')}:00`,
+                                })]);
+                                setScheduleBlockErrors([]);
+                                setBookingModalData({
+                                  dateStr: dStr,
+                                  startTimeStr: timeStr,
+                                  endTimeStr: hour + 1 === 24 ? '00:00:00' : `${(hour + 1).toString().padStart(2, '0')}:00:00`,
+                                  status: 'Booked',
+                                  notes: '', bookedBy: '', email: '', phone: '', paymentStatus: BookingStatus.Paid, amountPaid: '', internalCoachProfileId: null, promoId: null, paddleRentalQuantity: 0, customerId: null
+                                });
+                              }
+                            }}
+                          >
+                            {isLoading ? (
+                              <Skeleton className="w-full h-full min-h-[70px] rounded-xl" />
+                            ) : slot ? (() => {
+                              const timedStatus = getTimedStatus(slot);
+                              return (
+                              <div className={cn(
+                                "w-full h-full rounded-xl border p-2.5 flex flex-col items-center justify-center overflow-hidden relative group/booked text-center gap-1",
+                                STATUS_COLORS[slot.status],
+                                "shadow-sm",
+                                timedStatus.phase === 'ongoing' && "ring-2 ring-emerald-500 ring-offset-1",
+                                timedStatus.phase === 'completed' && "brightness-75 saturate-50"
+                              )}>
+                                <span className="font-bold text-[11px] uppercase tracking-wider leading-tight w-full">{timedStatus.label}</span>
+                                {slot.status === ScheduleStatus.Training ? (
+                                  <span className="text-[11px] opacity-90 font-medium w-full flex flex-col gap-0.5 overflow-hidden">
+                                    <span className="truncate">{slot.bookedBy || 'No Trainee'}</span>
+                                    {slot.internalCoachProfileId && internalCoaches && (() => {
+                                      const coach = internalCoaches.find((c: any) => c.id === slot.internalCoachProfileId);
+                                      return coach ? <span className="text-[9px] opacity-75 truncate">w/ {coach.name}</span> : null;
+                                    })()}
+                                  </span>
+                                ) : slot.status === ScheduleStatus.Internal ? (
+                                  <span className="text-[11px] truncate opacity-90 font-medium w-full">
+                                    {internalCoaches.find(profile => profile.id === slot.internalCoachProfileId)?.name || 'No internal assigned'}
+                                  </span>
+                                ) : (
+                                  (slot.bookedBy || slot.notes) && <span className="text-[11px] truncate opacity-90 font-medium w-full">{slot.bookedBy || slot.notes}</span>
+                                )}
+                                {/* Hover View Details Overlay */}
+                                <div 
+                                  className="absolute inset-0 bg-black/60 opacity-0 group-hover/booked:opacity-100 flex items-center justify-center transition-opacity rounded-xl cursor-pointer backdrop-blur-[1px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewModalData(slot);
+                                  }}
+                                >
+                                  <span className="text-white text-[11px] font-bold tracking-wide">View Details</span>
+                                </div>
+                              </div>
+                              );
+                            })() : isPastStart ? (
+                              <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Past</div>
+                            ) : !isStaff ? (
+                              <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm border border-primary/20">
+                                  <Plus className="h-4 w-4" />
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 })}
-              </div>;
-            })}</div>
-          </div></div>
-          <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500 sm:hidden">Swipe sideways to view every court.</div>
-        </div>}
-      </section>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
 
       {/* Booking Modal */}
       <Dialog open={!!bookingModalData} onOpenChange={(open) => { if (!open) { setBookingModalData(null); setScheduleErrors({}); setScheduleBlockErrors([]); } }}>
@@ -814,7 +1025,7 @@ export default function SchedulePage() {
           </div>
           
           <div data-slot="dialog-footer" className="p-4 sm:px-6 bg-slate-50 dark:bg-[#252527] border-t border-slate-100 dark:border-white/10 flex justify-end gap-2">
-            {!isStaff && viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, bookingId: viewModalData.bookingId, courtId: String(viewModalData.courtId), dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0, customerId: viewModalData.customerId || null }); setViewModalData(null); }}>Edit Details</button>}
+            {!isStaff && viewModalData && viewModalData.status !== ScheduleStatus.Requested && getTimedStatus(viewModalData).phase === 'scheduled' && <button className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-primary text-white" onClick={() => { setBookingModalData({ id: viewModalData.id, bookingId: viewModalData.bookingId, dateStr: viewModalData.date, startTimeStr: viewModalData.startTime, endTimeStr: viewModalData.endTime, status: viewModalData.status, notes: viewModalData.notes || '', bookedBy: viewModalData.bookedBy || '', email: viewModalData.email || '', phone: viewModalData.phone || '', paymentStatus: viewModalData.paymentStatus === BookingStatus.Paid ? BookingStatus.Paid : BookingStatus.Reserved, amountPaid: viewModalData.amountPaid || '', internalCoachProfileId: viewModalData.internalCoachProfileId || null, promoId: null, paddleRentalQuantity: 0, customerId: viewModalData.customerId || null }); setViewModalData(null); }}>Edit Details</button>}
             <button
               className="h-9 px-6 rounded-lg text-[13px] font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
               onClick={() => setViewModalData(null)}

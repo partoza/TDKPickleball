@@ -156,7 +156,7 @@ export default function VerifyPage() {
                     aria-invalid={!!error}
                     className={`h-12 flex-1 rounded-none border-[#241f1d]/20 bg-white px-4 font-mono text-sm shadow-none focus-visible:ring-[#72151d]/20 ${error ? 'border-red-600' : ''}`}
                   />
-                  <Button type="submit" disabled={isPending} className="h-12 rounded-none bg-[#72151d] px-8 text-sm font-bold text-white hover:bg-[#5f1118]">
+                  <Button type="submit" disabled={isPending} className="h-12 rounded-xl bg-[#72151d] px-8 text-sm font-bold text-white hover:bg-[#5f1118]">
                     Verify
                     {isPending && <LoadingIndicator className="ml-2" label="Checking reference" />}
                   </Button>

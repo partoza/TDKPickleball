@@ -153,7 +153,7 @@ export default function HomePage() {
         {/* Full Screen Map */}
         <div className="absolute inset-0 z-0">
           {cookieConsent === 'accepted' ? <iframe
-            src="https://maps.google.com/maps?q=Chixboy%20Grill%20Juna,%20University%20Avenue,%20Juna%20Subdivision,%20Matina,%20Davao%20City&t=&z=17&ie=UTF8&iwloc=&output=embed"
+            src="https://maps.google.com/maps?q=3H3V%2B8Q9,%20University%20Ave,%20Talomo,%20Davao%20City,%20Davao%20del%20Sur&t=&z=17&ie=UTF8&iwloc=&output=embed"
             width="100%" 
             height="100%" 
             style={{ border: 0 }} 
@@ -212,7 +212,7 @@ export default function HomePage() {
             </div>
             
             <Button className="mt-8 md:mt-12 w-full sm:w-auto px-8 md:px-10 hover:scale-105 active:scale-95 transition-all duration-200 h-12 md:h-14 text-base md:text-lg font-bold shadow-xl shadow-primary/25" asChild>
-              <a href="https://maps.google.com/?q=Chixboy+Grill+Juna,+University+Avenue,+Juna+Subdivision,+Matina,+Davao+City" target="_blank" rel="noopener noreferrer">
+              <a href="https://maps.google.com/?q=3H3V%2B8Q9%2C+University+Ave%2C+Talomo%2C+Davao+City%2C+Davao+del+Sur" target="_blank" rel="noopener noreferrer">
                 Get Directions
               </a>
             </Button>

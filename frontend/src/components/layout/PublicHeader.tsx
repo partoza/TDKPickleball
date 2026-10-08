@@ -86,7 +86,7 @@ export default function PublicHeader() {
           </div>
         </div>
         <div className="lg:hidden">
-          <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex h-11 w-11 items-center justify-center text-primary transition-colors hover:text-primary/80" aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}>
+          <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex h-11 w-11 items-center justify-center rounded-xl text-primary transition-colors hover:bg-primary/5 hover:text-primary/80" aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}>
             {isOpen
               ? <XMarkIcon className="size-8" aria-hidden="true" />
               : <Bars3BottomRightIcon className="size-8" aria-hidden="true" />}

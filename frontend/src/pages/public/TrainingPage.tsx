@@ -90,12 +90,12 @@ export default function TrainingPage() {
               From your first paddle to your next breakthrough, get focused court time shaped around the player you are—and the player you want to become.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" className="h-12 rounded-none bg-[#72151d] px-7 font-bold text-white hover:bg-[#5f1118]" asChild>
+              <Button size="lg" className="h-12 rounded-xl bg-[#72151d] px-7 font-bold text-white hover:bg-[#5f1118]" asChild>
                 <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">
                   Ask about training <ArrowRightIcon className="ml-2 h-4 w-4" />
                 </a>
               </Button>
-              <Button size="lg" variant="outline" className="h-12 rounded-none border-[#72151d]/30 bg-transparent px-7 font-bold text-[#72151d] hover:bg-white/50 hover:text-[#72151d]" asChild>
+              <Button size="lg" variant="outline" className="h-12 rounded-xl border-[#72151d]/30 bg-transparent px-7 font-bold text-[#72151d] hover:bg-white/50 hover:text-[#72151d]" asChild>
                 <Link to={ROUTES.SCHEDULE}>View court schedule</Link>
               </Button>
             </div>
@@ -218,7 +218,7 @@ export default function TrainingPage() {
                   ))}
                 </div>
               </div>
-              <Button size="lg" className="mt-10 h-12 w-full rounded-none bg-[#d9f900] font-bold text-[#241f1d] hover:bg-[#e4ff3b]" asChild>
+              <Button size="lg" className="mt-10 h-12 w-full rounded-xl bg-[#d9f900] font-bold text-[#241f1d] hover:bg-[#e4ff3b]" asChild>
                 <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">
                   <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" /> Message our team
                 </a>
