@@ -36,6 +36,7 @@ export const ROUTES = {
   TRAINING: '/training',
   BOOKING: '/booking',
   VERIFY: '/verify',
+  RULES: '/rules',
   SUCCESS: '/success',
   CONTACT: '/contact',
   LOGIN: '/login',

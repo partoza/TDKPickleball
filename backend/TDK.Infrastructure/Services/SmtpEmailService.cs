@@ -101,7 +101,8 @@ public class SmtpEmailService : IEmailService
         await SendMessageAsync(storeEmail, $"Booking request awaiting review - {request.RequestReference}", plainText, html, null, cancellationToken, true, receipt);
 
         var requestUrl = $"{GetFrontendUrl()}/verify?reference={Uri.EscapeDataString(request.RequestReference)}";
-        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nView request status: {requestUrl}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
+        var rulesUrl = GetRulesUrl();
+        var customerPlainText = $"Your booking request {request.RequestReference} was sent to The Dirty Kitchen for manual review.\n\n{scheduleText}{paddleText}{promoText}\nTotal expected payment: PHP {request.TotalAmount:N2}{notesText}\n\nView request status: {requestUrl}\nRead the Rules & Regulations before your visit: {rulesUrl}\n\nYour payment receipt is attached for your records. This is not yet a confirmed booking. Please wait for the store's reply before considering the court reserved.";
         var customerHtml = WrapEmail($"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">Request received</div>
             <h1 style="margin:12px 0 12px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">We received your booking request.</h1>
@@ -115,6 +116,7 @@ public class SmtpEmailService : IEmailService
             </div>
             <div style="padding:16px 18px;border:1px solid #f0d59a;border-radius:12px;background:#fff8e8;color:#6d4b00;font-size:13px;line-height:1.6;"><strong>This is not a confirmed booking.</strong><br>Please wait for the store to verify the receipt and reply before considering the court reserved.</div>
             <div style="margin-top:24px;">{Button(requestUrl, "View request", true)}</div>
+            {RulesNotice(rulesUrl)}
             <p style="margin:20px 0 0;color:#777777;font-size:13px;line-height:1.6;">Your submitted payment receipt is attached for your records.</p>
             """, request.RequestReference);
 
@@ -311,7 +313,7 @@ public class SmtpEmailService : IEmailService
         if (!string.IsNullOrWhiteSpace(coachEmail) && !string.Equals(coachEmail.Trim(), booking.Email?.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             var coachSubject = isRescheduled ? $"Training rescheduled - {booking.BookingReference}" : $"Training assigned - {booking.BookingReference}";
-            var coachPlainText = $"Hello {coachName ?? "Coach"},\n\nYou are assigned to training for {booking.CustomerName}.\nCourt: {courtName}\nDate: {booking.BookingDate:MMMM d, yyyy}\nTime: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}\nReference: {booking.BookingReference}";
+            var coachPlainText = $"Hello {coachName ?? "Coach"},\n\nYou are assigned to training for {booking.CustomerName}.\nCourt: {courtName}\nDate: {booking.BookingDate:MMMM d, yyyy}\nTime: {booking.StartTime:h:mm tt} - {booking.EndTime:h:mm tt}\nReference: {booking.BookingReference}\n\nRead the Rules & Regulations: {GetRulesUrl()}";
             await SendMessageAsync(coachEmail, coachSubject, coachPlainText, BuildCoachBookingHtml(booking, courtName, coachName, isRescheduled), qrBytes, cancellationToken, false);
         }
     }
@@ -367,6 +369,7 @@ public class SmtpEmailService : IEmailService
     {
         var remaining = Math.Max(0, booking.TotalAmount - booking.AmountPaid);
         var verifyUrl = $"{GetFrontendUrl()}/verify";
+        var rulesUrl = GetRulesUrl();
         var content = $"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">{Encode(eyebrow)}</div>
             <h1 style="margin:12px 0 20px;font-size:30px;line-height:1.15;letter-spacing:-.035em;color:#111111;">{Encode(title)}</h1>
@@ -409,11 +412,12 @@ public class SmtpEmailService : IEmailService
             </div>
 
             <div style="margin-top:32px;text-align:center;">{Button(verifyUrl, "Verify booking", true)}</div>
+            {RulesNotice(rulesUrl)}
             """;
         return WrapEmail(content, booking.BookingReference);
     }
 
-    private static string BuildCoachBookingHtml(Booking booking, string courtName, string? coachName, bool isRescheduled)
+    private string BuildCoachBookingHtml(Booking booking, string courtName, string? coachName, bool isRescheduled)
     {
         var content = $"""
             <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{BrandRed};">{(isRescheduled ? "Training rescheduled" : "Training assignment")}</div>
@@ -427,6 +431,7 @@ public class SmtpEmailService : IEmailService
               {DetailRow("Reference", booking.BookingReference, true)}
             </div>
             <div style="margin:28px 0 0;text-align:center;"><img src="cid:tdk-booking-qr" width="240" alt="Training verification QR code" style="display:block;width:240px;max-width:100%;height:auto;margin:0 auto;border:1px solid #e7e7e7;border-radius:12px;" /></div>
+            {RulesNotice(GetRulesUrl())}
             """;
         return WrapEmail(content, booking.BookingReference);
     }
@@ -463,6 +468,13 @@ public class SmtpEmailService : IEmailService
         <table role="presentation" cellspacing="0" cellpadding="0" border="0"{(centered ? " align=\"center\"" : "")}><tr><td style="border-radius:9px;background:{BrandRed};"><a href="{Encode(url)}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">{Encode(label)}</a></td></tr></table>
         """;
 
+    private static string RulesNotice(string rulesUrl) => $"""
+        <div style="margin:24px 0 0;padding:16px 18px;border:1px solid #ead9db;border-radius:12px;background:#fffafa;color:#555555;font-size:13px;line-height:1.6;">
+          <strong style="display:block;margin-bottom:4px;color:#111111;">Please read before you play</strong>
+          Review our <a href="{Encode(rulesUrl)}" style="color:{BrandRed};font-weight:700;text-decoration:underline;">Rules &amp; Regulations</a> before arriving at the court.
+        </div>
+        """;
+
     private static string WrapEmail(string content, string preheader) => $"""
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
         <body style="margin:0;padding:0;background:#ffffff;color:#111111;">
@@ -477,7 +489,7 @@ public class SmtpEmailService : IEmailService
         </body></html>
         """;
 
-    private static string BuildPlainText(Booking booking, string courtName, bool isReminder)
+    private string BuildPlainText(Booking booking, string courtName, bool isReminder)
     {
         var breakdown = booking.DiscountAmount > 0 
             ? $"\n        Subtotal: PHP {booking.Subtotal:N2}\n        Discount: -PHP {booking.DiscountAmount:N2}"
@@ -500,10 +512,12 @@ public class SmtpEmailService : IEmailService
         Remaining: PHP {Math.Max(0, booking.TotalAmount - booking.AmountPaid):N2}
 
         Present your booking reference or QR code when you arrive.
+        Read the Rules & Regulations before your visit: {GetRulesUrl()}
         """;
     }
 
     private string GetFrontendUrl() => (_configuration["Frontend:BaseUrl"] ?? "https://thedirtykitchen.vercel.app").TrimEnd('/');
+    private string GetRulesUrl() => $"{GetFrontendUrl()}/rules";
     private string? GetStoreEmail()
     {
         var configured = _configuration["Smtp:StoreEmail"];

@@ -70,7 +70,7 @@ export default function HomePage() {
 
           <div className="grid gap-5 lg:grid-cols-3">
             {[
-              { title: 'Daytime', time: '7:00 AM – 5:00 PM', price: 320, description: 'A relaxed daytime schedule for casual games and regular court sessions.', features: ['Professional indoor court', 'Ideal for morning and afternoon play'], featured: false },
+              { title: 'Daytime', time: '7:00 AM – 5:00 PM', price: 320, description: 'A relaxed daytime schedule for casual games and regular court sessions.', features: ['Standard court with silica', 'Ideal for morning and afternoon play'], featured: false },
               { title: 'Prime Time', time: '5:00 PM – 12:00 MN', price: 400, description: 'Evening court access with the full tournament-lighting experience.', features: ['After-work sessions', 'Tournament lighting included'], featured: true },
               { title: 'Training', time: '7:00 AM – 12:00 MN', price: 300, description: 'A dedicated hourly rate for coached practice and focused skill development.', features: ['Available throughout operating hours', 'Designed for training sessions'], featured: false },
             ].map(rate => <Card key={rate.title} className={`relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${rate.featured ? 'border-primary shadow-md' : 'border-border'}`}>{rate.featured && <div className="bg-primary py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-white">Most popular</div>}<CardHeader className={rate.featured ? 'pb-3 pt-7' : 'pb-3 pt-9'}><div className="mb-5 flex items-center justify-end"><span className="text-xs font-medium text-muted-foreground">per hour</span></div><CardTitle className="text-2xl">{rate.title}</CardTitle><CardDescription className="text-sm font-medium">{rate.time}</CardDescription></CardHeader><CardContent className="flex flex-1 flex-col pb-7"><div className="mb-5 flex items-end gap-1 text-primary"><span className="text-2xl font-bold">₱</span><span className="text-5xl font-bold tracking-tight tabular-nums">{formatPesoAmount(rate.price)}</span><span className="mb-1 text-sm font-semibold text-muted-foreground">/hr</span></div><p className="min-h-[60px] text-sm leading-relaxed text-muted-foreground">{rate.description}</p><ul className="my-6 space-y-3">{rate.features.map(feature => <li key={feature} className="flex items-start gap-2.5 text-sm"><CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><span>{feature}</span></li>)}</ul><Button className="mt-auto h-11 w-full hover:scale-105 active:scale-95 transition-all duration-200" variant={rate.featured ? 'default' : 'outline'} asChild><Link to={rate.title === 'Training' ? ROUTES.TRAINING : ROUTES.BOOKING}>{rate.title === 'Training' ? 'Explore Training' : 'Book This Rate'}</Link></Button></CardContent></Card>)}
@@ -83,7 +83,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 md:px-6 max-w-7xl">
           <div className="mb-10 grid gap-5 lg:grid-cols-[0.7fr_1.3fr] lg:items-end">
             <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-primary">Play indoors</p><h2 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl">Courts</h2></div>
-            <p className="max-w-2xl text-base leading-relaxed text-muted-foreground lg:justify-self-end lg:text-right md:text-lg">Two professionally surfaced indoor pickleball courts with clear sightlines and tournament-grade lighting, ready for casual games, training, and events.</p>
+            <p className="max-w-2xl text-base leading-relaxed text-muted-foreground lg:justify-self-end lg:text-right md:text-lg">Two standard indoor pickleball courts with silica-finished surfaces, clear sightlines, and tournament-grade lighting—ready for casual games, training, and events.</p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -97,7 +97,7 @@ export default function HomePage() {
             <div className="relative flex min-h-[340px] items-center justify-center overflow-hidden rounded-3xl border bg-card p-5 shadow-sm sm:p-8"><div className="absolute left-5 top-5 z-10 rounded-full bg-foreground px-4 py-2 text-[11px] font-semibold text-background shadow-sm">Court layout</div><img src="/assets/images/courtDiagram.png" alt="Layout of Court 1 and Court 2" className="h-full max-h-[430px] w-full object-contain" /></div>
             <div className="rounded-3xl border bg-card p-6 shadow-sm md:p-8"><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">At a glance</p><h3 className="mt-2 text-2xl font-bold tracking-tight">Built for better play</h3><ul className="mt-7 space-y-6">{[
               ['Two Indoor Courts', 'Full-size regulation courts suited for doubles or singles.'],
-              ['Professional Surfacing', 'Non-slip texture for dependable grip and a consistent bounce.'],
+              ['Standard Courts with Silica', 'Silica-finished surfaces provide dependable grip and a consistent bounce.'],
               ['Tournament Lighting', 'Bright anti-glare lighting for clear visibility day or night.'],
             ].map(([title, text]) => <li key={title} className="flex items-start gap-3"><CheckCircleIcon className="mt-0.5 h-6 w-6 shrink-0 text-primary" /><div><h4 className="font-semibold text-foreground">{title}</h4><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{text}</p></div></li>)}</ul><Button className="mt-8 w-full hover:scale-105 active:scale-95 transition-all duration-200" asChild><Link to={ROUTES.BOOKING}>Book a Court</Link></Button></div>
           </div>
@@ -107,7 +107,7 @@ export default function HomePage() {
 
 
       {/* Testimonials Section */}
-      <section className="relative overflow-hidden border-t border-border/50 bg-muted/20 py-20 md:py-24">
+      <section hidden className="relative overflow-hidden border-t border-border/50 bg-muted/20 py-20 md:py-24">
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
         <div className="container relative z-10 mx-auto max-w-7xl px-4 md:px-6">
           <div className="mb-10 grid items-end gap-8 md:grid-cols-[1fr_auto] md:mb-14">
@@ -153,7 +153,7 @@ export default function HomePage() {
         {/* Full Screen Map */}
         <div className="absolute inset-0 z-0">
           {cookieConsent === 'accepted' ? <iframe
-            src="https://maps.google.com/maps?q=Chixboy%20Grill,%2041%20Luisa%20Street,%20Davao%20City,%20Davao,%20Philippines&t=&z=15&ie=UTF8&iwloc=&output=embed" 
+            src="https://maps.google.com/maps?q=University%20Avenue,%20Juna%20Subdivision,%20Matina,%20Davao%20City&t=&z=15&ie=UTF8&iwloc=&output=embed"
             width="100%" 
             height="100%" 
             style={{ border: 0 }} 
@@ -193,8 +193,8 @@ export default function HomePage() {
                 <div>
                   <h4 className="text-xl md:text-2xl font-bold text-primary mb-1 md:mb-2 drop-shadow-sm">Address</h4>
                   <p className="text-base md:text-lg text-foreground font-medium leading-relaxed drop-shadow-sm">
-                    University Drive<br />
-                    Juna Subdivision, Davao City, 8000
+                    University Avenue<br />
+                    Juna Subdivision, Matina, Davao City
                   </p>
                 </div>
               </div>
@@ -205,14 +205,14 @@ export default function HomePage() {
                   <h4 className="text-xl md:text-2xl font-bold text-primary mb-1 md:mb-2 drop-shadow-sm">Operating Hours</h4>
                   <p className="text-base md:text-lg text-foreground font-medium leading-relaxed drop-shadow-sm">
                     Monday - Sunday<br />
-                    6:00 AM - 12:00 MN
+                    7:00 AM - 12:00 MN
                   </p>
                 </div>
               </div>
             </div>
             
             <Button className="mt-8 md:mt-12 w-full sm:w-auto px-8 md:px-10 hover:scale-105 active:scale-95 transition-all duration-200 h-12 md:h-14 text-base md:text-lg font-bold shadow-xl shadow-primary/25" asChild>
-              <a href="https://maps.google.com/?q=Chixboy+Grill,+41+Luisa+Street,+Davao+City,+Davao,+Philippines" target="_blank" rel="noopener noreferrer">
+              <a href="https://maps.google.com/?q=University+Avenue,+Juna+Subdivision,+Matina,+Davao+City" target="_blank" rel="noopener noreferrer">
                 Get Directions
               </a>
             </Button>

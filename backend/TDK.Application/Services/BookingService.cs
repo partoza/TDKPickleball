@@ -123,8 +123,8 @@ public class BookingService : IBookingService
     {
         if (!IsValidPublicPhone(request.Phone))
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail("A valid contact number is required");
-        if (request.Schedules.Count is < 1 or > 20)
-            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Select between 1 and 20 booking schedules");
+        if (request.Schedules.Count < 1)
+            return ApiResponse<PublicBookingRequestReceiptDto>.Fail("Select at least one booking schedule");
         var bookingThroughDate = await _publicBookingWindow.GetBookingThroughDateAsync();
         if (bookingThroughDate.HasValue && request.Schedules.Any(schedule => schedule.BookingDate > bookingThroughDate.Value))
             return ApiResponse<PublicBookingRequestReceiptDto>.Fail($"Public bookings are open through {bookingThroughDate:MMMM d, yyyy}");

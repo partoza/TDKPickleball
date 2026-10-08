@@ -141,8 +141,8 @@ public class BookingController : ControllerBase
         {
             return BadRequest(new { success = false, message = "Booking schedules are invalid" });
         }
-        if (schedules is null || schedules.Count is < 1 or > 20)
-            return BadRequest(new { success = false, message = "Select between 1 and 20 booking schedules" });
+        if (schedules is null || schedules.Count < 1)
+            return BadRequest(new { success = false, message = "Select at least one booking schedule" });
 
         var detected = await DetectReceiptTypeAsync(request.Receipt);
         if (detected is null)

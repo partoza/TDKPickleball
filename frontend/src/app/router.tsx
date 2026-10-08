@@ -8,6 +8,7 @@ import BookingPage from '@/pages/public/BookingPage';
 import VerifyPage from '@/pages/public/VerifyPage';
 import SuccessPage from '@/pages/public/SuccessPage';
 import ContactPage from '@/pages/public/ContactPage';
+import RulesPage from '@/pages/public/RulesPage';
 import GoogleLoginPage from '@/pages/public/GoogleLoginPage';
 import GoogleCallbackPage from '@/pages/public/GoogleCallbackPage';
 import NotFoundPage from '@/pages/public/NotFoundPage';
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.VERIFY.substring(1), element: <VerifyPage /> },
       { path: ROUTES.SUCCESS.substring(1), element: <SuccessPage /> },
       { path: ROUTES.CONTACT.substring(1), element: <ContactPage /> },
+      { path: ROUTES.RULES.substring(1), element: <RulesPage /> },
       { path: ROUTES.LOGIN.substring(1), element: <GoogleLoginPage /> },
       { path: ROUTES.GOOGLE_CALLBACK.substring(1), element: <GoogleCallbackPage /> },
       { path: 'card/:username/:token', element: <CustomerCardPage /> },

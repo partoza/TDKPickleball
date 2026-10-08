@@ -24,6 +24,7 @@ export default function PublicHeader() {
     { name: 'Home', href: ROUTES.HOME },
     { name: 'Schedule', href: ROUTES.SCHEDULE },
     { name: 'Training', href: ROUTES.TRAINING },
+    { name: 'Rules', href: ROUTES.RULES },
     { name: 'Verify Booking', href: ROUTES.VERIFY },
     { name: 'Contact', href: ROUTES.CONTACT },
   ];
@@ -34,8 +35,8 @@ export default function PublicHeader() {
         <Link to={ROUTES.HOME} className="flex items-center gap-2">
           <img src={TDK_LOGO_URL} alt="The Dirty Kitchen Pickleball Court" className="h-14 sm:h-16 md:h-14 w-auto object-contain" />
         </Link>
-        <div className="hidden md:flex items-center gap-8">
-          <nav className="flex gap-8">
+        <div className="hidden lg:flex items-center gap-7">
+          <nav className="flex gap-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -84,7 +85,7 @@ export default function PublicHeader() {
             ))}
           </div>
         </div>
-        <div className="md:hidden">
+        <div className="lg:hidden">
           <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex h-11 w-11 items-center justify-center text-primary transition-colors hover:text-primary/80" aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}>
             {isOpen
               ? <XMarkIcon className="size-8" aria-hidden="true" />
@@ -93,7 +94,7 @@ export default function PublicHeader() {
         </div>
       </div>
       {isOpen && (
-        <div className="md:hidden border-b bg-background px-6 py-6 shadow-lg space-y-2">
+        <div className="border-b bg-background px-6 py-6 shadow-lg space-y-2 lg:hidden">
           {navLinks.map((link) => (
             <Link
               key={link.href}

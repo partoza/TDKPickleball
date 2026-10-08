@@ -1,30 +1,44 @@
-﻿import { useState, useEffect } from 'react';
-import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek } from 'date-fns';
-import { usePublicBookingWindow, usePublicWeeklySchedules } from '@/hooks/useSchedule';
+import { useEffect, useState } from 'react';
+import { addDays, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { ArrowRightIcon, CalendarDaysIcon as CalendarIcon, CheckIcon, ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, XMarkIcon as XIcon } from '@heroicons/react/24/solid';
+import { usePublicBookingWindow, useScheduleBoard } from '@/hooks/useSchedule';
 import { useCourts } from '@/hooks/useCourts';
-import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, CalendarDaysIcon as CalendarIcon, XMarkIcon as XIcon, CheckIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import AvailabilityChecker from '@/components/public/AvailabilityChecker';
+import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { ROUTES, STATUS_COLORS, STATUS_LABELS } from '@/lib/constants';
+import { formatAppDate } from '@/lib/date-time';
+import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
 import { cn } from '@/lib/utils';
 import { Schedule, ScheduleStatus } from '@/types';
-import AvailabilityChecker from '@/components/public/AvailabilityChecker';
-import { Link } from 'react-router-dom';
-import { getManilaDate, isPastManilaStart } from '@/lib/manila-time';
-import { PaddleIcon } from '@/components/ui/paddle-icon';
-import { formatAppDate } from '@/lib/date-time';
 
-function getWeekRangeString(start: Date, end: Date) {
-  return `${formatAppDate(start)} - ${formatAppDate(end)}`;
+type SelectedSlot = { key: string; courtId: string; date: string; startTime: string; endTime: string };
+
+function formatHourLabel(hour: number) {
+  if (hour === 12) return '12:00 NN';
+  if (hour === 24 || hour === 0) return '12:00 MN';
+  if (hour < 12) return `${hour}:00 AM`;
+  return `${hour - 12}:00 PM`;
 }
 
-function getCompactWeekRangeString(start: Date, end: Date) {
-  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-  return sameMonth
-    ? `${format(start, 'MMM d')}–${format(end, 'd, yyyy')}`
-    : `${format(start, 'MMM d')}–${format(end, 'MMM d, yyyy')}`;
+function toMinutes(value: string) {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function scheduleAtHour(schedules: Schedule[], date: string, time: string) {
+  const minute = toMinutes(time);
+  return schedules.find(schedule => {
+    if (schedule.date !== date) return false;
+    const start = toMinutes(schedule.startTime);
+    const rawEnd = toMinutes(schedule.endTime);
+    const end = rawEnd <= start ? rawEnd + 1440 : rawEnd;
+    return minute >= start && minute < end;
+  });
 }
 
 function getTimedStatus(slot: Schedule) {
@@ -39,520 +53,124 @@ function getTimedStatus(slot: Schedule) {
   return { label: base, phase: 'scheduled' as const };
 }
 
-const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDate: Date, onSelect: (d: Date) => void, bookingThroughDate?: string | null }) => {
+const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDate: Date; onSelect: (date: Date) => void; bookingThroughDate?: string | null }) => {
   const [viewDate, setViewDate] = useState(currentDate);
   const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
   const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
   const calendarDays = eachDayOfInterval({ start, end });
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = new Date(`${getManilaDate()}T00:00:00`);
   const thisMonthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
 
-  return (
-    <div className="w-[240px] p-1">
-      <div className="flex justify-between items-center mb-4 gap-1">
-         <Select
-           value={String(viewDate.getMonth())}
-           onValueChange={(value) => {
-             const newDate = new Date(viewDate);
-             newDate.setMonth(parseInt(value));
-             // Don't allow going to past months
-             const newMonthStart = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-             if (newMonthStart >= thisMonthStart) setViewDate(newDate);
-           }}
-         >
-           <SelectTrigger className="h-8 w-[126px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
-           <SelectContent>{Array.from({length: 12}).map((_, i) => {
-             const monthDate = new Date(viewDate.getFullYear(), i, 1);
-             const isPastMonth = monthDate < thisMonthStart;
-             return <SelectItem key={i} value={String(i)} disabled={isPastMonth}>{format(new Date(2000, i, 1), 'MMMM')}</SelectItem>;
-           })}</SelectContent>
-         </Select>
-         
-         <Select
-           value={String(viewDate.getFullYear())}
-           onValueChange={(value) => {
-             const newDate = new Date(viewDate);
-             newDate.setFullYear(parseInt(value));
-             const newMonthStart = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
-             if (newMonthStart >= thisMonthStart) setViewDate(newDate);
-           }}
-         >
-           <SelectTrigger className="h-8 w-[84px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
-           <SelectContent>{Array.from({length: 10}).map((_, i) => {
-             const y = new Date().getFullYear() - 2 + i;
-             return <SelectItem key={y} value={String(y)}>{y}</SelectItem>;
-           })}</SelectContent>
-         </Select>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {calendarDays.map(day => {
-          const isCurrentMonth = day.getMonth() === viewDate.getMonth();
-          const isSelected = format(day, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-          const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-          const isPast = day < todayStart;
-          const isAfterBookingWindow = !!bookingThroughDate && format(day, 'yyyy-MM-dd') > bookingThroughDate;
-          
-          return (
-            <button
-              key={day.toISOString()}
-              onClick={() => !isPast && !isAfterBookingWindow && onSelect(day)}
-              disabled={isPast || isAfterBookingWindow}
-              className={cn(
-                "h-8 w-8 rounded-full flex items-center justify-center text-[12px] font-medium transition-colors",
-                (isPast || isAfterBookingWindow) && "text-slate-200 cursor-not-allowed",
-                !isPast && !isAfterBookingWindow && !isCurrentMonth && "text-slate-300",
-                !isPast && !isAfterBookingWindow && isCurrentMonth && !isSelected && !isToday && "text-slate-700 hover:bg-slate-100",
-                !isPast && !isAfterBookingWindow && isToday && !isSelected && "bg-slate-100 text-primary font-bold",
-                isSelected && !isPast && !isAfterBookingWindow && "bg-primary text-primary-foreground font-bold shadow-sm"
-              )}
-            >
-              {format(day, 'd')}
-            </button>
-          )
-        })}
-      </div>
+  return <div className="w-[240px] p-1">
+    <div className="mb-4 flex items-center justify-between gap-1">
+      <Select value={String(viewDate.getMonth())} onValueChange={value => {
+        const next = new Date(viewDate); next.setMonth(Number(value));
+        if (new Date(next.getFullYear(), next.getMonth(), 1) >= thisMonthStart) setViewDate(next);
+      }}>
+        <SelectTrigger className="h-8 w-[126px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: 12 }, (_, month) => <SelectItem key={month} value={String(month)} disabled={new Date(viewDate.getFullYear(), month, 1) < thisMonthStart}>{format(new Date(2000, month, 1), 'MMMM')}</SelectItem>)}</SelectContent>
+      </Select>
+      <Select value={String(viewDate.getFullYear())} onValueChange={value => {
+        const next = new Date(viewDate); next.setFullYear(Number(value));
+        if (new Date(next.getFullYear(), next.getMonth(), 1) >= thisMonthStart) setViewDate(next);
+      }}>
+        <SelectTrigger className="h-8 w-[84px] border-0 bg-transparent px-2 text-xs font-semibold shadow-none"><SelectValue /></SelectTrigger>
+        <SelectContent>{Array.from({ length: 10 }, (_, index) => { const year = new Date().getFullYear() - 2 + index; return <SelectItem key={year} value={String(year)}>{year}</SelectItem>; })}</SelectContent>
+      </Select>
     </div>
-  )
-}
+    <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => <div key={day}>{day}</div>)}</div>
+    <div className="grid grid-cols-7 gap-1">{calendarDays.map(day => {
+      const dayString = format(day, 'yyyy-MM-dd');
+      const isSelected = dayString === format(currentDate, 'yyyy-MM-dd');
+      const isToday = dayString === getManilaDate();
+      const disabled = day < todayStart || (!!bookingThroughDate && dayString > bookingThroughDate);
+      return <button key={day.toISOString()} type="button" disabled={disabled} onClick={() => !disabled && onSelect(day)} className={cn('flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-colors', disabled && 'cursor-not-allowed text-slate-200', !disabled && day.getMonth() !== viewDate.getMonth() && 'text-slate-300', !disabled && !isSelected && !isToday && 'text-slate-700 hover:bg-slate-100', !disabled && isToday && !isSelected && 'bg-slate-100 font-bold text-primary', isSelected && !disabled && 'bg-primary font-bold text-white shadow-sm')}>{format(day, 'd')}</button>;
+    })}</div>
+  </div>;
+};
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  
-  const { data: courtsRes, isLoading: courtsLoading, isError: courtsError } = useCourts();
-  const courts = courtsRes?.data || [];
-  const { data: publicBookingWindowResponse } = usePublicBookingWindow();
-  const bookingThroughDate = publicBookingWindowResponse?.data?.bookingThroughDate;
-  
-  const [selectedCourt, setSelectedCourt] = useState<string>('');
-
-  // Inline slot selection (no modal)
-  type SelectedSlot = { key: string; courtId: string; date: string; startTime: string; endTime: string };
   const [pickedSlots, setPickedSlots] = useState<SelectedSlot[]>([]);
-  const RATE_PER_HOUR = 320;
-  const MAX_SLOTS = 6;
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    setPickedSlots(current => current.filter(slot => !isPastManilaStart(slot.date, slot.startTime, new Date(clock))));
-  }, [clock]);
-
-  useEffect(() => {
-    if (courts.length > 0 && !selectedCourt) {
-      setSelectedCourt(courts[0].id.toString());
-    }
-  }, [courts, selectedCourt]);
-
-  const activeCourtId = selectedCourt;
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-
-  // Keep selections from every court while browsing the same week.
-  useEffect(() => { setPickedSlots([]); }, [weekStart.getTime()]);
-
-  const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
-  const isCurrentWeek = weekStart <= thisWeekStart;
-
-  const prevWeek = () => { if (!isCurrentWeek) setCurrentDate(addDays(currentDate, -7)); };
-  const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
-  const today = () => setCurrentDate(new Date());
-
-  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-  const weekDaysStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
-
-  const { data: weeklyBoardData, isLoading: scheduleLoading } = usePublicWeeklySchedules(weekDaysStrs);
+  const { data: courtsResponse, isLoading: courtsLoading, isError: courtsError } = useCourts();
+  const courts = courtsResponse?.data || [];
+  const { data: bookingWindowResponse } = usePublicBookingWindow();
+  const bookingThroughDate = bookingWindowResponse?.data?.bookingThroughDate;
+  const selectedDate = format(currentDate, 'yyyy-MM-dd');
+  const { data: boardResponse, isLoading: scheduleLoading } = useScheduleBoard(selectedDate);
+  const board = boardResponse?.data;
+  const displayCourts = board?.courts.map(item => item.court) || courts;
+  const schedulesByCourt = new Map((board?.courts || []).map(item => [String(item.court.id), item.schedules]));
   const isLoading = courtsLoading || scheduleLoading;
+  const todayString = getManilaDate(new Date(clock));
+  const isToday = selectedDate === todayString;
+  const isAfterBookingWindow = !!bookingThroughDate && selectedDate > bookingThroughDate;
+  const canGoBack = selectedDate > todayString;
+  const canGoForward = !bookingThroughDate || selectedDate < bookingThroughDate;
 
-  const weekSchedules: Schedule[] = [];
-  if (weeklyBoardData) {
-    weeklyBoardData.forEach(dayBoard => {
-      if (dayBoard && dayBoard.courts) {
-        const courtData = dayBoard.courts.find(c => c.court.id.toString() === activeCourtId);
-        if (courtData && courtData.schedules) {
-          weekSchedules.push(...courtData.schedules);
-        }
-      }
-    });
-  }
+  useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { setPickedSlots(current => current.filter(slot => !isPastManilaStart(slot.date, slot.startTime, new Date(clock)))); }, [clock]);
 
-  const toggleSlot = (date: string, startTime: string, endTime: string) => {
-    if (bookingThroughDate && date > bookingThroughDate) return;
-    const key = `${activeCourtId}-${date}-${startTime}`;
-    setPickedSlots(prev =>
-      prev.find(s => s.key === key)
-        ? prev.filter(s => s.key !== key)
-        : prev.length < MAX_SLOTS
-          ? [...prev, { key, courtId: activeCourtId, date, startTime, endTime }]
-          : prev
-    );
+  const toggleSlot = (courtId: string, startTime: string, endTime: string) => {
+    if (isAfterBookingWindow) return;
+    const key = `${courtId}-${selectedDate}-${startTime}`;
+    setPickedSlots(current => current.some(slot => slot.key === key) ? current.filter(slot => slot.key !== key) : [...current, { key, courtId, date: selectedDate, startTime, endTime }]);
   };
 
-  const totalAmount = pickedSlots.length * RATE_PER_HOUR;
+  const gridTemplateColumns = `112px repeat(${Math.max(displayCourts.length, 1)}, minmax(180px, 1fr))`;
+  const gridMinWidth = 112 + Math.max(displayCourts.length, 1) * 180;
+  const totalAmount = pickedSlots.length * 320;
 
-  return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-4 overflow-x-hidden px-3 pb-12 pt-6 sm:space-y-6 sm:px-6 sm:pt-12 md:pt-16">
-      
-      {/* Header */}
-      <div className="mb-4 flex flex-col gap-4 px-1 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p>
-          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:mt-2 sm:text-[28px]">Court Schedule</h1>
-          <p className="mt-2 max-w-[600px] text-[14px] leading-relaxed text-slate-500">
-            A clear, real-time view of every court and session for the entire week.
-          </p>
-        </div>
-        <Link
-          to={ROUTES.TRAINING}
-          className="group inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg sm:h-11 sm:w-auto"
-        >
-          <PaddleIcon className="h-5 w-5" white />
-          Become a Trainee
-          <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-
-      {bookingThroughDate && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] font-semibold leading-5 text-amber-800 sm:px-4 sm:text-sm">
-          Online bookings are open through {formatAppDate(bookingThroughDate)}.
-        </div>
-      )}
-
-      <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 md:p-6">
-        
-        {/* Navigation & Filters Toolbar */}
-        <div className="mb-4 grid min-w-0 gap-4 border-b border-slate-100 pb-4 md:mb-8 md:gap-5 md:pb-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-          
-          <div className="flex min-w-0 w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end md:gap-5">
-            
-            <div className="grid min-w-0 w-full grid-cols-[72px_minmax(0,1fr)] items-end gap-2 sm:flex sm:w-auto sm:gap-4 md:gap-5">
-              {/* Quick Jump */}
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-primary uppercase tracking-widest pl-0.5 block">Quick Jump</label>
-                <button 
-                  onClick={today} 
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 sm:h-9 sm:px-5 sm:text-[13px]"
-                >
-                  Today
-                </button>
-              </div>
-
-              {/* Date Navigation */}
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-none sm:shrink-0">
-                <label className="text-[10px] font-extrabold text-primary uppercase tracking-widest pl-0.5 block">Week View</label>
-                <div className="flex w-full items-center gap-1.5 sm:gap-2 sm:justify-start">
-                  <button 
-                    onClick={prevWeek} 
-                    disabled={isCurrentWeek}
-                    title="Previous week" 
-                    className={cn(
-                      "h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center shrink-0 rounded-lg border border-slate-200 bg-white shadow-sm transition-colors",
-                      isCurrentWeek
-                        ? "text-slate-200 cursor-not-allowed"
-                        : "hover:bg-slate-50 text-slate-500"
-                    )}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-
-                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                      <button className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-1.5 shadow-sm transition-colors hover:bg-slate-50 sm:h-9 sm:flex-none sm:gap-2 sm:px-4">
-                        <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400 hidden sm:block" />
-                        <span className="truncate text-[11px] font-bold text-slate-700 sm:hidden">
-                          {getCompactWeekRangeString(weekDays[0], weekDays[6])}
-                        </span>
-                        <span className="hidden text-[13px] font-bold text-slate-700 sm:inline">
-                          {getWeekRangeString(weekDays[0], weekDays[6])}
-                        </span>
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4 rounded-xl shadow-xl border-slate-200 bg-white" align="center" sideOffset={8}>
-                      <MiniCalendar 
-                        currentDate={currentDate} 
-                        bookingThroughDate={bookingThroughDate}
-                        onSelect={(d) => { setCurrentDate(d); setIsCalendarOpen(false); }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <button 
-                    onClick={nextWeek} 
-                    title="Next week" 
-                    className="h-10 w-10 sm:h-9 sm:w-9 flex items-center justify-center shrink-0 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 shadow-sm transition-colors"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Court Selection Tabs */}
-            <div className="flex min-w-0 flex-col gap-1.5 w-full sm:w-auto sm:shrink-0 max-w-full">
-              <label className="text-[10px] font-extrabold text-primary uppercase tracking-widest pl-0.5 block">Court</label>
-              {courtsLoading ? (
-                <div className="flex h-10 w-full sm:w-[200px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-100/80 p-1 sm:h-9" aria-label="Loading courts">
-                  <span className="h-7 flex-1 animate-pulse rounded-md bg-white/80" />
-                  <span className="h-7 flex-1 animate-pulse rounded-md bg-white/60" />
-                </div>
-              ) : courts.length > 0 ? (
-                <div
-                  className="grid h-10 w-full max-w-full items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 p-1 sm:inline-grid sm:h-9 sm:w-auto"
-                  style={{ gridTemplateColumns: `repeat(${courts.length}, minmax(0, 1fr))` }}
-                >
-                  {courts.map(c => (
-                    <button 
-                      key={c.id} 
-                      type="button"
-                      onClick={() => setSelectedCourt(c.id.toString())}
-                      className={cn(
-                        "h-8 min-w-0 truncate rounded-md px-1.5 text-[12px] font-bold transition-all sm:h-7 sm:min-w-[88px] sm:px-4 sm:text-[13px]",
-                        selectedCourt === c.id.toString()
-                          ? "bg-primary text-white shadow-sm ring-1 ring-primary"
-                          : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                      )}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-10 items-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 sm:h-9">
-                  {courtsError ? 'Courts are temporarily unavailable' : 'No active courts available'}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex w-full items-end sm:w-auto xl:justify-end">
-            <AvailabilityChecker />
-          </div>
-        </div>
-
-        {/* Mobile Day Selector */}
-        <div className="mb-4 grid grid-cols-7 gap-1 md:hidden" aria-label="Select day">
-          {weekDays.map(date => {
-            const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-            const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
-            return (
-              <button 
-                key={date.toISOString()}
-                onClick={() => setCurrentDate(date)}
-                className={cn(
-                  "flex h-14 min-w-0 flex-col items-center justify-center rounded-lg border transition-all",
-                  isSelectedDay 
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                    : isToday 
-                      ? "bg-primary/5 border-primary/20 text-primary"
-                      : "bg-white border-slate-200 text-slate-600"
-                )}
-              >
-                <span className={cn("mb-0.5 text-[8px] font-bold uppercase tracking-wide", isSelectedDay ? "text-primary-foreground/80" : isToday ? "text-primary/70" : "text-slate-400")}>{format(date, 'EEEEE')}</span>
-                <span className="text-base font-semibold leading-none">{format(date, 'd')}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Flush Schedule Grid */}
-        <div className="relative">
-          {isLoading && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-              <div className="bg-white/95 dark:bg-[#2c2c2e]/95 backdrop-blur-sm shadow-[0_4px_20px_rgb(0,0,0,0.1)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] border border-slate-200 dark:border-white/10 px-5 py-2.5 rounded-full flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
-                <LoadingIndicator size="sm" className="text-primary" />
-                <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Loading Schedule...</span>
-              </div>
-            </div>
-          )}
-          <div className="min-w-0 overflow-hidden md:overflow-x-auto md:custom-scrollbar">
-            <div className="min-w-full md:min-w-[950px] border border-slate-300 rounded-xl overflow-hidden bg-white">
-            
-            {/* Header Row */}
-            <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-slate-300 bg-slate-50/50 sm:grid-cols-[110px_minmax(0,1fr)] md:grid-cols-[140px_repeat(7,1fr)]">
-              <div className="flex items-center justify-center pb-2 pt-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</span>
-              </div>
-              
-              {weekDays.map(date => {
-                const isSelectedDay = format(date, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd');
-                const isToday = format(date, 'yyyy-MM-dd') === getManilaDate(new Date(clock));
-                return (
-                  <div 
-                    key={date.toISOString()} 
-                    className={cn(
-                      "flex-col items-center py-4 border-l border-slate-300 relative transition-colors",
-                      isToday ? "bg-primary/5" : "",
-                      isSelectedDay ? "flex" : "hidden md:flex"
-                    )}
-                  >
-                    {isToday && <div className="absolute top-0 left-0 right-0 h-1 bg-primary rounded-t-sm" />}
-                    <span className={cn("text-[11px] font-bold uppercase tracking-widest mb-1", isToday ? "text-primary/70" : "text-slate-500")}>
-                      {format(date, 'EEEE')}
-                    </span>
-                    <span className={cn("text-3xl font-light tracking-tight leading-none mb-1", isToday ? "text-primary font-medium" : "text-slate-900")}>
-                      {format(date, 'd')}
-                    </span>
-                    <span className={cn("text-[11px] font-semibold", isToday ? "text-primary" : "text-slate-500")}>
-                      {format(date, 'MMMM')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Time Rows */}
-            <div className="overflow-y-auto max-h-[650px] custom-scrollbar bg-white">
-              <div className="flex flex-col">
-                {Array.from({ length: 17 }).map((_, i) => {
-                  const hour = i + 7; // 7 AM to 12 MN
-                  const timeStr = `${hour.toString().padStart(2, '0')}:00:00`;
-                  
-                  const formatHourLabel = (h: number) => {
-                    if (h === 12) return '12:00 NN';
-                    if (h === 24 || h === 0) return '12:00 MN';
-                    if (h < 12) return `${h}:00 AM`;
-                    return `${h - 12}:00 PM`;
-                  };
-                  const displayTime = `${formatHourLabel(hour)} - ${formatHourLabel(hour + 1)}`;
-                  return (
-                    <div key={timeStr} className="group/row grid grid-cols-[92px_minmax(0,1fr)] border-b border-slate-300 last:border-b-0 sm:grid-cols-[110px_minmax(0,1fr)] md:grid-cols-[140px_repeat(7,1fr)]">
-                      
-                      {/* Time Label */}
-                      <div className="flex items-center justify-center border-r border-slate-300 bg-white p-1 px-2">
-                        <span className="text-center text-[9px] font-bold leading-tight tracking-tight text-black transition-colors dark:text-white sm:text-[11px] md:text-[12px]">
-                          {displayTime}
-                        </span>
-                      </div>
-                      
-                      {/* Slots for each day */}
-                      {weekDays.map(date => {
-                        const dStr = format(date, 'yyyy-MM-dd');
-                        const scheduleRecord = weekSchedules.find(s => s.date === dStr && s.startTime === timeStr);
-                        const slot = scheduleRecord?.status === ScheduleStatus.Available ? undefined : scheduleRecord;
-                        const isSelectedDay = dStr === format(currentDate, 'yyyy-MM-dd');
-                        const isToday = dStr === getManilaDate(new Date(clock));
-                        const isPastStart = isPastManilaStart(dStr, timeStr, new Date(clock));
-                        const isAfterBookingWindow = !!bookingThroughDate && dStr > bookingThroughDate;
-                        
-                        return (
-                          <div 
-                            key={`${dStr}-${timeStr}`} 
-                            className={cn(
-                              "border-l border-slate-300 p-1.5 h-[90px] relative transition-colors",
-                              isToday && "bg-slate-50/40 dark:bg-white/[0.02]",
-                              !slot && !isPastStart && !isAfterBookingWindow && "hover:bg-slate-50 dark:hover:bg-white/[0.04]",
-                              !slot && isPastStart && "bg-slate-100/70 dark:bg-white/[0.03]",
-                              !slot && isAfterBookingWindow && "bg-amber-50/50 dark:bg-white/[0.03]",
-                              isSelectedDay ? "block" : "hidden md:block"
-                            )}
-                          >
-                            {isLoading ? (
-                              <Skeleton className="w-full h-full min-h-[70px] rounded-xl" />
-                            ) : slot ? (() => {
-                              const timedStatus = getTimedStatus(slot);
-                              return (
-                              <div className={cn(
-                                "w-full h-full rounded-xl border p-2.5 flex flex-col items-center justify-center overflow-hidden relative text-center gap-1",
-                                STATUS_COLORS[slot.status],
-                                "shadow-sm",
-                                timedStatus.phase === 'ongoing' && "ring-2 ring-emerald-500 ring-offset-1",
-                                timedStatus.phase === 'completed' && "brightness-75 saturate-50"
-                              )}>
-                                <span className="font-bold text-[11px] uppercase tracking-wider leading-tight w-full">{timedStatus.label}</span>
-                              </div>
-                              );
-                            })() : (() => {
-                              const key = `${activeCourtId}-${dStr}-${timeStr}`;
-                              const isSelected = !!pickedSlots.find(s => s.key === key);
-                              const isMaxed = pickedSlots.length >= MAX_SLOTS && !isSelected;
-                              // Calculate endTime directly (1 hour duration)
-                              const startHour = parseInt(timeStr.split(':')[0], 10);
-                              const endTime = startHour + 1 === 24 ? '00:00:00' : `${(startHour + 1).toString().padStart(2, '0')}:00:00`;
-                              return (
-                                <button
-                                  disabled={isMaxed || isPastStart || isAfterBookingWindow}
-                                  onClick={() => !isMaxed && !isPastStart && !isAfterBookingWindow && toggleSlot(dStr, timeStr, endTime)}
-                                  className={cn(
-                                    "w-full h-full flex flex-col items-center justify-center rounded-xl border transition-all",
-                                    isPastStart || isAfterBookingWindow
-                                      ? "cursor-not-allowed border-slate-200 border-dashed bg-slate-100/80 text-slate-400"
-                                      : isSelected
-                                      ? "bg-[#e8fbf4] border-[#00c881] shadow-sm"
-                                      : isMaxed
-                                        ? "border-slate-200 border-dashed opacity-40 cursor-not-allowed"
-                                        : "border-dashed border-slate-200 hover:border-[#00c881]/50 hover:bg-[#e8fbf4]/40 group/cell"
-                                  )}
-                                >
-                                  {isPastStart || isAfterBookingWindow ? (
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-center">
-                                      {isPastStart ? 'Past' : 'Booking closed'}
-                                    </span>
-                                  ) : isSelected ? (
-                                    <div className="h-8 w-8 rounded-full bg-[#00c881] flex items-center justify-center shadow-sm">
-                                      <CheckIcon className="h-4 w-4 text-white stroke-[2.5]" />
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-slate-300 group-hover/cell:text-[#00c881] uppercase tracking-widest text-center select-none transition-colors">
-                                      Available
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
-
-      {/* ── Floating Selected Slots Bar ── */}
-      {pickedSlots.length > 0 && (
-        <div className="fixed bottom-3 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 animate-in px-3 duration-300 slide-in-from-bottom-3 sm:bottom-6 sm:px-4">
-          <div className="relative flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:gap-4 sm:px-7 sm:py-6">
-            <button
-              onClick={() => setPickedSlots([])}
-              className="absolute right-2 top-2 cursor-pointer rounded-lg p-1.5 text-muted-foreground opacity-70 ring-offset-background transition-all duration-200 hover:bg-red-50 hover:text-red-600 hover:opacity-100 focus:outline-none active:scale-95 dark:hover:bg-red-950/40 dark:hover:text-red-400 sm:right-4 sm:top-4"
-            >
-              <XIcon className="h-4 w-4 stroke-[2]" />
-            </button>
-            
-            <div className="flex flex-col gap-1">
-              <p className="text-[10.5px] font-bold text-slate-400/90 uppercase tracking-[0.1em] mb-0.5">Selected Slots</p>
-              <div className="mb-1 flex items-baseline">
-                <span className="text-xl font-bold leading-none tracking-tight text-[#111827] sm:text-[26px]">{pickedSlots.length}</span>
-                <span className="ml-1.5 text-[11px] font-medium text-[#8a99a8] sm:text-[13px]">slots / 6</span>
-              </div>
-              <p className="text-[13.5px] font-semibold text-[#111827]">
-                Total: ₱{totalAmount.toLocaleString()}
-              </p>
-            </div>
-            
-            <div className="mt-3 flex shrink-0 items-center pr-1 md:pr-2">
-              <Link to="/booking" state={{ pickedSlots }}>
-                <button className="flex h-10 items-center gap-1 whitespace-nowrap rounded-lg bg-primary px-3 text-[12px] font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:h-[38px] sm:px-5 sm:text-[13.5px]">
-                  <span className="sm:hidden">Continue</span>
-                  <span className="hidden sm:inline">Proceed to Pay</span>
-                  <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
-                </button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
+  return <div className="mx-auto w-full max-w-[1600px] space-y-5 overflow-x-hidden px-3 pb-16 pt-6 sm:px-6 sm:pt-12 md:pt-16">
+    <div className="flex flex-col gap-4 px-1 sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p><h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">Court Schedule</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">Choose a date and compare every court at once. Tap any available slot to add it to your booking.</p></div>
+      <Link to={ROUTES.TRAINING} className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 sm:w-auto"><PaddleIcon className="h-5 w-5" white /> Become a Trainee <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
     </div>
-  );
+    {bookingThroughDate && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Online bookings are open through {formatAppDate(bookingThroughDate)}.</div>}
+
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court availability for ${formatAppDate(currentDate)}`}>
+      <div className="flex flex-col gap-4 border-b border-slate-200 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <button type="button" onClick={() => canGoBack && setCurrentDate(addDays(currentDate, -1))} disabled={!canGoBack} aria-label="Previous date" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-200"><ChevronLeft className="h-5 w-5" /></button>
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><button type="button" className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 font-bold text-slate-800 transition hover:bg-slate-50 sm:min-w-[240px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{isToday && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger><PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} bookingThroughDate={bookingThroughDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent></Popover>
+          <button type="button" onClick={() => canGoForward && setCurrentDate(addDays(currentDate, 1))} disabled={!canGoForward} aria-label="Next date" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-200"><ChevronRight className="h-5 w-5" /></button>
+          {!isToday && <button type="button" onClick={() => setCurrentDate(new Date())} className="hidden h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:block">Today</button>}
+        </div>
+        <div className="w-full lg:w-auto"><AvailabilityChecker /></div>
+      </div>
+
+      {courtsError || (!isLoading && displayCourts.length === 0) ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><p className="font-bold text-slate-800">{courtsError ? 'Courts are temporarily unavailable' : 'No active courts available'}</p><p className="mt-1 text-sm text-slate-500">Please check again shortly.</p></div></div> : <div className="relative">
+        {isLoading && <div className="pointer-events-none absolute left-1/2 top-6 z-30 -translate-x-1/2"><div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-5 py-2.5 shadow-lg backdrop-blur"><LoadingIndicator size="sm" className="text-primary" /><span className="text-xs font-bold text-slate-700">Loading schedule</span></div></div>}
+        <div className="overflow-x-auto custom-scrollbar"><div style={{ minWidth: `${gridMinWidth}px` }}>
+          <div className="sticky top-0 z-20 grid border-b border-slate-200 bg-slate-50" style={{ gridTemplateColumns }}>
+            <div className="sticky left-0 z-30 flex min-h-20 items-center border-r border-slate-200 bg-slate-50 px-4 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time</div>
+            {displayCourts.map(court => <div key={court.id} className="flex min-h-20 flex-col items-center justify-center border-r border-slate-200 px-4 text-center last:border-r-0"><span className="text-base font-bold text-slate-900">{court.displayName || court.name}</span><span className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Indoor court</span></div>)}
+          </div>
+          <div className="max-h-[680px] overflow-y-auto custom-scrollbar">{Array.from({ length: 17 }, (_, index) => index + 7).map(hour => {
+            const startTime = `${String(hour).padStart(2, '0')}:00:00`;
+            const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
+            return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns }}>
+              <div className="sticky left-0 z-10 flex min-h-[82px] flex-col justify-center border-r border-slate-200 bg-white px-3 sm:px-4"><span className="text-xs font-bold text-slate-800">{formatHourLabel(hour)}</span><span className="mt-1 text-[10px] font-medium text-slate-400">to {formatHourLabel(hour + 1)}</span></div>
+              {displayCourts.map(court => {
+                const courtId = String(court.id);
+                const record = scheduleAtHour(schedulesByCourt.get(courtId) || [], selectedDate, startTime);
+                const slot = record?.status === ScheduleStatus.Available ? undefined : record;
+                const isPast = isPastManilaStart(selectedDate, startTime, new Date(clock));
+                const key = `${courtId}-${selectedDate}-${startTime}`;
+                const isSelected = pickedSlots.some(picked => picked.key === key);
+                return <div key={`${courtId}-${startTime}`} className={cn('min-h-[82px] border-r border-slate-200 p-2 last:border-r-0', !slot && !isPast && !isAfterBookingWindow && 'bg-white hover:bg-emerald-50/40', (isPast || isAfterBookingWindow) && !slot && 'bg-slate-50')}>
+                  {isLoading ? <Skeleton className="h-full min-h-[64px] w-full rounded-lg" /> : slot ? (() => { const timed = getTimedStatus(slot); return <div className={cn('flex h-full min-h-[64px] flex-col items-center justify-center rounded-lg border px-3 text-center shadow-sm', STATUS_COLORS[slot.status], timed.phase === 'ongoing' && 'ring-2 ring-emerald-500 ring-offset-1', timed.phase === 'completed' && 'brightness-75 saturate-50')}><span className="text-[11px] font-bold uppercase tracking-wider">{timed.label}</span></div>; })() : <button type="button" disabled={isPast || isAfterBookingWindow} onClick={() => toggleSlot(courtId, startTime, endTime)} className={cn('flex h-full min-h-[64px] w-full items-center justify-center rounded-lg border text-[11px] font-bold uppercase tracking-wider transition', isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : isPast || isAfterBookingWindow ? 'cursor-not-allowed border-dashed border-slate-200 text-slate-300' : 'border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600')}>{isSelected ? <span className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-white"><CheckIcon className="h-4 w-4" /></span> Selected</span> : isPast ? 'Past' : isAfterBookingWindow ? 'Booking closed' : 'Available'}</button>}
+                </div>;
+              })}
+            </div>;
+          })}</div>
+        </div></div>
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500 sm:hidden">Swipe sideways to compare all courts.</div>
+      </div>}
+    </section>
+
+    {pickedSlots.length > 0 && <div className="fixed bottom-3 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 animate-in px-3 duration-300 slide-in-from-bottom-3 sm:bottom-6 sm:px-4"><div className="relative flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:px-7 sm:py-6"><button type="button" onClick={() => setPickedSlots([])} className="absolute right-2 top-2 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600 sm:right-4 sm:top-4" aria-label="Clear selected slots"><XIcon className="h-4 w-4" /></button><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Selected slots</p><div className="flex items-baseline gap-1.5"><span className="text-2xl font-bold leading-none text-slate-900">{pickedSlots.length}</span><span className="text-xs font-medium text-slate-500">slots</span></div><p className="mt-2 text-sm font-semibold text-slate-900">Total: ₱{totalAmount.toLocaleString()}</p></div><Link to={ROUTES.BOOKING} state={{ pickedSlots }} className="mr-1 mt-3 inline-flex h-10 items-center gap-1 rounded-lg bg-primary px-4 text-xs font-bold text-white shadow-sm transition hover:bg-primary/90 sm:px-5 sm:text-sm"><span className="sm:hidden">Continue</span><span className="hidden sm:inline">Proceed to Pay</span><ChevronRight className="h-4 w-4" /></Link></div></div>}
+  </div>;
 }
