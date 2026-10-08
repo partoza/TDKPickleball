@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { CheckCircleIcon, MapPinIcon, ClockIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
-import { CalendarDaysIcon, CheckBadgeIcon, Squares2X2Icon, UserIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, CheckBadgeIcon, QrCodeIcon, UserIcon } from '@heroicons/react/24/outline';
 
 const COOKIE_CONSENT_KEY = 'tdk-cookie-consent';
 
@@ -64,28 +64,32 @@ export default function HomePage() {
       </section>
 
       {/* Booking Steps */}
-      <section className="bg-white py-14 text-[#17213f] sm:py-16 lg:py-20">
+      <section className="bg-[#f4efe5] py-16 text-[#241f1d] sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-500">Booking</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] sm:text-4xl">How booking works</h2>
-          <p className="mt-3 text-base text-slate-500 sm:text-lg">Four steps, from an open court to a confirmed booking.</p>
+          <div className="grid gap-5 border-b border-[#241f1d]/15 pb-8 md:grid-cols-2 md:items-end">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#72151d]">Booking</p>
+              <h2 className="mt-3 text-4xl font-bold tracking-[-0.04em] sm:text-5xl">From schedule to court.</h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-[#6b625d] sm:text-base md:justify-self-end md:text-right">Choose your session, send your payment receipt, and keep your reference while The Dirty Kitchen confirms your request.</p>
+          </div>
 
-          <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:mt-10 lg:grid-cols-4 lg:gap-5">
+          <div className="grid border-t border-[#241f1d]/15 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: 'Choose your date', description: 'Pick the day you want to play.', icon: CalendarDaysIcon },
-              { title: 'Choose a court and time', description: 'See which courts are available and select the slots you want.', icon: Squares2X2Icon },
-              { title: 'Sign in', description: 'So your booking is in your name and you can find it later.', icon: UserIcon },
-              { title: 'Confirm', description: 'Review your booking and confirm your reservation.', icon: CheckBadgeIcon },
+              { title: 'Choose your schedule', description: 'Pick a date, court, and one or more available time slots.', icon: CalendarDaysIcon },
+              { title: 'Sign in and add details', description: 'Continue with Google, then add your contact details, rentals, or promo.', icon: UserIcon },
+              { title: 'Pay and upload receipt', description: 'Scan the merchant QR and upload your payment receipt within 15 minutes.', icon: QrCodeIcon },
+              { title: 'Wait for confirmation', description: 'Keep your request reference while our team verifies the receipt and approves the booking.', icon: CheckBadgeIcon },
             ].map(({ title, description, icon: Icon }, index) => (
-              <article key={title} className="relative min-h-52 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:p-7">
+              <article key={title} className={`group min-h-72 border-b border-[#241f1d]/15 px-1 py-9 sm:px-6 lg:px-7 ${index % 2 === 0 ? 'sm:border-r' : ''} ${index < 3 ? 'lg:border-r' : 'lg:border-r-0'}`}>
                 <div className="flex items-start justify-between gap-4">
-                  <span className="grid h-13 w-13 place-items-center rounded-2xl bg-[#293f91] text-white">
+                  <span className="grid h-12 w-12 place-items-center rounded-full border border-[#72151d]/20 text-[#72151d] transition-colors group-hover:bg-[#72151d] group-hover:text-white">
                     <Icon className="h-6 w-6" />
                   </span>
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-amber-400 text-base font-bold text-[#17213f]">{index + 1}</span>
+                  <span className="text-xs font-bold tracking-[0.18em] text-[#72151d]">0{index + 1}</span>
                 </div>
-                <h3 className="mt-6 text-lg font-bold tracking-[-0.02em]">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">{description}</p>
+                <h3 className="mt-12 max-w-xs text-xl font-bold uppercase leading-tight tracking-[-0.025em] text-[#72151d]">{title}</h3>
+                <p className="mt-4 text-sm leading-7 text-[#5e5651]">{description}</p>
               </article>
             ))}
           </div>
