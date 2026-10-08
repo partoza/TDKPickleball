@@ -34,7 +34,10 @@ function FieldError({ message }: { message?: string }) {
 
 function groupSlots(slots: any[]) {
   if (!slots || !slots.length) return [];
-  const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  const sorted = [...slots].sort((a, b) =>
+    a.date.localeCompare(b.date)
+    || String(a.courtId ?? '').localeCompare(String(b.courtId ?? ''), undefined, { numeric: true })
+    || a.startTime.localeCompare(b.startTime));
   const blocks = [];
   let currentBlock: any = null;
   for (const slot of sorted) {

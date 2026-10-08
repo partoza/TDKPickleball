@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { addDays, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CalendarDaysIcon as CalendarIcon, CheckIcon, ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, XMarkIcon as XIcon } from '@heroicons/react/24/solid';
@@ -120,9 +120,12 @@ export default function SchedulePage() {
     setPickedSlots(current => current.some(slot => slot.key === key) ? current.filter(slot => slot.key !== key) : [...current, { key, courtId, date: selectedDate, startTime, endTime }]);
   };
 
-  const timeColumnWidth = 220;
-  const gridTemplateColumns = `${timeColumnWidth}px repeat(${Math.max(displayCourts.length, 1)}, minmax(200px, 1fr))`;
-  const gridMinWidth = timeColumnWidth + Math.max(displayCourts.length, 1) * 200;
+  const courtColumnCount = Math.max(displayCourts.length, 1);
+  const scheduleGridStyle = {
+    '--schedule-mobile-columns': `82px repeat(${courtColumnCount}, minmax(0, 1fr))`,
+    '--schedule-desktop-columns': `220px repeat(${courtColumnCount}, minmax(200px, 1fr))`,
+    '--schedule-desktop-min-width': `${220 + courtColumnCount * 200}px`,
+  } as CSSProperties;
   const totalAmount = pickedSlots.length * 320;
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-5 overflow-x-hidden px-3 pb-16 pt-6 sm:px-6 sm:pt-12 md:pt-16">
@@ -148,16 +151,16 @@ export default function SchedulePage() {
 
       {courtsError || (!isLoading && displayCourts.length === 0) ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><p className="font-bold text-slate-800">{courtsError ? 'Courts are temporarily unavailable' : 'No active courts available'}</p><p className="mt-1 text-sm text-slate-500">Please check again shortly.</p></div></div> : <div className="relative">
         {isLoading && <div className="pointer-events-none absolute left-1/2 top-6 z-30 -translate-x-1/2"><div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-5 py-2.5 shadow-lg backdrop-blur"><LoadingIndicator size="sm" className="text-primary" /><span className="text-xs font-bold text-slate-700">Loading schedule</span></div></div>}
-        <div className="overflow-x-auto custom-scrollbar"><div style={{ minWidth: `${gridMinWidth}px` }}>
-          <div className="sticky top-0 z-20 grid border-b border-slate-200 bg-slate-50" style={{ gridTemplateColumns }}>
-            <div className="sticky left-0 z-30 flex min-h-20 items-center border-r border-slate-200 bg-slate-50 px-4 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time</div>
-            {displayCourts.map(court => <div key={court.id} className="flex min-h-20 flex-col items-center justify-center border-r border-slate-200 px-4 text-center last:border-r-0"><span className="text-base font-bold text-slate-900">{court.displayName || court.name}</span><span className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Indoor court</span></div>)}
+        <div className="overflow-hidden sm:overflow-x-auto custom-scrollbar"><div className="min-w-0 sm:min-w-[var(--schedule-desktop-min-width)]" style={scheduleGridStyle}>
+          <div className="sticky top-0 z-20 grid border-b border-slate-200 bg-slate-50 [grid-template-columns:var(--schedule-mobile-columns)] sm:[grid-template-columns:var(--schedule-desktop-columns)]">
+            <div className="sticky left-0 z-30 flex min-h-14 items-center border-r border-slate-200 bg-slate-50 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:min-h-20 sm:px-4 sm:text-xs sm:tracking-[0.16em]">Time</div>
+            {displayCourts.map(court => <div key={court.id} className="flex min-h-14 min-w-0 flex-col items-center justify-center border-r border-slate-200 px-1 text-center last:border-r-0 sm:min-h-20 sm:px-4"><span className="w-full truncate text-xs font-bold text-slate-900 sm:text-base">{court.displayName || court.name}</span><span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-400 sm:mt-1 sm:text-[11px] sm:tracking-wider">Indoor court</span></div>)}
           </div>
           <div className="max-h-[680px] overflow-y-auto custom-scrollbar">{Array.from({ length: 17 }, (_, index) => index + 7).map(hour => {
             const startTime = `${String(hour).padStart(2, '0')}:00:00`;
             const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
-            return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns }}>
-              <div className="sticky left-0 z-10 flex min-h-[88px] items-center border-r border-slate-200 bg-white px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
+            return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0 [grid-template-columns:var(--schedule-mobile-columns)] sm:[grid-template-columns:var(--schedule-desktop-columns)]">
+              <div className="sticky left-0 z-10 flex min-h-[68px] min-w-0 flex-col justify-center border-r border-slate-200 bg-white px-2 sm:min-h-[88px] sm:px-5"><span className="text-[10px] font-bold leading-tight tracking-tight text-slate-900 sm:hidden">{formatHourLabel(hour)}</span><span className="mt-0.5 text-[9px] font-semibold leading-tight text-slate-400 sm:hidden">to {formatHourLabel(hour + 1)}</span><span className="hidden whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900 sm:inline">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
               {displayCourts.map(court => {
                 const courtId = String(court.id);
                 const record = scheduleAtHour(schedulesByCourt.get(courtId) || [], selectedDate, startTime);
@@ -165,14 +168,13 @@ export default function SchedulePage() {
                 const isPast = isPastManilaStart(selectedDate, startTime, new Date(clock));
                 const key = `${courtId}-${selectedDate}-${startTime}`;
                 const isSelected = pickedSlots.some(picked => picked.key === key);
-                return <div key={`${courtId}-${startTime}`} className={cn('min-h-[82px] border-r border-slate-200 p-2 last:border-r-0', !slot && !isPast && !isAfterBookingWindow && 'bg-white hover:bg-emerald-50/40', (isPast || isAfterBookingWindow) && !slot && 'bg-slate-50')}>
-                  {isLoading ? <Skeleton className="h-full min-h-[64px] w-full rounded-lg" /> : slot ? (() => { const timed = getTimedStatus(slot); return <div className={cn('flex h-full min-h-[64px] flex-col items-center justify-center rounded-lg border px-3 text-center shadow-sm', STATUS_COLORS[slot.status], timed.phase === 'ongoing' && 'ring-2 ring-emerald-500 ring-offset-1', timed.phase === 'completed' && 'brightness-75 saturate-50')}><span className="text-[11px] font-bold uppercase tracking-wider">{timed.label}</span></div>; })() : <button type="button" disabled={isPast || isAfterBookingWindow} onClick={() => toggleSlot(courtId, startTime, endTime)} className={cn('flex h-full min-h-[64px] w-full items-center justify-center rounded-lg border text-[11px] font-bold uppercase tracking-wider transition', isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : isPast || isAfterBookingWindow ? 'cursor-not-allowed border-dashed border-slate-200 text-slate-300' : 'border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600')}>{isSelected ? <span className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-white"><CheckIcon className="h-4 w-4" /></span> Selected</span> : isPast ? 'Past' : isAfterBookingWindow ? 'Booking closed' : 'Available'}</button>}
+                return <div key={`${courtId}-${startTime}`} className={cn('min-h-[68px] min-w-0 border-r border-slate-200 p-1 last:border-r-0 sm:min-h-[82px] sm:p-2', !slot && !isPast && !isAfterBookingWindow && 'bg-white hover:bg-emerald-50/40', (isPast || isAfterBookingWindow) && !slot && 'bg-slate-50')}>
+                  {isLoading ? <Skeleton className="h-full min-h-[58px] w-full rounded-lg sm:min-h-[64px]" /> : slot ? (() => { const timed = getTimedStatus(slot); return <div className={cn('flex h-full min-h-[58px] flex-col items-center justify-center rounded-lg border px-1 text-center shadow-sm sm:min-h-[64px] sm:px-3', STATUS_COLORS[slot.status], timed.phase === 'ongoing' && 'ring-2 ring-emerald-500 ring-offset-1', timed.phase === 'completed' && 'brightness-75 saturate-50')}><span className="break-words text-[8px] font-bold uppercase leading-tight tracking-wide sm:text-[11px] sm:tracking-wider">{timed.label}</span></div>; })() : <button type="button" disabled={isPast || isAfterBookingWindow} onClick={() => toggleSlot(courtId, startTime, endTime)} className={cn('flex h-full min-h-[58px] w-full items-center justify-center rounded-lg border px-0.5 text-[8px] font-bold uppercase leading-tight tracking-wide transition sm:min-h-[64px] sm:text-[11px] sm:tracking-wider', isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : isPast || isAfterBookingWindow ? 'cursor-not-allowed border-dashed border-slate-200 text-slate-300' : 'border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600')}>{isSelected ? <span className="flex flex-col items-center gap-1 sm:flex-row sm:gap-2"><span className="grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white sm:h-6 sm:w-6"><CheckIcon className="h-3 w-3 sm:h-4 sm:w-4" /></span> Selected</span> : isPast ? 'Past' : isAfterBookingWindow ? 'Booking closed' : 'Available'}</button>}
                 </div>;
               })}
             </div>;
           })}</div>
         </div></div>
-        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500 sm:hidden">Swipe sideways to compare all courts.</div>
       </div>}
     </section>
 
