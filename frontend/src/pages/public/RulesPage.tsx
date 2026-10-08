@@ -116,7 +116,7 @@ export default function RulesPage() {
               <span className="h-px w-10 bg-[#72151d]" /> Before you step on court
             </p>
             <h1 className="text-[clamp(2.75rem,6vw,5rem)] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#72151d]">
-              Play fair.<br />Play safe.
+              Rules &amp;<br />Regulation
             </h1>
             <p className="mt-8 max-w-2xl text-base leading-7 text-[#5e5651] sm:text-lg sm:leading-8">
               A few straightforward rules keep every session safe, on time, and enjoyable for the whole Dirty Kitchen community.
