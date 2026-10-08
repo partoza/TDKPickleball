@@ -1,58 +1,106 @@
+import {
+  ArrowUpRightIcon,
+  ChatBubbleLeftRightIcon,
+  ClockIcon,
+  MapPinIcon,
+} from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { EXTERNAL_LINKS } from '@/lib/constants';
 
+function PickleballDecoration() {
+  return (
+    <svg viewBox="0 0 320 320" className="h-full w-full" aria-hidden="true">
+      <circle cx="160" cy="160" r="154" fill="#d9f900" />
+      {[
+        [100, 58], [188, 38], [252, 92], [110, 142], [200, 130],
+        [270, 190], [154, 228], [76, 238], [228, 266],
+      ].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="16" fill="#72151d" opacity=".12" />)}
+    </svg>
+  );
+}
+
 export default function ContactPage() {
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)]">
-      <section 
-        className="relative flex-1 flex flex-col justify-center items-center overflow-hidden bg-cover bg-center py-20"
-        style={{ backgroundImage: 'url("/assets/images/contact-image.png")' }}
-      >
-        {/* White Overlay */}
-        <div className="absolute inset-0 bg-white/70 z-0 border-b border-primary/10"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/80 to-transparent z-0"></div>
+    <div className="bg-[#f4efe5] text-[#241f1d]">
+      <section className="relative overflow-hidden border-b border-[#72151d]/15">
+        <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 opacity-[0.1] sm:-right-36 sm:-top-36 sm:h-[34rem] sm:w-[34rem]">
+          <PickleballDecoration />
+        </div>
 
-        <div className="container mx-auto px-4 md:px-6 relative z-10 w-full max-w-6xl text-center flex flex-col items-center">
-          <div className="mb-10 max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-widest text-primary mb-4 drop-shadow-sm">Contact Us</p>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-primary drop-shadow-sm">Let’s get you on court.</h1>
-            <p className="mt-6 text-lg md:text-xl text-black leading-relaxed">
-              Questions about a booking, training, or court availability? Reach The Dirty Kitchen team directly on Facebook.
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:px-10 lg:py-24">
+          <div className="relative z-10 max-w-2xl">
+            <img src="/assets/images/tdk-logo.png" alt="The Dirty Kitchen Pickleball Court" className="mb-10 h-auto w-52 object-contain sm:w-64" />
+            <p className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.26em] text-[#72151d]">
+              <span className="h-px w-10 bg-[#72151d]" /> Contact the team
             </p>
-          </div>
-          
-          <div className="mb-10 max-w-2xl w-full hover:-translate-y-1 transition-transform duration-300 drop-shadow-2xl">
-            <a 
-              href={EXTERNAL_LINKS.FACEBOOK_PAGE}
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <img 
-                src="/assets/images/facebook.png" 
-                alt="The Dirty Kitchen Facebook Page" 
-                className="w-full h-auto rounded-xl object-cover ring-1 ring-black/5"
-              />
-            </a>
+            <h1 className="text-[clamp(3.5rem,8vw,7rem)] font-black uppercase leading-[0.84] tracking-[-0.065em] text-[#72151d]">
+              Let’s get<br />you on court.
+            </h1>
+            <p className="mt-8 max-w-xl text-base leading-7 text-[#5e5651] sm:text-lg sm:leading-8">
+              Questions about a booking, training, or court availability? Reach The Dirty Kitchen team directly and we will help you sort the details.
+            </p>
+            <Button asChild size="lg" className="mt-9 h-12 rounded-none bg-[#72151d] px-7 font-bold text-white hover:bg-[#5f1118]">
+              <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">
+                <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" /> Message us on Facebook
+              </a>
+            </Button>
           </div>
 
-          <Button 
-            asChild
-            size="lg"
-            className="h-14 md:h-16 px-8 md:px-10 text-base md:text-xl font-bold rounded-full shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <a 
-              href={EXTERNAL_LINKS.FACEBOOK_MESSAGE}
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 md:h-11 md:w-11 mr-3 md:mr-4 drop-shadow-sm" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951"/>
-              </svg>
-              Message us on Facebook
-            </a>
-          </Button>
+          <div className="relative z-10 lg:justify-self-end">
+            <div className="relative mx-auto max-w-xl lg:mx-0">
+              <div className="absolute -left-4 -top-4 h-full w-full border border-[#72151d]/25 sm:-left-6 sm:-top-6" aria-hidden="true" />
+              <img src="/assets/images/contact-image.png" alt="The Dirty Kitchen location in Davao City" className="relative aspect-[4/3] w-full object-cover" />
+              <a href={EXTERNAL_LINKS.FACEBOOK_PAGE} target="_blank" rel="noopener noreferrer" className="absolute bottom-0 right-0 inline-flex items-center gap-2 bg-[#d9f900] px-5 py-4 text-sm font-bold text-[#241f1d] transition hover:bg-[#e4ff3b] sm:px-7">
+                Visit our Facebook page <ArrowUpRightIcon className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#fffdf8] py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <div className="grid gap-5 border-b border-[#241f1d]/15 pb-8 md:grid-cols-2 md:items-end">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#72151d]">Plan your visit</p>
+              <h2 className="mt-3 text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Find us in Matina.</h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-[#6b625d] sm:text-base md:justify-self-end md:text-right">Open every day for early rallies, after-work games, and late-night court time.</p>
+          </div>
+
+          <div className="grid border-t border-[#241f1d]/15 md:grid-cols-2">
+            <article className="grid min-h-56 grid-cols-[auto_1fr] gap-5 border-b border-[#241f1d]/15 py-8 sm:gap-7 sm:px-6 md:border-r">
+              <span className="grid h-12 w-12 place-items-center rounded-full border border-[#72151d]/20 text-[#72151d]"><MapPinIcon className="h-6 w-6" /></span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#72151d]">Address</p>
+                <h3 className="mt-4 max-w-md text-2xl font-bold leading-tight">University Avenue, Juna Subdivision, Matina, Davao City</h3>
+              </div>
+            </article>
+            <article className="grid min-h-56 grid-cols-[auto_1fr] gap-5 border-b border-[#241f1d]/15 py-8 sm:gap-7 sm:px-6">
+              <span className="grid h-12 w-12 place-items-center rounded-full border border-[#72151d]/20 text-[#72151d]"><ClockIcon className="h-6 w-6" /></span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#72151d]">Operating hours</p>
+                <h3 className="mt-4 text-2xl font-bold">Monday to Sunday</h3>
+                <p className="mt-2 text-lg font-semibold text-[#5e5651]">7:00 AM–12:00 MN</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#72151d] py-16 text-white sm:py-20">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[1fr_.9fr] lg:items-center lg:px-10">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d9f900]">Talk to a real person</p>
+            <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Need help choosing a time?</h2>
+            <p className="mt-5 max-w-xl text-sm leading-7 text-white/70 sm:text-base">Send us a message for booking questions, training arrangements, group play, or anything else you need before coming over.</p>
+          </div>
+          <div className="border border-white/20 p-6 sm:p-8 lg:justify-self-end">
+            <p className="text-sm font-semibold leading-6 text-white/80">The fastest way to reach us is through Facebook Messenger.</p>
+            <Button asChild size="lg" className="mt-6 h-12 w-full rounded-none bg-[#d9f900] px-7 font-bold text-[#241f1d] hover:bg-[#e4ff3b] sm:w-auto">
+              <a href={EXTERNAL_LINKS.FACEBOOK_MESSAGE} target="_blank" rel="noopener noreferrer">Start a conversation <ArrowUpRightIcon className="ml-2 h-4 w-4" /></a>
+            </Button>
+          </div>
         </div>
       </section>
     </div>

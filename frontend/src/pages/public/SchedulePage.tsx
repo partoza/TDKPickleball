@@ -89,6 +89,18 @@ const MiniCalendar = ({ currentDate, onSelect, bookingThroughDate }: { currentDa
   </div>;
 };
 
+function PickleballDecoration() {
+  return (
+    <svg viewBox="0 0 320 320" className="h-full w-full" aria-hidden="true">
+      <circle cx="160" cy="160" r="154" fill="#d9f900" />
+      {[
+        [100, 58], [188, 38], [252, 92], [110, 142], [200, 130],
+        [270, 190], [154, 228], [76, 238], [228, 266],
+      ].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="16" fill="#72151d" opacity=".12" />)}
+    </svg>
+  );
+}
+
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [clock, setClock] = useState(Date.now());
@@ -124,57 +136,67 @@ export default function SchedulePage() {
   const gridMinWidth = timeColumnWidth + Math.max(displayCourts.length, 1) * 200;
   const totalAmount = pickedSlots.length * 320;
 
-  return <div className="mx-auto w-full max-w-[1600px] space-y-5 overflow-x-hidden px-3 pb-16 pt-6 sm:px-6 sm:pt-12 md:pt-16">
-    <div className="flex flex-col gap-4 px-1 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Live availability</p><h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">Court Schedule</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">Choose a date and compare every court at once. Tap any available slot to add it to your booking.</p></div>
-      <Link to={ROUTES.TRAINING} className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 sm:w-auto"><PaddleIcon className="h-5 w-5" white /> Become a Trainee <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
-    </div>
-    {bookingThroughDate && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Online bookings are open through {formatAppDate(bookingThroughDate)}.</div>}
-
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court availability for ${formatAppDate(currentDate)}`}>
-      <div className="flex flex-col gap-4 border-b border-slate-200 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.14em] text-primary">Schedule date</span>
-          <div className="flex min-w-0 items-center gap-2">
-            <button type="button" onClick={() => canGoBack && setCurrentDate(addDays(currentDate, -1))} disabled={!canGoBack} aria-label="Previous date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-200"><ChevronLeft className="h-5 w-5" /></button>
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><button type="button" className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-bold text-slate-800 transition hover:bg-slate-50 sm:min-w-[280px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{isToday && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger><PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} bookingThroughDate={bookingThroughDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent></Popover>
-            <button type="button" onClick={() => canGoForward && setCurrentDate(addDays(currentDate, 1))} disabled={!canGoForward} aria-label="Next date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-200"><ChevronRight className="h-5 w-5" /></button>
-            {!isToday && <button type="button" onClick={() => setCurrentDate(new Date())} className="hidden h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:block">Today</button>}
-          </div>
+  return <div className="min-h-[calc(100vh-64px)] bg-[#f4efe5] text-[#241f1d]">
+    <section className="relative overflow-hidden border-b border-[#72151d]/15">
+      <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 opacity-[0.1] sm:-right-36 sm:-top-36 sm:h-[34rem] sm:w-[34rem]"><PickleballDecoration /></div>
+      <div className="relative mx-auto flex max-w-7xl flex-col gap-8 px-5 py-14 sm:px-8 sm:py-20 lg:flex-row lg:items-end lg:justify-between lg:px-10">
+        <div className="max-w-3xl">
+          <p className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.26em] text-[#72151d]"><span className="h-px w-10 bg-[#72151d]" /> Live court availability</p>
+          <h1 className="text-[clamp(3.4rem,7vw,6.75rem)] font-black uppercase leading-[0.84] tracking-[-0.065em] text-[#72151d]">Pick a court.<br />Pick a time.</h1>
+          <p className="mt-7 max-w-2xl text-base leading-7 text-[#5e5651] sm:text-lg sm:leading-8">Compare every court for one date, select any open time, and build your booking in a few taps.</p>
         </div>
-        <div className="w-full lg:w-auto"><AvailabilityChecker /></div>
+        <Link to={ROUTES.TRAINING} className="group inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 bg-[#72151d] px-6 text-sm font-bold text-white transition hover:bg-[#5f1118] sm:w-auto"><PaddleIcon className="h-5 w-5" white /> Explore training <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
       </div>
-
-      {courtsError || (!isLoading && displayCourts.length === 0) ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><p className="font-bold text-slate-800">{courtsError ? 'Courts are temporarily unavailable' : 'No active courts available'}</p><p className="mt-1 text-sm text-slate-500">Please check again shortly.</p></div></div> : <div className="relative">
-        {isLoading && <div className="pointer-events-none absolute left-1/2 top-6 z-30 -translate-x-1/2"><div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-5 py-2.5 shadow-lg backdrop-blur"><LoadingIndicator size="sm" className="text-primary" /><span className="text-xs font-bold text-slate-700">Loading schedule</span></div></div>}
-        <div className="overflow-x-auto custom-scrollbar"><div style={{ minWidth: `${gridMinWidth}px` }}>
-          <div className="sticky top-0 z-20 grid border-b border-slate-200 bg-slate-50" style={{ gridTemplateColumns }}>
-            <div className="sticky left-0 z-30 flex min-h-20 items-center border-r border-slate-200 bg-slate-50 px-4 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time</div>
-            {displayCourts.map(court => <div key={court.id} className="flex min-h-20 flex-col items-center justify-center border-r border-slate-200 px-4 text-center last:border-r-0"><span className="text-base font-bold text-slate-900">{court.displayName || court.name}</span><span className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Indoor court</span></div>)}
-          </div>
-          <div className="max-h-[680px] overflow-y-auto custom-scrollbar">{Array.from({ length: 17 }, (_, index) => index + 7).map(hour => {
-            const startTime = `${String(hour).padStart(2, '0')}:00:00`;
-            const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
-            return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns }}>
-              <div className="sticky left-0 z-10 flex min-h-[88px] items-center border-r border-slate-200 bg-white px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
-              {displayCourts.map(court => {
-                const courtId = String(court.id);
-                const record = scheduleAtHour(schedulesByCourt.get(courtId) || [], selectedDate, startTime);
-                const slot = record?.status === ScheduleStatus.Available ? undefined : record;
-                const isPast = isPastManilaStart(selectedDate, startTime, new Date(clock));
-                const key = `${courtId}-${selectedDate}-${startTime}`;
-                const isSelected = pickedSlots.some(picked => picked.key === key);
-                return <div key={`${courtId}-${startTime}`} className={cn('min-h-[82px] border-r border-slate-200 p-2 last:border-r-0', !slot && !isPast && !isAfterBookingWindow && 'bg-white hover:bg-emerald-50/40', (isPast || isAfterBookingWindow) && !slot && 'bg-slate-50')}>
-                  {isLoading ? <Skeleton className="h-full min-h-[64px] w-full rounded-lg" /> : slot ? (() => { const timed = getTimedStatus(slot); return <div className={cn('flex h-full min-h-[64px] flex-col items-center justify-center rounded-lg border px-3 text-center shadow-sm', STATUS_COLORS[slot.status], timed.phase === 'ongoing' && 'ring-2 ring-emerald-500 ring-offset-1', timed.phase === 'completed' && 'brightness-75 saturate-50')}><span className="text-[11px] font-bold uppercase tracking-wider">{timed.label}</span></div>; })() : <button type="button" disabled={isPast || isAfterBookingWindow} onClick={() => toggleSlot(courtId, startTime, endTime)} className={cn('flex h-full min-h-[64px] w-full items-center justify-center rounded-lg border text-[11px] font-bold uppercase tracking-wider transition', isSelected ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : isPast || isAfterBookingWindow ? 'cursor-not-allowed border-dashed border-slate-200 text-slate-300' : 'border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600')}>{isSelected ? <span className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-white"><CheckIcon className="h-4 w-4" /></span> Selected</span> : isPast ? 'Past' : isAfterBookingWindow ? 'Booking closed' : 'Available'}</button>}
-                </div>;
-              })}
-            </div>;
-          })}</div>
-        </div></div>
-        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500 sm:hidden">Swipe sideways to compare all courts.</div>
-      </div>}
     </section>
 
-    {pickedSlots.length > 0 && <div className="fixed bottom-3 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 animate-in px-3 duration-300 slide-in-from-bottom-3 sm:bottom-6 sm:px-4"><div className="relative flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] sm:px-7 sm:py-6"><button type="button" onClick={() => setPickedSlots([])} className="absolute right-2 top-2 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600 sm:right-4 sm:top-4" aria-label="Clear selected slots"><XIcon className="h-4 w-4" /></button><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Selected slots</p><div className="flex items-baseline gap-1.5"><span className="text-2xl font-bold leading-none text-slate-900">{pickedSlots.length}</span><span className="text-xs font-medium text-slate-500">slots</span></div><p className="mt-2 text-sm font-semibold text-slate-900">Total: ₱{totalAmount.toLocaleString()}</p></div><Link to={ROUTES.BOOKING} state={{ pickedSlots }} className="mr-1 mt-3 inline-flex h-10 items-center gap-1 rounded-lg bg-primary px-4 text-xs font-bold text-white shadow-sm transition hover:bg-primary/90 sm:px-5 sm:text-sm"><span className="sm:hidden">Continue</span><span className="hidden sm:inline">Proceed to Pay</span><ChevronRight className="h-4 w-4" /></Link></div></div>}
+    <section className="mx-auto max-w-[1600px] px-3 py-10 sm:px-6 sm:py-14 lg:px-10">
+      {bookingThroughDate && <div className="mb-5 border border-[#72151d]/20 bg-[#fffdf8] px-5 py-4 text-sm font-semibold text-[#72151d]">Online bookings are open through {formatAppDate(bookingThroughDate)}.</div>}
+
+      <div className="overflow-hidden border border-[#72151d]/20 bg-[#fffdf8]" aria-label={`Court availability for ${formatAppDate(currentDate)}`}>
+        <div className="flex flex-col gap-5 border-b border-[#72151d]/20 p-5 sm:p-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#72151d]">Schedule date</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" onClick={() => canGoBack && setCurrentDate(addDays(currentDate, -1))} disabled={!canGoBack} aria-label="Previous date" className="grid h-12 w-12 shrink-0 place-items-center border border-[#72151d]/20 text-[#72151d] transition hover:bg-[#f4efe5] disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft className="h-5 w-5" /></button>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><button type="button" className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 border border-[#72151d]/20 bg-white px-4 text-[15px] font-bold text-[#241f1d] transition hover:bg-[#f4efe5] sm:min-w-[290px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-[#72151d]" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{isToday && <span className="bg-[#72151d] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger><PopoverContent className="w-auto rounded-none border-[#72151d]/20 bg-[#fffdf8] p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} bookingThroughDate={bookingThroughDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent></Popover>
+              <button type="button" onClick={() => canGoForward && setCurrentDate(addDays(currentDate, 1))} disabled={!canGoForward} aria-label="Next date" className="grid h-12 w-12 shrink-0 place-items-center border border-[#72151d]/20 text-[#72151d] transition hover:bg-[#f4efe5] disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight className="h-5 w-5" /></button>
+              {!isToday && <button type="button" onClick={() => setCurrentDate(new Date())} className="hidden h-12 border border-[#72151d]/20 px-4 text-sm font-bold text-[#72151d] hover:bg-[#f4efe5] sm:block">Today</button>}
+            </div>
+          </div>
+          <div className="w-full lg:w-auto"><AvailabilityChecker /></div>
+        </div>
+
+        {courtsError || (!isLoading && displayCourts.length === 0) ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><p className="font-bold text-[#241f1d]">{courtsError ? 'Courts are temporarily unavailable' : 'No active courts available'}</p><p className="mt-1 text-sm text-[#6b625d]">Please check again shortly.</p></div></div> : <div className="relative">
+          {isLoading && <div className="pointer-events-none absolute left-1/2 top-6 z-30 -translate-x-1/2"><div className="flex items-center gap-3 border border-[#72151d]/20 bg-[#fffdf8]/95 px-5 py-2.5 shadow-lg backdrop-blur"><LoadingIndicator size="sm" className="text-[#72151d]" /><span className="text-xs font-bold text-[#241f1d]">Loading schedule</span></div></div>}
+          <div className="overflow-x-auto custom-scrollbar"><div style={{ minWidth: `${gridMinWidth}px` }}>
+            <div className="sticky top-0 z-20 grid border-b border-white/15 bg-[#72151d] text-white" style={{ gridTemplateColumns }}>
+              <div className="sticky left-0 z-30 flex min-h-20 items-center border-r border-white/15 bg-[#72151d] px-5 text-xs font-bold uppercase tracking-[0.18em] text-[#d9f900]">Time</div>
+              {displayCourts.map(court => <div key={court.id} className="flex min-h-20 flex-col items-center justify-center border-r border-white/15 px-4 text-center last:border-r-0"><span className="text-base font-bold">{court.displayName || court.name}</span><span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">Indoor court</span></div>)}
+            </div>
+            <div className="max-h-[680px] overflow-y-auto custom-scrollbar">{Array.from({ length: 17 }, (_, index) => index + 7).map(hour => {
+              const startTime = `${String(hour).padStart(2, '0')}:00:00`;
+              const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
+              return <div key={startTime} className="grid border-b border-[#241f1d]/10 last:border-b-0" style={{ gridTemplateColumns }}>
+                <div className="sticky left-0 z-10 flex min-h-[88px] items-center border-r border-[#241f1d]/10 bg-[#f4efe5] px-5"><span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-[#241f1d]">{formatHourLabel(hour)} to {formatHourLabel(hour + 1)}</span></div>
+                {displayCourts.map(court => {
+                  const courtId = String(court.id);
+                  const record = scheduleAtHour(schedulesByCourt.get(courtId) || [], selectedDate, startTime);
+                  const slot = record?.status === ScheduleStatus.Available ? undefined : record;
+                  const isPast = isPastManilaStart(selectedDate, startTime, new Date(clock));
+                  const key = `${courtId}-${selectedDate}-${startTime}`;
+                  const isSelected = pickedSlots.some(picked => picked.key === key);
+                  return <div key={`${courtId}-${startTime}`} className={cn('min-h-[88px] border-r border-[#241f1d]/10 p-2 last:border-r-0', !slot && !isPast && !isAfterBookingWindow && 'bg-[#fffdf8]', (isPast || isAfterBookingWindow) && !slot && 'bg-[#f4efe5]/60')}>
+                    {isLoading ? <Skeleton className="h-full min-h-[68px] w-full rounded-none" /> : slot ? (() => { const timed = getTimedStatus(slot); return <div className={cn('flex h-full min-h-[68px] flex-col items-center justify-center border px-3 text-center', STATUS_COLORS[slot.status], timed.phase === 'ongoing' && 'ring-2 ring-[#d9f900] ring-offset-1', timed.phase === 'completed' && 'brightness-75 saturate-50')}><span className="text-[11px] font-bold uppercase tracking-wider">{timed.label}</span></div>; })() : <button type="button" disabled={isPast || isAfterBookingWindow} onClick={() => toggleSlot(courtId, startTime, endTime)} className={cn('flex h-full min-h-[68px] w-full items-center justify-center border text-[11px] font-bold uppercase tracking-[0.14em] transition', isSelected ? 'border-[#72151d] bg-[#d9f900]/45 text-[#72151d]' : isPast || isAfterBookingWindow ? 'cursor-not-allowed border-dashed border-[#241f1d]/10 text-[#241f1d]/25' : 'border-dashed border-[#72151d]/20 text-[#72151d]/55 hover:border-[#72151d] hover:bg-[#d9f900]/15 hover:text-[#72151d]')}>{isSelected ? <span className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-full bg-[#72151d] text-white"><CheckIcon className="h-4 w-4" /></span> Selected</span> : isPast ? 'Past' : isAfterBookingWindow ? 'Booking closed' : 'Available'}</button>}
+                  </div>;
+                })}
+              </div>;
+            })}</div>
+          </div></div>
+          <div className="border-t border-[#72151d]/20 bg-[#f4efe5] px-4 py-3 text-xs font-medium text-[#6b625d] sm:hidden">Swipe sideways to compare all courts.</div>
+        </div>}
+      </div>
+    </section>
+
+    {pickedSlots.length > 0 && <div className="fixed bottom-3 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 animate-in px-3 duration-300 slide-in-from-bottom-3 sm:bottom-6 sm:px-4"><div className="relative flex items-center justify-between gap-3 border border-white/15 bg-[#241f1d] px-5 py-4 text-white shadow-[0_12px_40px_rgb(0,0,0,0.25)] sm:px-7 sm:py-6"><button type="button" onClick={() => setPickedSlots([])} className="absolute right-2 top-2 p-1.5 text-white/50 transition hover:text-[#d9f900] sm:right-4 sm:top-4" aria-label="Clear selected slots"><XIcon className="h-4 w-4" /></button><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#d9f900]">Selected slots</p><div className="flex items-baseline gap-1.5"><span className="text-2xl font-bold leading-none">{pickedSlots.length}</span><span className="text-xs font-medium text-white/55">slots</span></div><p className="mt-2 text-sm font-semibold">Total: ₱{totalAmount.toLocaleString()}</p></div><Link to={ROUTES.BOOKING} state={{ pickedSlots }} className="mr-1 mt-3 inline-flex h-11 items-center gap-1 bg-[#d9f900] px-4 text-xs font-bold text-[#241f1d] transition hover:bg-[#e4ff3b] sm:px-5 sm:text-sm"><span className="sm:hidden">Continue</span><span className="hidden sm:inline">Proceed to pay</span><ChevronRight className="h-4 w-4" /></Link></div></div>}
   </div>;
 }

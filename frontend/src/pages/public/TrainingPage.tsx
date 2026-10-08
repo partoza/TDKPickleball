@@ -38,16 +38,49 @@ const steps = [
 ];
 
 const rateDetails = [
-  'Available during operating hours',
-  'Indoor court with tournament lighting',
-  'Session details confirmed by our team',
+  'Personalized coaching and drills',
+  'Beginner to advanced skill levels',
+  'Minimum two-hour session',
+  'Discounted court rate — ₱300 per hour',
 ];
+
+const trainers = [
+  {
+    name: 'Coach JC',
+    image: '/assets/images/players.png',
+    position: '18% center',
+  },
+  {
+    name: 'Coach Luis',
+    image: '/assets/images/players.png',
+    position: '50% center',
+  },
+  {
+    name: 'Coach — name to confirm',
+    image: '/assets/images/players.png',
+    position: '82% center',
+  },
+];
+
+function PickleballDecoration() {
+  return (
+    <svg viewBox="0 0 320 320" className="h-full w-full" aria-hidden="true">
+      <circle cx="160" cy="160" r="154" fill="#d9f900" />
+      {[
+        [100, 58], [188, 38], [252, 92], [110, 142], [200, 130],
+        [270, 190], [154, 228], [76, 238], [228, 266],
+      ].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="16" fill="#72151d" opacity=".12" />)}
+    </svg>
+  );
+}
 
 export default function TrainingPage() {
   return (
     <div className="bg-[#f4efe5] text-[#241f1d]">
       <section className="relative overflow-hidden border-b border-[#72151d]/15">
-        <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full border-[58px] border-[#72151d] opacity-[0.045] sm:h-[34rem] sm:w-[34rem] sm:border-[92px]" />
+        <div className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 opacity-[0.1] sm:-right-36 sm:-top-36 sm:h-[34rem] sm:w-[34rem]">
+          <PickleballDecoration />
+        </div>
         <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-10 lg:py-24">
           <div className="relative z-10 max-w-3xl">
             <img
@@ -90,6 +123,43 @@ export default function TrainingPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-[#241f1d] py-16 text-white sm:py-20 lg:py-24" aria-labelledby="trainers-title">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <div className="grid gap-5 border-b border-white/15 pb-8 md:grid-cols-2 md:items-end">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d9f900]">The people behind your progress</p>
+              <h2 id="trainers-title" className="mt-3 text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Meet the trainers.</h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-white/60 sm:text-base md:justify-self-end md:text-right">
+              Learn with trainers who keep every session focused, practical, and welcoming at every level.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {trainers.map((trainer, index) => (
+              <article key={trainer.name} className="group">
+                <div className="relative aspect-[4/5] overflow-hidden bg-[#302927]">
+                  <img
+                    src={trainer.image}
+                    alt="The Dirty Kitchen pickleball training community"
+                    className="h-full w-full scale-[1.65] object-cover grayscale transition duration-500 group-hover:scale-[1.72] group-hover:grayscale-0"
+                    style={{ objectPosition: trainer.position }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#241f1d] via-[#241f1d]/10 to-transparent" />
+                  <span className="absolute left-5 top-5 text-xs font-bold tracking-[0.2em] text-[#d9f900]">0{index + 1}</span>
+                  <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d9f900]">Pickleball trainer</p>
+                    <h3 className="mt-2 text-2xl font-bold uppercase tracking-[-0.025em] text-white">{trainer.name}</h3>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <p className="mt-6 text-xs leading-5 text-white/45">Temporary training imagery is shown until individual coach portraits are provided.</p>
         </div>
       </section>
 
@@ -147,13 +217,13 @@ export default function TrainingPage() {
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
           <div className="grid overflow-hidden border border-[#72151d]/20 bg-[#fffdf8] lg:grid-cols-[1fr_.95fr]">
             <div className="p-7 sm:p-10 lg:p-14">
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#72151d]">Training court rate</p>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#72151d]">Discounted training court rate</p>
               <div className="mt-5 flex items-end gap-3 text-[#72151d]">
                 <span className="mb-2 text-2xl font-bold">₱</span>
                 <span className="text-7xl font-black tracking-[-0.06em] sm:text-8xl">300</span>
                 <span className="mb-3 text-sm font-semibold text-[#5e5651]">per hour</span>
               </div>
-              <p className="mt-6 max-w-lg text-sm leading-6 text-[#6b625d] sm:text-base">Coach availability and any additional fees are confirmed with you before your session.</p>
+              <p className="mt-6 max-w-lg text-sm leading-6 text-[#6b625d] sm:text-base">Training sessions have a two-hour minimum. Coach availability and final session details are confirmed with you before booking.</p>
             </div>
 
             <div className="flex flex-col justify-between border-t border-[#72151d]/20 bg-[#241f1d] p-7 text-white sm:p-10 lg:border-l lg:border-t-0 lg:p-14">
