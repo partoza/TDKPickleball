@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { CheckCircleIcon, MapPinIcon, ClockIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
-import { CalendarDaysIcon, CheckBadgeIcon, QrCodeIcon, UserIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, CheckBadgeIcon, QrCodeIcon, UserIcon } from '@heroicons/react/24/solid';
 
 const COOKIE_CONSENT_KEY = 'tdk-cookie-consent';
 

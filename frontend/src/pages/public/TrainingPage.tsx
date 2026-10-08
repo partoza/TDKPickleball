@@ -5,7 +5,7 @@ import {
   CheckIcon,
   SparklesIcon,
   UserGroupIcon,
-} from '@heroicons/react/24/outline';
+} from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { PickleballAccent } from '@/components/public/PickleballAccent';

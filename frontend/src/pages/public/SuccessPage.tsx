@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircleIcon, ArrowDownTrayIcon, TicketIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ArrowDownTrayIcon, TicketIcon } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 

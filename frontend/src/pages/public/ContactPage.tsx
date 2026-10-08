@@ -3,7 +3,7 @@ import {
   ChatBubbleLeftRightIcon,
   ClockIcon,
   MapPinIcon,
-} from '@heroicons/react/24/outline';
+} from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { PickleballAccent } from '@/components/public/PickleballAccent';
 import { EXTERNAL_LINKS } from '@/lib/constants';

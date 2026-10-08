@@ -11,7 +11,7 @@ import {
   SparklesIcon,
   UserGroupIcon,
   WrenchScrewdriverIcon,
-} from '@heroicons/react/24/outline';
+} from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/button';
 import { PickleballAccent } from '@/components/public/PickleballAccent';
 import { ROUTES } from '@/lib/constants';
