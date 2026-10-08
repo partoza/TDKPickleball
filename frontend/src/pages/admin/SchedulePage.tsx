@@ -195,8 +195,9 @@ export default function SchedulePage() {
   const { data: schedulesResponse, isLoading: scheduleLoading } = useAdminSchedules(selectedDate);
   const isLoading = courtsLoading || scheduleLoading;
   const daySchedules = schedulesResponse?.data || [];
-  const scheduleGridTemplate = `112px repeat(${Math.max(courts.length, 1)}, minmax(190px, 1fr))`;
-  const scheduleGridMinWidth = 112 + Math.max(courts.length, 1) * 190;
+  const timeColumnWidth = 148;
+  const scheduleGridTemplate = `${timeColumnWidth}px repeat(${Math.max(courts.length, 1)}, minmax(210px, 1fr))`;
+  const scheduleGridMinWidth = timeColumnWidth + Math.max(courts.length, 1) * 210;
   const modalRateType = bookingModalData?.status === 'Training' ? RateType.Training : RateType.Booking;
   const isAddingCustomerSchedule = !!bookingModalData && !bookingModalData.id && (bookingModalData.status === 'Booked' || bookingModalData.status === 'Training');
   const { data: customerPromosResponse, isFetching: customerPromosLoading } = useCustomerAvailablePromos(
@@ -391,14 +392,17 @@ export default function SchedulePage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label={`Court schedules for ${formatAppDate(currentDate)}`}>
         <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
-            <button type="button" onClick={prevDay} aria-label="Previous date" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronLeft className="h-5 w-5" /></button>
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-              <PopoverTrigger asChild><button type="button" className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 font-bold text-slate-800 shadow-sm hover:bg-slate-50 sm:min-w-[250px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{selectedDate === getManilaDate(new Date(clock)) && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger>
-              <PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
-            </Popover>
-            <button type="button" onClick={nextDay} aria-label="Next date" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronRight className="h-5 w-5" /></button>
-            {selectedDate !== getManilaDate(new Date(clock)) && <button type="button" onClick={today} className="hidden h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:block">Today</button>}
+          <div className="min-w-0">
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Schedule date</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" onClick={prevDay} aria-label="Previous date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronLeft className="h-5 w-5" /></button>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <PopoverTrigger asChild><button type="button" className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-bold text-slate-800 shadow-sm hover:bg-slate-50 sm:min-w-[290px] sm:flex-none"><CalendarIcon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{format(currentDate, 'EEE, MMM d, yyyy')}</span>{selectedDate === getManilaDate(new Date(clock)) && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Today</span>}</button></PopoverTrigger>
+                <PopoverContent className="w-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl" align="center" sideOffset={8}><MiniCalendar currentDate={currentDate} onSelect={date => { setCurrentDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
+              </Popover>
+              <button type="button" onClick={nextDay} aria-label="Next date" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"><ChevronRight className="h-5 w-5" /></button>
+              {selectedDate !== getManilaDate(new Date(clock)) && <button type="button" onClick={today} className="hidden h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:block">Today</button>}
+            </div>
           </div>
 
           {!isStaff && <button type="button" disabled={!courts.length} onClick={() => {
@@ -421,7 +425,7 @@ export default function SchedulePage() {
               const endTime = hour + 1 === 24 ? '00:00:00' : `${String(hour + 1).padStart(2, '0')}:00:00`;
               const isPastStart = isPastManilaStart(selectedDate, startTime, new Date(clock));
               return <div key={startTime} className="grid border-b border-slate-200 last:border-b-0" style={{ gridTemplateColumns: scheduleGridTemplate }}>
-                <div className="sticky left-0 z-10 flex min-h-[86px] flex-col justify-center border-r border-slate-200 bg-white px-3 sm:px-4"><span className="text-xs font-bold text-slate-800">{formatHourLabel(hour)}</span><span className="mt-1 text-[10px] font-medium text-slate-400">to {formatHourLabel(hour + 1)}</span></div>
+                <div className="sticky left-0 z-10 flex min-h-[90px] flex-col justify-center border-r border-slate-200 bg-white px-4 sm:px-5"><span className="text-[15px] font-bold tracking-tight text-slate-900">{formatHourLabel(hour)}</span><span className="mt-1 text-xs font-medium text-slate-500">to {formatHourLabel(hour + 1)}</span></div>
                 {courts.map(court => {
                   const courtId = court.id.toString();
                   const record = scheduleAtHour(daySchedules, courtId, selectedDate, startTime);
