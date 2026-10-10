@@ -47,13 +47,13 @@ const rateDetails = [
 
 const trainers = [
   {
-    name: 'Coach JC',
-    image: '/assets/images/coaches/coachjc.png',
+    name: 'Coach Luis',
+    image: '/assets/images/coaches/coachluis.png',
     position: 'center',
   },
   {
-    name: 'Coach Luis',
-    image: '/assets/images/coaches/coachluis.png',
+    name: 'Coach JC',
+    image: '/assets/images/coaches/coachjc.png',
     position: 'center',
   },
   {
@@ -120,7 +120,7 @@ export default function TrainingPage() {
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {trainers.map((trainer, index) => (
+            {trainers.map(trainer => (
               <article key={trainer.name}>
                 <div className="relative aspect-[4/5] overflow-hidden bg-[#302927]">
                   <img
@@ -130,7 +130,6 @@ export default function TrainingPage() {
                     style={{ objectPosition: trainer.position }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#241f1d] via-[#241f1d]/10 to-transparent" />
-                  <span className="absolute left-5 top-5 text-xs font-bold tracking-[0.2em] text-[#d9f900]">0{index + 1}</span>
                   <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d9f900]">Pickleball trainer</p>
                     <h3 className="mt-2 text-2xl font-bold uppercase tracking-[-0.025em] text-white">{trainer.name}</h3>
