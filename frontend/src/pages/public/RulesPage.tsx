@@ -148,8 +148,7 @@ export default function RulesPage() {
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
           <div className="mb-10 grid gap-5 border-b border-[#241f1d]/15 pb-8 md:grid-cols-[1fr_1fr] md:items-end">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#72151d]">The house standard</p>
-              <h2 className="mt-3 text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Court rules</h2>
+              <h2 className="text-4xl font-bold uppercase tracking-[-0.04em] sm:text-5xl">Court rules</h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-[#6b625d] md:justify-self-end md:text-right sm:text-base">Eight simple habits that make the court better for the next rally—and the next group.</p>
           </div>
@@ -176,7 +175,7 @@ export default function RulesPage() {
 
           <div className="mt-10 grid gap-4 border border-[#72151d]/15 bg-[#f4efe5] p-6 sm:grid-cols-[auto_1fr] sm:items-center sm:p-8">
             <span className="grid h-12 w-12 place-items-center rounded-full bg-[#72151d] text-white"><ExclamationTriangleIcon className="h-6 w-6" /></span>
-            <div><h3 className="font-bold text-[#72151d]">Food and beverage policy</h3><p className="mt-1 text-sm leading-6 text-[#5e5651] sm:text-base">Outside food and beverages are not allowed, except personal tumblers. Our in-house restaurant is available for your food and beverage needs.</p></div>
+            <div><h3 className="font-bold uppercase text-[#72151d]">Food and beverage policy</h3><p className="mt-1 text-sm leading-6 text-[#5e5651] sm:text-base">Outside food and beverages are not allowed, except personal tumblers. Our in-house restaurant is available for your food and beverage needs.</p></div>
           </div>
         </div>
       </section>

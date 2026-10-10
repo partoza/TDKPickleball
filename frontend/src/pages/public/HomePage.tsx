@@ -105,8 +105,8 @@ export default function HomePage() {
           </div>
           <div className="grid border-t border-[#241f1d]/15 lg:grid-cols-3">
             {[
-              { title: 'Daytime', time: '7:00 AM – 5:00 PM', price: 320, description: 'A relaxed daytime schedule for casual games and regular court sessions.', features: ['Standard court with silica', 'Morning and afternoon play'] },
-              { title: 'Prime Time', time: '5:00 PM – 12:00 MN', price: 400, description: 'Evening court access with the full tournament-lighting experience.', features: ['After-work sessions', 'Tournament lighting included'] },
+              { title: 'Daytime', time: '7:00 AM – 5:00 PM', price: 320, description: 'A relaxed daytime schedule for casual games and regular court sessions.', features: ['Morning and afternoon play'] },
+              { title: 'PrimeTime', time: '5:00 PM – 12:00 MN', price: 400, description: 'Evening court access for after-work games and regular play.', features: ['After-work sessions'] },
               { title: 'Training', time: '7:00 AM – 12:00 MN', price: 300, description: 'A dedicated hourly rate for coached practice and focused skill development.', features: ['Available all operating hours', 'Built for focused training'] },
             ].map((rate, index) => <article key={rate.title} className={`flex min-h-[430px] flex-col border-b border-[#241f1d]/15 px-1 py-9 sm:px-6 lg:px-8 ${index < 2 ? 'lg:border-r' : ''}`}>
               <div className="flex items-center justify-between"><span className="text-xs font-bold tracking-[0.18em] text-[#72151d]">0{index + 1}</span><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6b625d]">{rate.time}</span></div>
@@ -125,7 +125,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
           <div className="grid gap-5 border-b border-white/15 pb-8 md:grid-cols-2 md:items-end">
             <div><p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d9f900]">Play indoors</p><h2 className="mt-3 text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Two courts.<br />One place to play.</h2></div>
-            <p className="max-w-xl text-sm leading-6 text-white/60 sm:text-base md:justify-self-end md:text-right">Silica-finished surfaces, clear sightlines, and tournament-grade lighting for games, training, and events.</p>
+            <p className="max-w-xl text-sm leading-6 text-white/60 sm:text-base md:justify-self-end md:text-right">Two well-lit indoor pickleball courts with silica-furnished surfaces and clear sightlines—ready for casual games, training, and events.</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             {[
@@ -144,8 +144,8 @@ export default function HomePage() {
           <div className="flex flex-col justify-between border-t border-[#72151d]/20 bg-[#72151d] p-7 text-white sm:p-10 lg:border-l lg:border-t-0 lg:p-14">
             <div><p className="text-xs font-bold uppercase tracking-[0.22em] text-[#d9f900]">Built for better play</p><div className="mt-8 space-y-7">{[
               ['Two indoor courts', 'Full-size regulation courts suited for doubles or singles.'],
-              ['Silica-finished surfaces', 'Dependable grip and a consistent bounce in every session.'],
-              ['Tournament lighting', 'Bright, clear visibility for daytime and evening play.'],
+              ['Indoor courts with silica', 'Silica-finished surfaces provide dependable grip and a consistent bounce.'],
+              ['Well-lit courts', 'Bright, clear visibility for daytime and evening play.'],
             ].map(([title, text], index) => <div key={title} className="grid grid-cols-[2.5rem_1fr] gap-3 border-b border-white/20 pb-6"><span className="text-xs font-bold text-[#d9f900]">0{index + 1}</span><div><h3 className="font-bold uppercase tracking-[-0.01em]">{title}</h3><p className="mt-2 text-sm leading-6 text-white/65">{text}</p></div></div>)}</div></div>
             <Button className="mt-9 h-12 w-full rounded-xl bg-[#d9f900] font-bold text-[#241f1d] hover:bg-[#e4ff3b]" asChild><Link to={ROUTES.BOOKING}>Book a Court</Link></Button>
           </div>
