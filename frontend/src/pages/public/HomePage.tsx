@@ -152,6 +152,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Promotional Ad */}
+      <section className="bg-[#fffdf8] py-12 sm:py-16">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10 flex justify-center">
+          <img src="/assets/images/coaches/ads.png" alt="Promotional Advertisement" className="w-full max-w-5xl rounded-2xl shadow-2xl" />
+        </div>
+      </section>
+
       {/* Location Map Section */}
       <section className="relative h-[650px] w-full overflow-hidden border-t border-[#72151d]/15 bg-[#f4efe5] lg:h-[750px]">
         

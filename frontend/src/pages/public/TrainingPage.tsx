@@ -48,18 +48,18 @@ const rateDetails = [
 const trainers = [
   {
     name: 'Coach JC',
-    image: '/assets/images/players.png',
-    position: '18% center',
+    image: '/assets/images/coaches/coachjc.png',
+    position: 'center',
   },
   {
     name: 'Coach Luis',
-    image: '/assets/images/players.png',
-    position: '50% center',
+    image: '/assets/images/coaches/coachluis.png',
+    position: 'center',
   },
   {
     name: 'Coach Nelvin',
-    image: '/assets/images/players.png',
-    position: '82% center',
+    image: '/assets/images/coaches/coachnelvin.png',
+    position: 'center',
   },
 ];
 
@@ -139,8 +139,6 @@ export default function TrainingPage() {
               </article>
             ))}
           </div>
-
-          <p className="mt-6 text-xs leading-5 text-white/45">Temporary training imagery is shown until individual coach portraits are provided.</p>
         </div>
       </section>
 
@@ -225,6 +223,13 @@ export default function TrainingPage() {
               </Button>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Promotional Ad */}
+      <section className="bg-[#f4efe5] py-12 sm:py-16">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10 flex justify-center">
+          <img src="/assets/images/coaches/ads.png" alt="Promotional Advertisement" className="w-full max-w-5xl rounded-2xl shadow-2xl" />
         </div>
       </section>
     </div>
