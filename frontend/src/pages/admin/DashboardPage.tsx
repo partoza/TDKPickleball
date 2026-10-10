@@ -7,7 +7,7 @@ import { ROUTES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useBookings } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
-import { Booking, BookingStatus, RateType } from '@/types';
+import { Booking, BookingStatus, InternalCoachProfile, RateType } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import { formatAppDate, formatAppTime } from '@/lib/date-time';
 import { useRevenue } from '@/hooks/useRevenue';
 import { getManilaNow, isActiveManilaTimeRange, secondsFromManilaTime } from '@/lib/manila-time';
 
-function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, bookings: Booking[], internalCoaches: any[], now: ReturnType<typeof getManilaNow> }) {
+function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, bookings: Booking[], internalCoaches: InternalCoachProfile[], now: ReturnType<typeof getManilaNow> }) {
   const todayStr = now.date;
   const timeStr = `${String(Math.floor(now.seconds / 3600)).padStart(2, '0')}:${String(Math.floor((now.seconds % 3600) / 60)).padStart(2, '0')}:${String(now.seconds % 60).padStart(2, '0')}`;
   const courtBookings = bookings
@@ -357,7 +357,7 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="mt-5 space-y-3">
-          {upcoming.slice(0, 4).map(b => <Upcoming key={b.id} booking={b} />)}
+          {upcoming.slice(0, 4).map(b => <Upcoming key={b.id} booking={b} coach={internalCoaches.find(profile => profile.id === b.internalCoachProfileId)} />)}
           {!upcoming.length && <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">No upcoming schedules.</p>}
         </div>
       </section>
@@ -376,7 +376,7 @@ function Stat({ icon: Icon, label, value, note }: any) {
     </div>
   ); 
 }
-function Upcoming({ booking: b }: { booking: Booking }) { 
+function Upcoming({ booking: b, coach }: { booking: Booking; coach?: InternalCoachProfile }) {
   return (
     <div className="rounded-xl border bg-card p-3 shadow-sm hover:border-primary/40 transition-colors">
       <div className="flex items-center justify-between gap-3">
@@ -386,6 +386,15 @@ function Upcoming({ booking: b }: { booking: Booking }) {
       <p className="mt-1 text-[11px] font-medium text-muted-foreground">
         {formatAppDate(b.bookingDate)} • {formatAppTime(b.startTime)}
       </p>
+      {b.bookingType === RateType.Training && (
+        <div className="mt-2 flex items-center gap-2 border-t pt-2">
+          <Avatar className="h-7 w-7 border shadow-sm">
+            {coach?.profilePictureUrl && <AvatarImage src={coach.profilePictureUrl} alt={coach.name} className="object-cover" />}
+            <AvatarFallback className="bg-orange-500/10 text-[9px] font-bold text-orange-600">{coach ? coach.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() : '?'}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-foreground">{coach?.name || 'Coach not assigned'}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Coach</p></div>
+        </div>
+      )}
     </div>
   ); 
 }

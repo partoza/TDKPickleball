@@ -30,6 +30,7 @@ import { AdminDatePicker } from '@/components/admin/AdminFormControls';
 import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 import { useCustomerAvailablePromos } from '@/hooks/useBookings';
 import { formatAppDate, formatAppTime } from '@/lib/date-time';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 function getWeekRangeString(start: Date, end: Date) {
   return `${formatAppDate(start)} - ${formatAppDate(end)}`;
@@ -139,9 +140,9 @@ export default function SchedulePage() {
   const courts = courtsRes?.data || [];
   const { data: ratesRes } = useRates();
   const rates = ratesRes?.data || [];
-  const { internalCoaches, fetchInternalCoaches } = useInternalCoaches(); 
+  const { internalCoaches } = useInternalCoaches();
   const { promos, fetchPromos } = usePromos();
-  useEffect(() => { fetchInternalCoaches(); fetchPromos(); }, [fetchInternalCoaches, fetchPromos]);
+  useEffect(() => { fetchPromos(); }, [fetchPromos]);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
 
   useEffect(() => {
@@ -620,7 +621,7 @@ export default function SchedulePage() {
                                     <span className="truncate">{slot.bookedBy || 'No Trainee'}</span>
                                     {slot.internalCoachProfileId && internalCoaches && (() => {
                                       const coach = internalCoaches.find((c: any) => c.id === slot.internalCoachProfileId);
-                                      return coach ? <span className="text-[9px] opacity-75 truncate">w/ {coach.name}</span> : null;
+                                      return coach ? <span className="flex min-w-0 items-center justify-center gap-1 text-[9px] opacity-90"><Avatar className="h-4 w-4 shrink-0 border border-white/30"><AvatarImage src={coach.profilePictureUrl} alt={coach.name} className="object-cover" /><AvatarFallback className="bg-black/15 text-[6px] font-bold text-current">{getInitials(coach.name)}</AvatarFallback></Avatar><span className="truncate">w/ {coach.name}</span></span> : null;
                                     })()}
                                   </span>
                                 ) : slot.status === ScheduleStatus.Internal ? (
@@ -969,13 +970,10 @@ export default function SchedulePage() {
                           <p className="text-[13px] font-medium text-slate-700">
                             <span className="text-slate-500 text-xs mr-2">Trainee:</span>{viewModalData.bookedBy || 'N/A'}
                           </p>
-                          <p className="text-[13px] font-medium text-slate-700">
-                            <span className="text-slate-500 text-xs mr-2">Coach:</span>
-                            {(() => {
-                              const coach = internalCoaches?.find((c: any) => c.id === viewModalData.internalCoachProfileId);
-                              return coach ? coach.name : 'N/A';
-                            })()}
-                          </p>
+                          {(() => {
+                            const coach = internalCoaches.find(profile => profile.id === viewModalData.internalCoachProfileId);
+                            return <div className="mt-1 flex items-center gap-2.5 rounded-lg border bg-white p-2"><Avatar className="h-9 w-9 border shadow-sm"><AvatarImage src={coach?.profilePictureUrl} alt={coach?.name || 'Coach'} className="object-cover" /><AvatarFallback className="bg-orange-500/10 text-[10px] font-bold text-orange-600">{coach ? getInitials(coach.name) : '?'}</AvatarFallback></Avatar><div><p className="text-[13px] font-semibold text-slate-700">{coach?.name || 'Coach not assigned'}</p><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Coach</p></div></div>;
+                          })()}
                           {viewModalData.notes && (
                             <p className="text-[12px] text-slate-500 mt-2 pt-2 border-t border-slate-200">
                               <span className="font-semibold text-slate-400 uppercase text-[9px] block mb-0.5">Notes:</span>

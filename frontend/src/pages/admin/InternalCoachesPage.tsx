@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useInternalCoaches } from '@/hooks/useInternalCoaches';
 import { InternalCoachProfile, InternalCoachType } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export default function InternalCoachesPage() {
 
-  const { internalCoaches, loading, fetchInternalCoaches, createInternalCoach, updateInternalCoach, uploadProfileImage, removeProfileImage, deleteInternalCoach } = useInternalCoaches();
+  const { internalCoaches, loading, createInternalCoach, updateInternalCoach, uploadProfileImage, removeProfileImage, deleteInternalCoach } = useInternalCoaches();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<InternalCoachProfile | null>(null);
   const [activeTab, setActiveTab] = useState<InternalCoachType>(InternalCoachType.Internal);
@@ -52,10 +52,6 @@ export default function InternalCoachesPage() {
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
   };
-
-  useEffect(() => {
-    fetchInternalCoaches();
-  }, [fetchInternalCoaches]);
 
   const handleOpen = (profile?: InternalCoachProfile) => {
     setProfileImage(null);

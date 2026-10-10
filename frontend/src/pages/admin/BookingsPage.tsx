@@ -9,7 +9,7 @@ import { PaddleIcon } from '@/components/ui/paddle-icon';
 import { toast } from 'sonner';
 import { useAddPaddleRental, useAvailability, useBookings, useCancelBooking, useConfirmBooking, useCreateBooking, useCustomerAvailablePromos, useDeleteBooking, useRescheduleBooking, useVerifyBooking, useVoidPaddleRental } from '@/hooks/useBookings';
 import { useCourts } from '@/hooks/useCourts';
-import { Booking, BookingStatus, Promo, PromoAudience, RateType } from '@/types';
+import { Booking, BookingStatus, InternalCoachProfile, InternalCoachType, Promo, PromoAudience, RateType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,7 @@ import { getApiErrorMessage } from '@/services/api';
 import { TDK_ICON_URL } from '@/lib/branding';
 import { formatManilaDatabaseTime, getManilaDate, getManilaDateAsLocalDate, isPastManilaStart } from '@/lib/manila-time';
 import { useInternalCoaches } from '@/hooks/useInternalCoaches';
-import { InternalCoachType } from '@/types';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePromos } from '@/hooks/usePromos';
 import { ConfirmDeleteDialog } from '@/components/admin/ConfirmDeleteDialog';
 import { AdminPageSkeleton } from '@/components/admin/AdminPageSkeleton';
@@ -45,6 +45,10 @@ import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 const emptyForm = { courtId: '', bookingDate: getManilaDate(), startTime: '', endTime: '', customerName: '', email: '', phone: '', notes: '', amountPaid: '' as number | string, paymentStatus: BookingStatus.Paid, rateType: RateType.Booking, internalCoachProfileId: null as number | null, promoId: null as number | null, paddleRentalQuantity: 0, customerId: null as number | null };
 const bookingStatusLabel = (status: BookingStatus) => status === BookingStatus.Requested ? 'Booking Requested' : status === BookingStatus.Reserved ? 'Reservation' : status;
 const bookingStatusClass = (status: BookingStatus) => status === BookingStatus.Requested ? 'bg-blue-600 text-white hover:bg-blue-600' : status === BookingStatus.Paid ? 'bg-emerald-600 text-white' : status === BookingStatus.Reserved ? 'bg-amber-500 text-white' : status === BookingStatus.Cancelled ? 'bg-red-500 text-white' : '';
+const getInitials = (name: string) => {
+  const parts = name.split(' ').filter(Boolean);
+  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
+};
 
 export default function BookingsPage() {
   const { user } = useAuth();
@@ -65,9 +69,9 @@ export default function BookingsPage() {
   const qrRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   
-  const { internalCoaches, fetchInternalCoaches } = useInternalCoaches();
+  const { internalCoaches } = useInternalCoaches();
   const { promos, fetchPromos } = usePromos();
-  useEffect(() => { fetchInternalCoaches(); fetchPromos(); }, [fetchInternalCoaches, fetchPromos]);
+  useEffect(() => { fetchPromos(); }, [fetchPromos]);
 
   const downloadQr = async () => {
     if (!qrBooking || !qrRef.current || downloading) return;
@@ -98,11 +102,6 @@ export default function BookingsPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [addBlocks, setAddBlocks] = useState<BookingBlockValue[]>([createBookingBlock()]);
   const [blockErrors, setBlockErrors] = useState<BookingBlockErrors[]>([]);
-  const getInitials = (name: string) => {
-    const parts = name.split(' ').filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  };
   const [creatingBatch, setCreatingBatch] = useState(false);
   const [scanResult, setScanResult] = useState<Booking | null>(null);
   const [scanError, setScanError] = useState('');
@@ -494,7 +493,7 @@ export default function BookingsPage() {
             {selected?.status === BookingStatus.Requested && getRequestReference(selected) && <span className="rounded-md bg-blue-50 px-2 py-1 font-mono text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{getRequestReference(selected)}</span>}
           </DialogDescription>
         </DialogHeader>
-        {selected && <BookingDetails booking={selected} />}
+        {selected && <BookingDetails booking={selected} coach={internalCoaches.find(profile => profile.id === selected.internalCoachProfileId)} />}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setSelected(null)}>Close</Button>
         </DialogFooter>
@@ -502,7 +501,7 @@ export default function BookingsPage() {
     </Dialog>
     <Dialog open={!!paddleRentalTarget} onOpenChange={open => { if (!open) { setPaddleRentalTarget(null); setPaddleRentalQuantity(1); } }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Add paddle rental</DialogTitle><DialogDescription>Add paid Selkirk paddle rentals to {paddleRentalTarget?.bookingReference}. The fee is charged once for the remaining session.</DialogDescription></DialogHeader><div className="rounded-2xl border bg-muted/20 p-4"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/15"><PaddleIcon className="h-8 w-8" /></div><div><p className="font-semibold">Selkirk Paddle</p><p className="text-sm text-muted-foreground">₱100 per paddle</p></div></div><div className="flex items-center rounded-xl border bg-background p-1"><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={paddleRentalQuantity === 1} onClick={() => setPaddleRentalQuantity(quantity => Math.max(1, quantity - 1))}><Minus className="h-4 w-4" /></Button><span className="w-10 text-center font-bold">{paddleRentalQuantity}</span><Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!paddleRentalTarget || paddleRentalTarget.paddleRentalQuantity + paddleRentalQuantity >= 50} onClick={() => setPaddleRentalQuantity(quantity => Math.min(50 - (paddleRentalTarget?.paddleRentalQuantity || 0), quantity + 1))}><Plus className="h-4 w-4" /></Button></div></div><div className="mt-4 flex items-center justify-between border-t pt-4"><span className="text-sm font-medium">Paid rental fee</span><strong className="text-primary">₱{(paddleRentalQuantity * 100).toLocaleString()}</strong></div></div><DialogFooter><Button variant="outline" onClick={() => setPaddleRentalTarget(null)} disabled={addPaddleRental.isPending}>Cancel</Button><Button onClick={savePaddleRental} disabled={addPaddleRental.isPending}>{addPaddleRental.isPending && <LoadingIndicator className="mr-2" label="Adding paddle rental" />}Add paid rental</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={!!qrBooking} onOpenChange={o => !o && setQrBooking(null)}><DialogContent className="sm:max-w-sm text-center"><DialogHeader><DialogTitle>Booking QR</DialogTitle><DialogDescription>Scan to verify {qrBooking?.bookingReference}</DialogDescription></DialogHeader>{qrBooking && <div className="flex flex-col gap-4"><div ref={qrRef} className="mx-auto flex w-full flex-col items-center rounded-2xl border p-6" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#000000' }}><img src="/assets/images/tdk-logo.png" alt="TDK Logo" crossOrigin="anonymous" className="h-10 mb-3 object-contain" /><p className="mb-6 font-bold text-center uppercase tracking-wider" style={{ color: '#861721', fontSize: '12px' }}>Scan this to verify your booking</p><div className="relative mx-auto h-[220px] w-[220px] rounded-xl" style={{ backgroundColor: '#ffffff' }}><QRCode value={qrBooking.bookingReference} size={220} level="H" bgColor="#ffffff" fgColor="#000000" /><div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] w-[56px] h-[56px]" style={{ backgroundColor: '#ffffff' }}><img src={TDK_ICON_URL} alt="" crossOrigin="anonymous" className="w-[38px] h-[38px] object-contain" /></div></div><p className="mt-6 text-lg font-bold" style={{ color: '#000000' }}>{qrBooking.customerName}</p></div><Button onClick={downloadQr} disabled={downloading} className="w-full">{downloading ? <><LoadingIndicator className="mr-2" label="Downloading ticket" /> Downloading...</> : <><Download className="mr-2 h-4 w-4" /> Download Ticket</>}</Button></div>}</DialogContent></Dialog>
-    <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} />}</DialogContent></Dialog>
+    <Dialog open={!!scanResult} onOpenChange={o => !o && setScanResult(null)}><DialogContent><DialogHeader><DialogTitle className="text-emerald-700">Valid booking</DialogTitle><DialogDescription>QR verification successful</DialogDescription></DialogHeader>{scanResult && <BookingDetails booking={scanResult} coach={internalCoaches.find(profile => profile.id === scanResult.internalCoachProfileId)} />}</DialogContent></Dialog>
     <Dialog open={showScanner} onOpenChange={open => { setShowScanner(open); if (open) setScanError(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Verify booking QR</DialogTitle><DialogDescription>Camera scanning is the fastest option, or upload a saved QR image.</DialogDescription></DialogHeader><div className="overflow-hidden rounded-2xl bg-black/5 aspect-square relative flex items-center justify-center">{showScanner && <Scanner onScan={result => { if (result?.[0]?.rawValue && !verify.isPending) verifyReference(result[0].rawValue); }} />}</div><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"><Upload className="h-4 w-4" />Upload QR image<input className="sr-only" type="file" accept="image/*" onChange={e => uploadQr(e.target.files?.[0])} /></label>{verify.isPending && <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">Verifying<LoadingIndicator label="Verifying QR code" /></p>}{scanError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300" role="alert">{scanError}</p>}</DialogContent></Dialog>
     <ConfirmDeleteDialog open={!!deleteTarget} title={`Delete ${deleteTarget?.bookingReference || 'booking'}?`} description="This permanently removes the cancelled booking and cannot be undone." pending={remove.isPending} onOpenChange={open => !open && setDeleteTarget(null)} onConfirm={deleteCancelled} />
     <Dialog open={!!cancelTarget} onOpenChange={open => { if (!open && !cancel.isPending) { setCancelTarget(null); setCancelReason(''); } }}>
@@ -601,7 +600,7 @@ function getRequestReference(booking: Booking) {
   if (booking.requestReference) return booking.requestReference;
   return booking.notes?.match(/\[PublicRequest:(REQ-\d{8}-\d{6})\]/i)?.[1]?.toUpperCase();
 }
-function BookingDetails({ booking: b }: { booking: Booking }) { 
+function BookingDetails({ booking: b, coach }: { booking: Booking; coach?: InternalCoachProfile }) {
   const isCancelled = b.status === 'Cancelled';
   const requestReference = getRequestReference(b);
   return (
@@ -626,6 +625,7 @@ function BookingDetails({ booking: b }: { booking: Booking }) {
           <Detail k="Court" v={b.courtName} />
           <Detail k="Schedule" v={`${formatAppDate(b.bookingDate)} · ${time(b.startTime)}–${time(b.endTime)}`} />
           <Detail k="Type" v={b.bookingType || RateType.Booking} />
+          {b.bookingType === RateType.Training && <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 p-2.5"><span className="text-slate-500 dark:text-slate-400">Coach</span><div className="flex min-w-0 items-center gap-2"><Avatar className="h-8 w-8 border shadow-sm"><AvatarImage src={coach?.profilePictureUrl} alt={coach?.name || 'Coach'} className="object-cover" /><AvatarFallback className="bg-orange-500/10 text-[9px] font-bold text-orange-600">{coach ? getInitials(coach.name) : '?'}</AvatarFallback></Avatar><span className="truncate text-right font-medium text-slate-900 dark:text-slate-100">{coach?.name || 'Coach not assigned'}</span></div></div>}
           <Detail k="Status" v={bookingStatusLabel(b.status)} />
           {b.status === BookingStatus.Requested && requestReference && <Detail k="Request reference" v={requestReference} valueClass="font-mono text-primary" />}
           <Detail k="Reschedule" v={b.rescheduledAt ? 'Used (one allowed)' : canReschedule(b) ? 'Available once within 24 hours' : 'Closed'} />

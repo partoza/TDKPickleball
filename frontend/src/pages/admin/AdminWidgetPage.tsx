@@ -85,9 +85,7 @@ export default function AdminWidgetPage() {
   const { data: courtResponse, isLoading: courtsLoading } = useCourts();
   const [now, setNow] = useState(() => getManilaNow());
   const { data: scheduleResponse, isLoading: schedulesLoading, isFetching: schedulesFetching, refetch: refetchSchedules } = useAdminSchedules(now.date);
-  const { internalCoaches, fetchInternalCoaches } = useInternalCoaches();
-
-  useEffect(() => { fetchInternalCoaches(); }, [fetchInternalCoaches]);
+  const { internalCoaches } = useInternalCoaches();
 
   useEffect(() => {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -148,7 +146,8 @@ export default function AdminWidgetPage() {
           <div className="relative z-10 flex items-center gap-2"><ClockIcon className="h-[18px] w-[18px] text-[#851923]" /><h2 className="text-[17px] font-semibold tracking-[-0.025em]">Upcoming Court Schedule</h2></div>
           <div className="relative z-10 mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{upcoming.map(booking => {
             const isTraining = booking.bookingType === RateType.Training;
-            return <article key={booking.id} className={`flex flex-col justify-between gap-4 rounded-[24px] border bg-white/50 p-6 shadow-sm backdrop-blur-md ${isTraining ? 'border-orange-400/50' : 'border-white/60'}`}><div className="min-w-0"><p className="text-[17px] font-bold tracking-[-0.02em]">{format(new Date(`${booking.bookingDate}T00:00:00`), 'MMM d')} · {displayTime(booking.startTime)}–{displayTime(booking.endTime)}</p><span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] ${isTraining ? 'bg-orange-500 text-white' : 'bg-[#851923] text-white'}`}>{isTraining ? 'Training' : 'Booking'}</span></div><span className="w-fit shrink-0 rounded-full border border-[#851923]/20 bg-white/60 px-3.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-[#851923] shadow-sm">{booking.courtName}</span></article>;
+            const coach = internalCoaches.find(profile => profile.id === booking.internalCoachProfileId);
+            return <article key={booking.id} className={`flex flex-col justify-between gap-4 rounded-[24px] border bg-white/50 p-6 shadow-sm backdrop-blur-md ${isTraining ? 'border-orange-400/50' : 'border-white/60'}`}><div className="min-w-0"><p className="text-[17px] font-bold tracking-[-0.02em]">{format(new Date(`${booking.bookingDate}T00:00:00`), 'MMM d')} · {displayTime(booking.startTime)}–{displayTime(booking.endTime)}</p><span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] ${isTraining ? 'bg-orange-500 text-white' : 'bg-[#851923] text-white'}`}>{isTraining ? 'Training' : 'Booking'}</span>{isTraining && <div className="mt-3"><PersonBadge name={coach?.name || 'Coach not assigned'} label="Coach" profilePictureUrl={coach?.profilePictureUrl} /></div>}</div><span className="w-fit shrink-0 rounded-full border border-[#851923]/20 bg-white/60 px-3.5 py-1.5 text-[12px] font-bold uppercase tracking-wider text-[#851923] shadow-sm">{booking.courtName}</span></article>;
           })}{!upcoming.length && <p className="rounded-[24px] border border-white/60 bg-white/50 p-6 text-[14px] font-medium tracking-[-0.01em] text-[#6e6e73] shadow-sm backdrop-blur-md sm:col-span-2 lg:col-span-4">No upcoming schedules.</p>}</div>
         </section>
       </>}

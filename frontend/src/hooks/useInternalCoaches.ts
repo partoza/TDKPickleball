@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { api, getApiErrorMessage } from '@/services/api';
 import { InternalCoachProfile, InternalCoachType } from '@/types';
 import { toast } from 'sonner';
@@ -23,6 +23,10 @@ export function useInternalCoaches() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    void fetchInternalCoaches();
+  }, [fetchInternalCoaches]);
 
   const createInternalCoach = async (data: InternalCoachCreatePayload) => {
     try {
