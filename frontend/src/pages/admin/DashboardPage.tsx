@@ -31,6 +31,7 @@ function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, 
 
   const activeBooking = courtBookings.find(b => isActiveManilaTimeRange(b.startTime, b.endTime, now.seconds));
   const nextBooking = courtBookings.find(b => secondsFromManilaTime(b.startTime) > now.seconds);
+  const nextIsTraining = nextBooking?.bookingType === RateType.Training;
 
   const formatHour = (hStr: string) => formatAppTime(hStr);
 
@@ -93,8 +94,8 @@ function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, 
              Ongoing {STATUS_LABELS[activeStatus]}
           </span>
         ) : nextBooking ? (
-          <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-300">
-            Upcoming
+          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold', nextIsTraining ? 'border-orange-500/30 bg-orange-500/10 text-orange-600 dark:text-orange-300' : 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300')}>
+            {nextIsTraining ? 'Upcoming training' : 'Upcoming booking'}
           </span>
         ) : (
           <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", STATUS_COLORS[ScheduleStatus.Available])}>
@@ -156,8 +157,8 @@ function LiveCourtCard({ court, bookings, internalCoaches, now }: { court: any, 
           </div>
         ) : (
           <div className="flex h-full min-h-[104px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/25 p-4 text-center">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Clock3 className="h-5 w-5" /></span>
-            {nextBooking ? <><p className="mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Next booking</p><p className="mt-1 text-lg font-bold text-foreground">{formatHour(nextBooking.startTime)}</p><p className="mt-1 text-xs text-muted-foreground">{nextBooking.customerName}</p></> : <><p className="mt-3 text-sm font-semibold text-foreground">Court is available</p><p className="mt-1 text-xs text-muted-foreground">No more bookings today</p></>}
+            <span className={cn('grid h-10 w-10 place-items-center rounded-full', nextBooking ? nextIsTraining ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')}><Clock3 className="h-5 w-5" /></span>
+            {nextBooking ? <><p className={cn('mt-3 text-xs font-extrabold uppercase tracking-[0.14em]', nextIsTraining ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400')}>{nextIsTraining ? 'Next training' : 'Next booking'}</p><p className="mt-1 text-lg font-bold text-foreground">{formatHour(nextBooking.startTime)}</p><p className="mt-1 text-xs text-muted-foreground">{nextBooking.customerName}</p></> : <><p className="mt-3 text-sm font-semibold text-foreground">Court is available</p><p className="mt-1 text-xs text-muted-foreground">No more bookings today</p></>}
           </div>
         )}
       </div>
