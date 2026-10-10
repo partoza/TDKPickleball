@@ -121,12 +121,12 @@ export default function TrainingPage() {
 
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {trainers.map((trainer, index) => (
-              <article key={trainer.name} className="group">
+              <article key={trainer.name}>
                 <div className="relative aspect-[4/5] overflow-hidden bg-[#302927]">
                   <img
                     src={trainer.image}
-                    alt="The Dirty Kitchen pickleball training community"
-                    className="h-full w-full scale-[1.65] object-cover grayscale transition duration-500 group-hover:scale-[1.72] group-hover:grayscale-0"
+                    alt={`${trainer.name}, The Dirty Kitchen pickleball trainer`}
+                    className="h-full w-full object-cover"
                     style={{ objectPosition: trainer.position }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#241f1d] via-[#241f1d]/10 to-transparent" />
