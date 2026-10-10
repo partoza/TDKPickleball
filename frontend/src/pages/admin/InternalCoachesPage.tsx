@@ -264,7 +264,7 @@ export default function InternalCoachesPage() {
                   <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Name</TableHead>
                   <TableHead className="font-semibold text-slate-900 dark:text-slate-100 hidden sm:table-cell">Contact</TableHead>
                   <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[168px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -289,7 +289,12 @@ export default function InternalCoachesPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1"><Button size="icon" variant="ghost" aria-label="View profile" onClick={() => setViewing(profile)}><Eye className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={profile.isActive ? 'Disable profile' : 'Enable profile'} onClick={() => setProfileStatus(profile)}>{profile.isActive ? <Disable className="h-4 w-4 text-amber-600" /> : <Enable className="h-4 w-4 text-emerald-600" />}</Button>{!profile.isActive && <Button size="icon" variant="ghost" aria-label="Delete profile" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDeleteTarget(profile)}><Trash className="h-4 w-4" /></Button>}</div>
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" aria-label={`View ${profile.name}`} title="View profile" onClick={() => setViewing(profile)}><Eye className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" aria-label={`Edit ${profile.name}`} title="Edit profile" onClick={() => handleOpen(profile)}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" aria-label={`${profile.isActive ? 'Disable' : 'Enable'} ${profile.name}`} title={profile.isActive ? 'Disable profile' : 'Enable profile'} onClick={() => setProfileStatus(profile)}>{profile.isActive ? <Disable className="h-4 w-4 text-amber-600" /> : <Enable className="h-4 w-4 text-emerald-600" />}</Button>
+                        {!profile.isActive && <Button size="icon" variant="ghost" aria-label={`Delete ${profile.name}`} title="Delete profile" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDeleteTarget(profile)}><Trash className="h-4 w-4" /></Button>}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -311,6 +316,7 @@ export default function InternalCoachesPage() {
                   <div className="mt-4 space-y-1 border-y py-3 text-sm text-muted-foreground"><p className="break-all">{profile.email || 'No email provided'}</p><p>{profile.phone || 'No phone provided'}</p></div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button size="sm" variant="outline" className="h-9 w-full" onClick={() => setViewing(profile)}><Eye className="h-4 w-4" />View</Button>
+                    <Button size="sm" variant="outline" className="h-9 w-full" onClick={() => handleOpen(profile)}><Pencil className="h-4 w-4" />Edit</Button>
                     <Button size="sm" variant="outline" className={`h-9 w-full ${profile.isActive ? 'text-amber-600' : 'text-emerald-600'}`} onClick={() => setProfileStatus(profile)}>{profile.isActive ? <Disable className="h-4 w-4" /> : <Enable className="h-4 w-4" />}{profile.isActive ? 'Disable' : 'Enable'}</Button>
                     {!profile.isActive && <Button size="sm" variant="outline" className="h-9 w-full text-red-600 hover:text-red-700" onClick={() => setDeleteTarget(profile)}><Trash className="h-4 w-4" />Delete</Button>}
                   </div>
